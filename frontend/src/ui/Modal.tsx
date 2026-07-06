@@ -1,4 +1,4 @@
-import { useEffect, type ReactNode } from "react";
+import { useEffect, useRef, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { AnimatePresence, motion } from "motion/react";
 
@@ -10,10 +10,16 @@ const SIZES = {
 
 export type ModalSize = keyof typeof SIZES;
 
+const FOCUSABLE_SELECTOR =
+  'a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])';
+
 /** مودال استاندارد و مشترک برنامه.
  * با createPortal روی body رندر می‌شود تا موقعیت‌دهی fixed هیچ‌وقت تحت‌تأثیر
  * transform/overflow والدها قرار نگیرد (رفع باگ باز شدن مودال خارج از مرکز).
  * Escape و کلیک روی پس‌زمینه = بستن؛ اسکرول body هنگام باز بودن قفل می‌شود.
+ * فوکوس هنگام باز شدن وارد مودال می‌شود، با Tab/Shift+Tab داخل آن قفل می‌ماند
+ * (کاربر کیبورد/screen reader پشت مودال گم نمی‌شود) و هنگام بسته‌شدن به عنصری
+ * که مودال را باز کرده برمی‌گردد.
  * انیمیشن با Framer Motion: scale + fade + spring. */
 export function Modal({
   title,
@@ -28,16 +34,43 @@ export function Modal({
   children: ReactNode;
   footer?: ReactNode;
 }) {
+  const dialogRef = useRef<HTMLDivElement>(null);
+
   useEffect(() => {
     const previousOverflow = document.body.style.overflow;
+    const previouslyFocused = document.activeElement as HTMLElement | null;
     document.body.style.overflow = "hidden";
+
+    const dialog = dialogRef.current;
+    const firstFocusable = dialog?.querySelector<HTMLElement>(FOCUSABLE_SELECTOR);
+    (firstFocusable ?? dialog)?.focus();
+
     function onKeyDown(e: KeyboardEvent) {
-      if (e.key === "Escape") onClose();
+      if (e.key === "Escape") {
+        onClose();
+        return;
+      }
+      if (e.key !== "Tab" || !dialog) return;
+      const focusable = Array.from(dialog.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR));
+      if (focusable.length === 0) {
+        e.preventDefault();
+        return;
+      }
+      const first = focusable[0]!;
+      const last = focusable[focusable.length - 1]!;
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault();
+        first.focus();
+      }
     }
     document.addEventListener("keydown", onKeyDown);
     return () => {
       document.body.style.overflow = previousOverflow;
       document.removeEventListener("keydown", onKeyDown);
+      previouslyFocused?.focus();
     };
   }, [onClose]);
 
@@ -54,10 +87,12 @@ export function Modal({
         transition={{ duration: 0.2 }}
       >
         <motion.div
+          ref={dialogRef}
           role="dialog"
           aria-modal="true"
           aria-label={typeof title === "string" ? title : undefined}
-          className={`max-h-[90vh] w-full ${SIZES[size]} overflow-y-auto rounded-3xl bg-white shadow-float`}
+          tabIndex={-1}
+          className={`max-h-[90vh] w-full ${SIZES[size]} overflow-y-auto rounded-3xl bg-white shadow-float outline-none`}
           initial={{ opacity: 0, scale: 0.95, y: 12 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.97, y: 8 }}

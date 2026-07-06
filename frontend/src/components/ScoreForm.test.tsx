@@ -57,6 +57,22 @@ describe("useScoreForm", () => {
     expect(draft?.score).toBe(4);
     expect(draft?.evidence_text).toBe("شواهد قبلی");
   });
+
+  it("re-initialises when indicators arrive after the first render (manager-path race)", () => {
+    // اولین رندر با فهرست خالی (شاخص‌ها هنوز در حال بارگذاری) — مانند مسیر «مدیر»
+    const { result, rerender } = renderHook(
+      ({ inds }) => useScoreForm(inds, []),
+      { initialProps: { inds: [] as Indicator[] } }
+    );
+    expect(result.current.drafts).toHaveLength(0);
+    // با فهرست خالی نباید معتبر باشد تا ثبت با scores خالی جلوگیری شود
+    expect(result.current.isValid).toBe(false);
+
+    // شاخص‌ها که رسیدند، drafts باید بازسازی شود
+    rerender({ inds: INDICATORS });
+    expect(result.current.drafts).toHaveLength(INDICATORS.length);
+    expect(result.current.isValid).toBe(true);
+  });
 });
 
 describe("scoredRows", () => {

@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { DEFAULT_APP_CONFIG, type AppConfig, type Indicator, type EvaluationScoreRow } from "../types";
 
 function wordCount(text: string): number {
@@ -60,6 +60,18 @@ export function useScoreForm(
 ) {
   const [drafts, setDrafts] = useState<ScoreDraft[]>(() => initialDrafts(indicators, existing));
 
+  // مقداردهی اولیهٔ useState فقط یک‌بار اجرا می‌شود؛ اگر در نخستین رندر فهرست شاخص‌ها
+  // هنوز در حال بارگذاری (خالی) باشد — مثلاً در مسیر «مدیر» که ارزیابی بلافاصله پس از
+  // ساخت باز می‌شود — drafts خالی می‌ماند و ثبت با scores خالی به سرور می‌رود. وقتی
+  // شاخص‌ها رسیدند، یک‌بار دوباره مقداردهی می‌کنیم (بدون پاک‌کردن ویرایش‌های بعدی کاربر).
+  const seededRef = useRef(indicators.length > 0);
+  useEffect(() => {
+    if (!seededRef.current && indicators.length > 0) {
+      seededRef.current = true;
+      setDrafts(initialDrafts(indicators, existing));
+    }
+  }, [indicators, existing]);
+
   const setScore = (indicatorId: number, score: number) => {
     setDrafts((prev) => prev.map((d) => (d.indicator_id === indicatorId ? { ...d, score } : d)));
   };
@@ -76,7 +88,8 @@ export function useScoreForm(
     );
   }, [drafts, config]);
 
-  const isValid = violations.length === 0;
+  // drafts.length > 0 از ثبت با فهرست خالی (پیش از بارگذاری شاخص‌ها) جلوگیری می‌کند
+  const isValid = violations.length === 0 && drafts.length > 0;
 
   return { drafts, setScore, setEvidence, violations, isValid };
 }
@@ -235,6 +248,7 @@ export function ScoreFormTable({
                   ) : (
                     <div>
                       <textarea
+                        aria-label={`شواهد عینی شاخص: ${ind.category}`}
                         className={`w-full rounded-xl border px-3 py-2 text-sm text-gray-800 outline-none transition-all duration-200 ${
                           invalid ? "border-red-300 focus:border-red-400" : "border-gray-200 focus:border-pulse-400"
                         }`}

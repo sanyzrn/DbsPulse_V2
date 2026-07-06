@@ -159,6 +159,43 @@ def test_dashboard_overview_reflects_finalized_evaluation(client, db_session):
     assert len(r.json()) > 0
 
 
+def test_reviewers_see_profile_only_for_personnel_in_their_scope(client, db_session):
+    """ارزیاب‌ها (مسئول واحد/معاونت/مدیرعامل) رادار و روند فردِ حوزهٔ خودشان را
+    می‌بینند، اما فردی خارج از حوزهٔ دسترسی‌شان را نه (۴۰۳)."""
+    hr = make_user(db_session, "hr")
+    sup = make_user(db_session, "unit_supervisor")
+    dep = make_user(db_session, "deputy")
+    ceo = make_user(db_session, "ceo")
+    personnel = make_personnel(db_session)
+    make_access(db_session, personnel, sup, dep, ceo)
+    # یک مسئول واحد دیگر که هیچ دسترسی‌ای به این فرد ندارد
+    other_sup = make_user(db_session, "unit_supervisor")
+    db_session.commit()
+
+    _run_full_workflow(client, db_session, hr, sup, dep, ceo, personnel)
+
+    for reviewer in (sup, dep, ceo):
+        assert (
+            client.get(
+                f"/api/dashboard/personnel/{personnel.id}/radar", headers=auth_header(reviewer)
+            ).status_code
+            == 200
+        )
+        assert (
+            client.get(
+                f"/api/dashboard/personnel/{personnel.id}/trend", headers=auth_header(reviewer)
+            ).status_code
+            == 200
+        )
+
+    assert (
+        client.get(
+            f"/api/dashboard/personnel/{personnel.id}/radar", headers=auth_header(other_sup)
+        ).status_code
+        == 403
+    )
+
+
 def test_pipeline_counts_by_status(client, db_session):
     hr = make_user(db_session, "hr")
     sup = make_user(db_session, "unit_supervisor")

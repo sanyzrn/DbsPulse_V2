@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { motion } from "motion/react";
 import { apiClient, extractConflictEvaluationId, extractErrorMessage } from "../../api/client";
 import { usePersonnelList } from "../../api/queries";
+import { EmployeeProfileModal } from "../../components/EmployeeProfileModal";
 import { EvaluationList } from "../../components/EvaluationList";
 import { PageHeader } from "../../ui/Card";
 import type { Personnel } from "../../types";
@@ -11,6 +12,7 @@ export function SupervisorHomePage() {
   const [error, setError] = useState<string | null>(null);
   const [starting, setStarting] = useState(false);
   const [startingId, setStartingId] = useState<number | null>(null);
+  const [profilePerson, setProfilePerson] = useState<Personnel | null>(null);
   const navigate = useNavigate();
   const { data, error: loadError } = usePersonnelList({
     accessible_to_me: true,
@@ -73,7 +75,15 @@ export function SupervisorHomePage() {
                     animate={{ opacity: 1 }}
                     transition={{ duration: 0.2, delay: idx * 0.03 }}
                   >
-                    <td className="px-3 py-2.5 font-medium text-gray-700">{p.full_name}</td>
+                    <td className="px-3 py-2.5">
+                      <button
+                        onClick={() => setProfilePerson(p)}
+                        className="font-medium text-pulse-700 transition-colors hover:text-pulse-800 hover:underline"
+                        title="مشاهده پروفایل و روند عملکرد"
+                      >
+                        {p.full_name}
+                      </button>
+                    </td>
                     <td className="px-3 py-2.5 text-gray-600">{p.job_title}</td>
                     <td className="px-3 py-2.5 text-gray-500">{p.org_unit}</td>
                     <td className="px-3 py-2.5">
@@ -106,6 +116,10 @@ export function SupervisorHomePage() {
       </div>
 
       <EvaluationList title="ارزیابی‌های من" />
+
+      {profilePerson && (
+        <EmployeeProfileModal personnel={profilePerson} onClose={() => setProfilePerson(null)} />
+      )}
     </div>
   );
 }

@@ -51,5 +51,41 @@ class Settings(BaseSettings):
             )
         return self
 
+    @model_validator(mode="after")
+    def _forbid_insecure_cors_and_public_url_in_production(self) -> "Settings":
+        # مثل گارد بالا برای JWT_SECRET_KEY: یک توسعه‌دهنده که .env.example را در
+        # production کپی می‌کند ممکن است CORS_ORIGINS/PUBLIC_BASE_URL را فراموش کند
+        # به‌روزرسانی کند — کوکی‌ها در production با پرچم Secure ست می‌شوند (فقط روی
+        # HTTPS ارسال می‌شوند)، پس origin غیر-https یا localhost عملاً کار نمی‌کند یا
+        # نشان‌دهندهٔ یک مقدار جامانده از تنظیمات توسعه است.
+        if self.environment != "production":
+            return self
+        insecure_markers = ("localhost", "127.0.0.1", "0.0.0.0")
+        for origin in self.cors_origins_list:
+            lowered = origin.lower()
+            if any(marker in lowered for marker in insecure_markers):
+                raise RuntimeError(
+                    f"CORS_ORIGINS شامل «{origin}» است که مقدار توسعه/دمو به‌نظر می‌رسد. "
+                    "پیش از اجرا در محیط production آن را به دامنهٔ واقعی frontend محدود کنید."
+                )
+            if not lowered.startswith("https://"):
+                raise RuntimeError(
+                    f"CORS_ORIGINS شامل «{origin}» بدون https است؛ چون کوکی‌ها در production "
+                    "با پرچم Secure ست می‌شوند (فقط روی HTTPS ارسال می‌شوند)، origin غیر-https "
+                    "عملاً کار نخواهد کرد."
+                )
+        public_url_lower = self.public_base_url.lower()
+        if any(marker in public_url_lower for marker in insecure_markers):
+            raise RuntimeError(
+                "PUBLIC_BASE_URL هنوز مقدار توسعه/دمو (localhost/127.0.0.1) است. پیش از اجرا "
+                "در محیط production آن را به آدرس عمومی واقعی frontend تغییر دهید."
+            )
+        if not public_url_lower.startswith("https://"):
+            raise RuntimeError(
+                "PUBLIC_BASE_URL در محیط production باید https باشد (برای لینک تأیید اصالت "
+                "داخل QR سند که باید از هر جا در دسترس و امن باشد)."
+            )
+        return self
+
 
 settings = Settings()

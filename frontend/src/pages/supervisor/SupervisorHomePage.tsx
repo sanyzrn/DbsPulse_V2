@@ -126,7 +126,11 @@ export function SupervisorHomePage() {
       />
 
       {profilePerson && (
-        <EmployeeProfileModal personnel={profilePerson} onClose={() => setProfilePerson(null)} />
+        <EmployeeProfileModal
+          personnelId={profilePerson.id}
+          personName={profilePerson.full_name}
+          onClose={() => setProfilePerson(null)}
+        />
       )}
     </div>
   );

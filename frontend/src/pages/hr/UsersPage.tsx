@@ -8,7 +8,8 @@ import { PaginationControls } from "../../components/PaginationControls";
 import { useToast } from "../../components/Toast";
 import { Button } from "../../ui/Button";
 import { PageHeader } from "../../ui/Card";
-import { ROLE_LABELS, type AppUser, type UserRole } from "../../types";
+import { Modal } from "../../ui/Modal";
+import { ROLE_LABELS, type AppUser, type Personnel, type UserRole } from "../../types";
 
 const ROLES: UserRole[] = ["unit_supervisor", "hr", "deputy", "ceo", "employee"];
 const PAGE_SIZE = 10;
@@ -25,6 +26,7 @@ export function UsersPage() {
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(0);
+  const [editingUser, setEditingUser] = useState<AppUser | null>(null);
   const debouncedSearch = useDebouncedValue(search);
 
   // برای نقش «کارمند» باید پرسنل متناظر انتخاب شود تا کارنامه‌اش را ببیند
@@ -209,9 +211,17 @@ export function UsersPage() {
                       )}
                     </td>
                     <td className="px-3 py-2.5">
-                      <button onClick={() => toggleActive(u)} className="text-sm font-medium text-pulse-600 hover:text-pulse-700">
-                        {u.is_active ? "غیرفعال کردن" : "فعال کردن"}
-                      </button>
+                      <div className="flex items-center gap-3">
+                        <button
+                          onClick={() => setEditingUser(u)}
+                          className="text-sm font-medium text-gray-600 hover:text-gray-800"
+                        >
+                          ویرایش
+                        </button>
+                        <button onClick={() => toggleActive(u)} className="text-sm font-medium text-pulse-600 hover:text-pulse-700">
+                          {u.is_active ? "غیرفعال کردن" : "فعال کردن"}
+                        </button>
+                      </div>
                     </td>
                   </motion.tr>
                 ))}
@@ -230,6 +240,136 @@ export function UsersPage() {
           onPageChange={setPage}
         />
       </div>
+
+      {editingUser && (
+        <EditUserModal
+          user={editingUser}
+          personnel={personnelData?.items ?? []}
+          onClose={() => setEditingUser(null)}
+        />
+      )}
     </div>
+  );
+}
+
+function EditUserModal({
+  user,
+  personnel,
+  onClose,
+}: {
+  user: AppUser;
+  personnel: Personnel[];
+  onClose: () => void;
+}) {
+  const { showSuccess, showError } = useToast();
+  const queryClient = useQueryClient();
+  const [role, setRole] = useState<UserRole>(user.role);
+  const [personnelId, setPersonnelId] = useState<number | "">(user.personnel_id ?? "");
+  const [newPassword, setNewPassword] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+
+  async function save() {
+    setError(null);
+    if (role === "employee" && personnelId === "") {
+      const message = "برای نقش «کارمند» باید پرسنل متناظر انتخاب شود";
+      setError(message);
+      showError(message);
+      return;
+    }
+    if (newPassword && newPassword.length < 10) {
+      const message = "رمز جدید باید حداقل ۱۰ نویسه باشد";
+      setError(message);
+      showError(message);
+      return;
+    }
+    setSaving(true);
+    try {
+      await apiClient.patch(`/users/${user.id}`, {
+        role,
+        personnel_id: role === "employee" ? personnelId : null,
+        ...(newPassword ? { password: newPassword } : {}),
+      });
+      await queryClient.invalidateQueries({ queryKey: ["users"] });
+      showSuccess("کاربر به‌روزرسانی شد");
+      onClose();
+    } catch (err) {
+      const message = extractErrorMessage(err);
+      setError(message);
+      showError(message);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <Modal
+      title={`ویرایش کاربر: ${user.username}`}
+      onClose={onClose}
+      footer={
+        <>
+          <Button variant="secondary" onClick={onClose}>
+            انصراف
+          </Button>
+          <Button onClick={save} disabled={saving}>
+            ذخیره
+          </Button>
+        </>
+      }
+    >
+      <div className="space-y-4 py-2">
+        <label className="flex flex-col gap-1.5 text-sm font-medium text-gray-700">
+          نقش
+          <select className={inputClass} value={role} onChange={(e) => setRole(e.target.value as UserRole)}>
+            {ROLES.map((r) => (
+              <option key={r} value={r}>
+                {ROLE_LABELS[r]}
+              </option>
+            ))}
+          </select>
+        </label>
+
+        {role === "employee" && (
+          <label className="flex flex-col gap-1.5 text-sm font-medium text-gray-700">
+            پرسنل متناظر
+            <select
+              className={inputClass}
+              value={personnelId}
+              onChange={(e) => setPersonnelId(e.target.value === "" ? "" : Number(e.target.value))}
+            >
+              <option value="">انتخاب کنید…</option>
+              {personnel.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.full_name} ({p.personnel_code})
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
+
+        <div className="border-t border-gray-100 pt-4">
+          <label className="flex flex-col gap-1.5 text-sm font-medium text-gray-700">
+            تعیین رمز جدید (اختیاری)
+            <input
+              type="password"
+              minLength={10}
+              autoComplete="new-password"
+              placeholder="خالی بگذارید تا رمز فعلی تغییر نکند"
+              className={inputClass}
+              value={newPassword}
+              onChange={(e) => setNewPassword(e.target.value)}
+            />
+          </label>
+          {newPassword && (
+            <p className="mt-1.5 text-xs text-amber-600">
+              با تنظیم رمز جدید، تمام نشست‌های فعال این کاربر باطل می‌شود و باید در ورود بعدی رمز را
+              دوباره تغییر دهد.
+            </p>
+          )}
+        </div>
+
+        {error && <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p>}
+      </div>
+    </Modal>
   );
 }

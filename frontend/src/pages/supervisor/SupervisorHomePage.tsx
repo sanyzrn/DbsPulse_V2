@@ -115,7 +115,15 @@ export function SupervisorHomePage() {
         )}
       </div>
 
-      <EvaluationList title="ارزیابی‌های من" />
+      <EvaluationList
+        title="ارزیابی‌های من"
+        tabs={[
+          { key: "all", label: "همه" },
+          { key: "draft", label: "پیش‌نویس", status: "draft" },
+          { key: "submitted", label: "در انتظار بررسی", status: "submitted" },
+          { key: "finalized", label: "نهایی‌شده", status: "finalized" },
+        ]}
+      />
 
       {profilePerson && (
         <EmployeeProfileModal personnel={profilePerson} onClose={() => setProfilePerson(null)} />

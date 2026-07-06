@@ -109,7 +109,14 @@ export function DeputyHomePage() {
           </div>
         </div>
       )}
-      <EvaluationList title="پرونده‌های در انتظار بررسی معاونت" statusFilter="hr_approved" />
+      <EvaluationList
+        title="پرونده‌های ارزیابی"
+        tabs={[
+          { key: "pending", label: "در انتظار بررسی معاونت", status: "hr_approved" },
+          { key: "finalized", label: "نهایی‌شده", status: "finalized" },
+          { key: "all", label: "همهٔ پرونده‌های من" },
+        ]}
+      />
 
       {profilePerson && (
         <EmployeeProfileModal personnel={profilePerson} onClose={() => setProfilePerson(null)} />

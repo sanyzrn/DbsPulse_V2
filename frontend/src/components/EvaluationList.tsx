@@ -9,21 +9,36 @@ import { PaginationControls } from "./PaginationControls";
 
 const PAGE_SIZE = 10;
 
+export interface EvaluationListTab {
+  /** کلید یکتای تب (برای state داخلی) */
+  key: string;
+  label: string;
+  /** بدون مقدار = بدون فیلتر وضعیت (همهٔ پرونده‌های در دسترس این کاربر) */
+  status?: EvaluationStatus;
+}
+
+/** فهرست پرونده‌های ارزیابی با جست‌وجو، صفحه‌بندی و — در صورت وجود بیش از یک تب —
+ * سوییچ وضعیت به‌دست کاربر (نه فقط یک وضعیت ثابت تحمیل‌شده توسط صفحهٔ والد؛ این
+ * دقیقاً همان محدودیتی بود که مانع می‌شد معاونت/مدیرعامل پروندهٔ خودشان را پس از
+ * اقدام دوباره پیدا کنند). */
 export function EvaluationList({
   title,
-  statusFilter,
+  tabs,
 }: {
   title: string;
-  statusFilter?: EvaluationStatus;
+  tabs: EvaluationListTab[];
 }) {
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(0);
+  const [activeTabKey, setActiveTabKey] = useState(tabs[0]!.key);
   const debouncedSearch = useDebouncedValue(search);
   const navigate = useNavigate();
 
+  const activeTab = tabs.find((t) => t.key === activeTabKey) ?? tabs[0]!;
+
   const { data, error, isPending } = useEvaluations({
     q: debouncedSearch,
-    status: statusFilter,
+    status: activeTab.status,
     limit: PAGE_SIZE,
     offset: page * PAGE_SIZE,
   });
@@ -51,6 +66,33 @@ export function EvaluationList({
           />
         </div>
       </div>
+
+      {tabs.length > 1 && (
+        <div
+          role="tablist"
+          className="mb-4 inline-flex flex-wrap gap-1 rounded-xl border border-gray-100 bg-gray-50 p-1"
+        >
+          {tabs.map((tab) => (
+            <button
+              key={tab.key}
+              type="button"
+              role="tab"
+              aria-selected={tab.key === activeTabKey}
+              onClick={() => {
+                setActiveTabKey(tab.key);
+                setPage(0);
+              }}
+              className={`rounded-lg px-3 py-1.5 text-sm font-medium transition-all duration-200 ${
+                tab.key === activeTabKey
+                  ? "bg-white text-pulse-700 shadow-sm"
+                  : "text-gray-500 hover:text-gray-800"
+              }`}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+      )}
 
       {error != null && (
         <p className="mb-2 text-sm text-red-600">{extractErrorMessage(error)}</p>

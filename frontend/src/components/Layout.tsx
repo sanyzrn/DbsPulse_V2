@@ -3,6 +3,7 @@ import { motion } from "motion/react";
 import { useAuth } from "../auth/AuthContext";
 import { APP_NAME, APP_NAME_FA } from "../appInfo";
 import { BrandMark } from "./Brand";
+import { ErrorBoundary } from "./ErrorBoundary";
 import { Footer } from "./Footer";
 import { NotificationBell } from "./NotificationBell";
 import { ROLE_LABELS } from "../types";
@@ -131,15 +132,18 @@ export function Layout() {
       </header>
 
       <main id="main-content" tabIndex={-1} className="mx-auto w-full max-w-6xl flex-1 p-4 sm:p-6">
-        {/* انیمیشن انتقال صفحه — fade + slide-up با key مسیر */}
-        <motion.div
-          key={location.pathname}
-          initial={{ opacity: 0, y: 8 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.3, ease: "easeOut" }}
-        >
-          <Outlet />
-        </motion.div>
+        {/* ErrorBoundary با key مسیر دوباره mount می‌شود تا خطای یک صفحه با رفتن به
+            صفحهٔ دیگر خودبه‌خود پاک شود، نه اینکه کاربر برای همیشه در حالت خطا بماند */}
+        <ErrorBoundary key={location.pathname} title="مشکلی در نمایش این صفحه پیش آمد">
+          {/* انیمیشن انتقال صفحه — fade + slide-up با key مسیر */}
+          <motion.div
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.3, ease: "easeOut" }}
+          >
+            <Outlet />
+          </motion.div>
+        </ErrorBoundary>
       </main>
 
       <Footer />

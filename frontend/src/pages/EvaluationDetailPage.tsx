@@ -702,11 +702,18 @@ function EditableScoring({
 
 function ReturnBox({ evaluationId, onReturned }: { evaluationId: number; onReturned: () => void }) {
   const { showSuccess, showError } = useToast();
+  const confirm = useConfirm();
   const [open, setOpen] = useState(false);
   const [reason, setReason] = useState("");
   const [sending, setSending] = useState(false);
 
   async function submitReturn() {
+    const ok = await confirm({
+      title: "برگشت این پرونده به مرحله قبل؟",
+      description: "پرونده یک مرحله عقب می‌رود و نمره‌دهنده/تأییدکنندهٔ آن مرحله مطلع می‌شود؛ اقدامات این مرحله باید دوباره انجام شود.",
+      confirmLabel: "برگشت پرونده",
+    });
+    if (!ok) return;
     setSending(true);
     try {
       await apiClient.post(`/evaluations/${evaluationId}/return`, { reason });

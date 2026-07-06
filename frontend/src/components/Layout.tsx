@@ -50,6 +50,14 @@ export function Layout() {
 
   return (
     <div className="flex min-h-screen flex-col bg-gray-50">
+      {/* پرش به محتوای اصلی: کاربر کیبورد/screen reader مجبور نیست هر بار کل هدر
+          (برند، زنگوله، منوی کاربر، ناوبری نقش) را Tab بزند تا به محتوای صفحه برسد */}
+      <a
+        href="#main-content"
+        className="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:right-2 focus:z-50 focus:rounded-xl focus:bg-pulse-600 focus:px-4 focus:py-2 focus:text-sm focus:font-medium focus:text-white focus:shadow-lg"
+      >
+        پرش به محتوای اصلی
+      </a>
       <header className="sticky top-0 z-40 border-b border-gray-100 bg-white/80 shadow-sm backdrop-blur-xl">
         {/* خط گرادیانت بالای هدر */}
         <div className="h-0.5 w-full bg-gradient-to-l from-pulse-500 via-pulse-violet-500 to-pulse-500" />
@@ -122,7 +130,7 @@ export function Layout() {
         </nav>
       </header>
 
-      <main className="mx-auto w-full max-w-6xl flex-1 p-4 sm:p-6">
+      <main id="main-content" tabIndex={-1} className="mx-auto w-full max-w-6xl flex-1 p-4 sm:p-6">
         {/* انیمیشن انتقال صفحه — fade + slide-up با key مسیر */}
         <motion.div
           key={location.pathname}

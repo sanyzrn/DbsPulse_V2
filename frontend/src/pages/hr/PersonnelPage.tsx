@@ -39,6 +39,7 @@ export function PersonnelPage() {
   const [error, setError] = useState<string | null>(null);
   const [selected, setSelected] = useState<Personnel | null>(null);
   const [profilePerson, setProfilePerson] = useState<Personnel | null>(null);
+  const [editingPersonnel, setEditingPersonnel] = useState<Personnel | null>(null);
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(0);
   const debouncedSearch = useDebouncedValue(search);
@@ -182,7 +183,8 @@ export function PersonnelPage() {
                     <th className="px-3 py-2.5 text-right text-xs font-semibold text-gray-600">نام</th>
                     <th className="px-3 py-2.5 text-right text-xs font-semibold text-gray-600">عنوان شغلی</th>
                     <th className="px-3 py-2.5 text-right text-xs font-semibold text-gray-600">واحد</th>
-                    <th className="px-3 py-2.5 text-right text-xs font-semibold text-gray-600">دسترسی ارزیابی</th>
+                    <th className="px-3 py-2.5 text-right text-xs font-semibold text-gray-600">وضعیت</th>
+                    <th className="px-3 py-2.5 text-right text-xs font-semibold text-gray-600"></th>
                   </tr>
                 </thead>
                 <tbody>
@@ -213,16 +215,37 @@ export function PersonnelPage() {
                       </td>
                       <td className="px-3 py-2.5 text-gray-500">{p.org_unit}</td>
                       <td className="px-3 py-2.5">
-                        <button
-                          onClick={() => setSelected(p)}
-                          className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-sm font-medium text-pulse-600 transition-colors hover:bg-pulse-50"
-                        >
-                          <svg viewBox="0 0 20 20" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-                            <path d="M10 12a2 2 0 1 0 0-4 2 2 0 0 0 0 4z" />
-                            <path d="M2 10s3-5 8-5 8 5 8 5-3 5-8 5-8-5-8-5z" />
-                          </svg>
-                          تنظیم دسترسی
-                        </button>
+                        {p.status === "active" ? (
+                          <span className="inline-flex items-center gap-1.5 rounded-full bg-green-50 px-2.5 py-0.5 text-xs font-medium text-green-700">
+                            <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-green-500" />
+                            فعال
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1.5 rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-medium text-gray-500">
+                            <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-gray-400" />
+                            غیرفعال
+                          </span>
+                        )}
+                      </td>
+                      <td className="px-3 py-2.5">
+                        <div className="flex items-center gap-3">
+                          <button
+                            onClick={() => setEditingPersonnel(p)}
+                            className="text-sm font-medium text-gray-600 hover:text-gray-800"
+                          >
+                            ویرایش
+                          </button>
+                          <button
+                            onClick={() => setSelected(p)}
+                            className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-sm font-medium text-pulse-600 transition-colors hover:bg-pulse-50"
+                          >
+                            <svg viewBox="0 0 20 20" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+                              <path d="M10 12a2 2 0 1 0 0-4 2 2 0 0 0 0 4z" />
+                              <path d="M2 10s3-5 8-5 8 5 8 5-3 5-8 5-8-5-8-5z" />
+                            </svg>
+                            تنظیم دسترسی
+                          </button>
+                        </div>
                       </td>
                     </motion.tr>
                   ))}
@@ -257,7 +280,140 @@ export function PersonnelPage() {
       {profilePerson && (
         <EmployeeProfileModal personnel={profilePerson} onClose={() => setProfilePerson(null)} />
       )}
+
+      {editingPersonnel && (
+        <EditPersonnelModal personnel={editingPersonnel} onClose={() => setEditingPersonnel(null)} />
+      )}
     </div>
+  );
+}
+
+function EditPersonnelModal({ personnel, onClose }: { personnel: Personnel; onClose: () => void }) {
+  const { showSuccess, showError } = useToast();
+  const queryClient = useQueryClient();
+  const [form, setForm] = useState({
+    personnel_code: personnel.personnel_code,
+    full_name: personnel.full_name,
+    job_title: personnel.job_title,
+    is_manager: personnel.is_manager,
+    org_unit: personnel.org_unit,
+    contract_start_date: personnel.contract_start_date,
+    contract_end_date: personnel.contract_end_date,
+    status: personnel.status,
+  });
+  const [error, setError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+
+  async function save() {
+    setError(null);
+    setSaving(true);
+    try {
+      await apiClient.patch(`/personnel/${personnel.id}`, form);
+      await queryClient.invalidateQueries({ queryKey: ["personnel"] });
+      showSuccess("پرسنل به‌روزرسانی شد");
+      onClose();
+    } catch (err) {
+      const message = extractErrorMessage(err);
+      setError(message);
+      showError(message);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <Modal
+      title={`ویرایش پرسنل: ${personnel.full_name}`}
+      onClose={onClose}
+      footer={
+        <>
+          <Button variant="secondary" onClick={onClose}>
+            انصراف
+          </Button>
+          <Button onClick={save} disabled={saving}>
+            ذخیره
+          </Button>
+        </>
+      }
+    >
+      <div className="grid grid-cols-1 gap-3 py-2 text-sm sm:grid-cols-2">
+        <label className="flex flex-col gap-1 text-xs font-medium text-gray-600">
+          کد پرسنلی
+          <input
+            required
+            className={inputClass}
+            value={form.personnel_code}
+            onChange={(e) => setForm({ ...form, personnel_code: e.target.value })}
+          />
+        </label>
+        <label className="flex flex-col gap-1 text-xs font-medium text-gray-600">
+          نام و نام خانوادگی
+          <input
+            required
+            className={inputClass}
+            value={form.full_name}
+            onChange={(e) => setForm({ ...form, full_name: e.target.value })}
+          />
+        </label>
+        <label className="flex flex-col gap-1 text-xs font-medium text-gray-600">
+          عنوان شغلی
+          <input
+            required
+            className={inputClass}
+            value={form.job_title}
+            onChange={(e) => setForm({ ...form, job_title: e.target.value })}
+          />
+        </label>
+        <label className="flex flex-col gap-1 text-xs font-medium text-gray-600">
+          واحد سازمانی
+          <input
+            required
+            className={inputClass}
+            value={form.org_unit}
+            onChange={(e) => setForm({ ...form, org_unit: e.target.value })}
+          />
+        </label>
+        <label className="flex flex-col gap-1 text-xs font-medium text-gray-600">
+          تاریخ شروع قرارداد
+          <JalaliDatePicker
+            required
+            className={inputClass}
+            value={form.contract_start_date}
+            onChange={(iso) => setForm({ ...form, contract_start_date: iso })}
+          />
+        </label>
+        <label className="flex flex-col gap-1 text-xs font-medium text-gray-600">
+          تاریخ پایان قرارداد
+          <JalaliDatePicker
+            required
+            className={inputClass}
+            value={form.contract_end_date}
+            onChange={(iso) => setForm({ ...form, contract_end_date: iso })}
+          />
+        </label>
+        <label className="flex flex-col gap-1 text-xs font-medium text-gray-600">
+          وضعیت
+          <select
+            className={inputClass}
+            value={form.status}
+            onChange={(e) => setForm({ ...form, status: e.target.value as Personnel["status"] })}
+          >
+            <option value="active">فعال</option>
+            <option value="inactive">غیرفعال</option>
+          </select>
+        </label>
+        <label className="flex items-center gap-2 self-end pb-2 text-sm">
+          <input
+            type="checkbox"
+            checked={form.is_manager}
+            onChange={(e) => setForm({ ...form, is_manager: e.target.checked })}
+            className="h-4 w-4 rounded border-gray-300 text-pulse-500 focus:ring-pulse-400"
+          />
+          پرسنل مدیریتی
+        </label>
+      </div>
+      {error && <p className="mt-2 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p>}
+    </Modal>
   );
 }
 

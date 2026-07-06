@@ -25,6 +25,10 @@ class EvaluationRecord(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     evaluation_code: Mapped[str] = mapped_column(String(50), unique=True, nullable=False)
+    # توکن تصادفی و غیرقابل‌حدس برای صفحهٔ تأیید عمومی (/api/verify/{token})؛ برخلاف
+    # evaluation_code که ترتیبی است (EVL-0001, EVL-0002, ...) و روی endpoint بدون
+    # احراز هویت نباید کلید جست‌وجو باشد. فقط در لحظهٔ نهایی‌سازی مقداردهی می‌شود.
+    verify_token: Mapped[str | None] = mapped_column(String(64), unique=True, nullable=True)
     subject_personnel_id: Mapped[int] = mapped_column(ForeignKey("personnel.id"), nullable=False)
     unit_supervisor_user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
     deputy_user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False)

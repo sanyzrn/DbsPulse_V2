@@ -1,6 +1,7 @@
 """تست‌های آرشیو PDF نهایی و تأیید اصالت عمومی (R9)."""
 from sqlalchemy import select
 
+from app.models.evaluation import EvaluationRecord
 from app.models.evaluation_document import EvaluationDocument
 from tests.helpers import (
     active_indicators,
@@ -68,9 +69,14 @@ def test_summary_pdf_serves_stored_bytes_stably(client, db_session):
 
 def test_public_verify_returns_authenticity_for_finalized(client, db_session):
     hr, sup, dep, ceo, evaluation_id, code = _finalize(client, db_session)
+    db_session.expire_all()
+    token = db_session.scalar(
+        select(EvaluationRecord.verify_token).where(EvaluationRecord.id == evaluation_id)
+    )
+    assert token is not None and len(token) > 20
 
     # بدون هدر احراز هویت — endpoint عمومی است
-    r = client.get(f"/api/verify/{code}")
+    r = client.get(f"/api/verify/{token}")
     assert r.status_code == 200
     body = r.json()
     assert body["valid"] is True
@@ -79,6 +85,13 @@ def test_public_verify_returns_authenticity_for_finalized(client, db_session):
     assert body["org_unit"] == "واحد اسناد"
     assert body["final_weighted_pct"] is not None
     assert len(body["sha256"]) == 64
+
+
+def test_verify_by_sequential_evaluation_code_is_rejected(client, db_session):
+    """کد ارزیابی (EVL-0001, ...) ترتیبی و قابل‌شمارش است؛ نباید کلید جست‌وجوی
+    endpoint عمومی باشد — فقط verify_token تصادفی کار می‌کند."""
+    hr, sup, dep, ceo, evaluation_id, code = _finalize(client, db_session)
+    assert client.get(f"/api/verify/{code}").status_code == 404
 
 
 def test_verify_unknown_or_unfinalized_is_404(client, db_session):

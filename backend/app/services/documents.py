@@ -12,8 +12,8 @@ from app.services.pdf import render_evaluation_summary_pdf, weasyprint_available
 logger = logging.getLogger(__name__)
 
 
-def verify_url_for(evaluation_code: str) -> str:
-    return f"{settings.public_base_url.rstrip('/')}/verify/{evaluation_code}"
+def verify_url_for(verify_token: str) -> str:
+    return f"{settings.public_base_url.rstrip('/')}/verify/{verify_token}"
 
 
 def get_document(db: Session, record_id: int) -> EvaluationDocument | None:
@@ -44,10 +44,12 @@ def archive_final_pdf(db: Session, record: EvaluationRecord) -> EvaluationDocume
         )
         return None
 
+    # رکوردهای نهایی‌شده (چه از این پس، چه backfill شدهٔ migration) همیشه verify_token
+    # دارند؛ اگر به هر دلیلی نداشت (رکورد خیلی قدیمی که هرگز backfill نشده)، لینک تأیید
+    # را نمی‌سازیم تا evaluation_code ترتیبی هرگز روی endpoint عمومی افشا نشود.
+    verify_url = verify_url_for(record.verify_token) if record.verify_token else None
     try:
-        pdf_bytes = render_evaluation_summary_pdf(
-            record.final_snapshot, verify_url=verify_url_for(record.evaluation_code)
-        )
+        pdf_bytes = render_evaluation_summary_pdf(record.final_snapshot, verify_url=verify_url)
     except RuntimeError:
         logger.warning(
             "PDF generation failed for evaluation %s; skipping archival. "

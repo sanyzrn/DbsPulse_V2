@@ -1,3 +1,4 @@
+import secrets
 from datetime import UTC, datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -414,6 +415,9 @@ def ceo_finalize(
     def _before() -> None:
         record.finalized_at = datetime.now(UTC)
         record.final_snapshot = build_final_snapshot(db, record)
+        # توکن تصادفی صفحهٔ تأیید عمومی؛ evaluation_code ترتیبی است و نباید کلید
+        # جست‌وجوی یک endpoint بدون احراز هویت باشد (قابل شمارش/enumeration)
+        record.verify_token = secrets.token_urlsafe(24)
 
     apply_transition(db, record, "ceo_finalize", current_user, before=_before)
     # سند PDF نهایی همین‌جا یک‌بار تولید، هش و آرشیو می‌شود تا از این پس همان بایت‌ها

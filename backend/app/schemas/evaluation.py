@@ -80,6 +80,9 @@ class EvaluationRead(BaseModel):
     created_at: datetime
     finalized_at: datetime | None
     acknowledged_at: datetime | None = None
+    # آیا این پرونده قبلاً حداقل یک‌بار برگشت خورده — تا صف بررسی بتواند آن را
+    # از یک ثبت/تأیید تازه متمایز کند (روی list_evaluations پر می‌شود، نه اینجا)
+    was_returned: bool = False
 
     @computed_field  # type: ignore[prop-decorator]
     @property

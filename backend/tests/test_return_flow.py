@@ -76,6 +76,18 @@ def test_hr_returns_file_to_supervisor_with_reason(client, db_session):
     )
     assert r.json()["total"] == 1
 
+    # صف بررسی باید این پرونده را از یک ثبت تازه (بدون سابقه برگشت) تشخیص دهد
+    r = client.get("/api/evaluations", params={"status": "submitted"}, headers=auth_header(hr))
+    items = {item["id"]: item for item in r.json()["items"]}
+    assert items[evaluation_id]["was_returned"] is True
+
+
+def test_fresh_submission_is_not_flagged_as_returned(client, db_session):
+    hr, sup, dep, ceo, evaluation_id = _setup_submitted(client, db_session)
+    r = client.get("/api/evaluations", params={"status": "submitted"}, headers=auth_header(hr))
+    items = {item["id"]: item for item in r.json()["items"]}
+    assert items[evaluation_id]["was_returned"] is False
+
 
 def test_deputy_and_ceo_returns_step_back_one_stage(client, db_session):
     hr, sup, dep, ceo, evaluation_id = _setup_submitted(client, db_session)

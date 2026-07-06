@@ -1,4 +1,4 @@
-import type { ComponentPropsWithRef, ReactNode } from "react";
+import type { ComponentPropsWithRef } from "react";
 
 type Variant = "primary" | "secondary" | "link" | "danger" | "ghost";
 

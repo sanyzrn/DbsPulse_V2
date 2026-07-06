@@ -1,6 +1,6 @@
 import pytest
 
-from app.services.pdf import TEMPLATES_DIR, _env, _local_templates_only_url_fetcher
+from app.services.pdf import _TEMPLATES_DIR, _env, _local_templates_only_url_fetcher
 
 
 def _snapshot_with(evidence_text: str) -> dict:
@@ -49,7 +49,7 @@ def test_url_fetcher_blocks_paths_outside_templates_dir():
     with pytest.raises(ValueError):
         _local_templates_only_url_fetcher("https://example.com/x.png")
     # فایل‌های فونت داخل templates همچنان مجازند
-    font_uri = (TEMPLATES_DIR / "fonts" / "Vazirmatn-Regular.woff2").as_uri()
+    font_uri = (_TEMPLATES_DIR / "fonts" / "Vazirmatn-Regular.woff2").as_uri()
     result = _local_templates_only_url_fetcher(font_uri)
     assert "file_obj" in result or "string" in result
 

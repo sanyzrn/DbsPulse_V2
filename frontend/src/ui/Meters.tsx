@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState } from "react";
-import { motion, useInView } from "motion/react";
+import { useEffect, useState } from "react";
+import { motion } from "motion/react";
 
 /** نمایش مدرن درصدها و امتیازها: نشان درصدی، نوار پیشرفت و حلقه امتیاز.
  * رنگ‌بندی معنایی (وضعیت): سبز = مطلوب، کهربایی = میانه، قرمز = نیازمند توجه.
@@ -27,8 +27,6 @@ const DOT_STYLES: Record<Tone, string> = {
   gray: "bg-gray-400",
 };
 
-const BAR_GRADIENT_ID = "pulse-bar-gradient";
-
 /** رنگ حلقه بر اساس tone — اما برای tone سبز/برند از گرادیانت استفاده می‌کنیم. */
 const RING_STOP_COLOR: Record<Tone, string> = {
   green: "#10b981",
@@ -54,11 +52,12 @@ export function CountUp({
   prefix?: string;
 }) {
   const [display, setDisplay] = useState(0);
-  const ref = useRef<HTMLSpanElement>(null);
-  const inView = useInView(ref, { once: true, margin: "-20px" });
 
+  // انیمیشن با تغییر مقدار/mount اجرا می‌شود، نه با ورود به دید (whileInView/useInView).
+  // اتکا به رویداد تقاطع دید باعث می‌شد وقتی مقدار پس از mount و بدون اسکرول تازه
+  // به‌روزرسانی می‌شود (مثلاً پس از ثبت ارزیابی) عدد روی صفر گیر کند.
   useEffect(() => {
-    if (!inView || value === null) return;
+    if (value === null) return;
     const target = value;
     const start = performance.now();
     let raf = 0;
@@ -71,15 +70,15 @@ export function CountUp({
     }
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
-  }, [inView, value, duration]);
+  }, [value, duration]);
 
   if (value === null) {
-    return <span ref={ref}>—</span>;
+    return <span>—</span>;
   }
 
   const rounded = format === "fa-pct" ? Math.round(display) : display;
   return (
-    <span ref={ref}>
+    <span>
       {prefix}
       {rounded.toLocaleString("fa-IR")}
       {format === "fa-pct" ? "٪" : ""}
@@ -125,8 +124,7 @@ export function PctBar({
             : { backgroundColor: RING_STOP_COLOR[resolved] }
         }
         initial={{ width: 0 }}
-        whileInView={{ width: `${clamped}%` }}
-        viewport={{ once: true }}
+        animate={{ width: `${clamped}%` }}
         transition={{ duration: 1, ease: "easeOut" }}
       />
     </div>
@@ -180,8 +178,7 @@ export function ScoreRing({
             strokeLinecap="round"
             strokeDasharray={circumference}
             initial={{ strokeDashoffset: circumference }}
-            whileInView={{ strokeDashoffset: circumference * (1 - clamped / 100) }}
-            viewport={{ once: true }}
+            animate={{ strokeDashoffset: circumference * (1 - clamped / 100) }}
             transition={{ duration: 1.2, ease: "easeOut" }}
           />
         </svg>

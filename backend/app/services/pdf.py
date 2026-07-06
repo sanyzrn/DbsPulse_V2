@@ -54,7 +54,10 @@ _weasyprint_available = False
 _WeasyPrintHTML = None
 _default_url_fetcher = None
 try:
-    from weasyprint import HTML as _WeasyPrintHTML, default_url_fetcher  # noqa: WPS433
+    from weasyprint import HTML as _WeasyPrintHTML
+    from weasyprint import default_url_fetcher
+
+    _default_url_fetcher = default_url_fetcher
     _weasyprint_available = True
 except OSError:
     logger.warning(

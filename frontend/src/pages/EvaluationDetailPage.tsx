@@ -160,14 +160,14 @@ export function EvaluationDetailPage() {
           <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
             <div className="rounded-xl bg-gray-50 p-3">
               <div className="mb-2 flex items-center justify-between text-sm">
-                <span className="text-gray-500">امتیاز عمومی</span>
+                <span className="text-gray-500">امتیاز عمومی (وزن {Math.round(config.general_section_weight * 100).toLocaleString("fa-IR")}٪)</span>
                 <PctBadge value={evaluation.general_score_pct} />
               </div>
               <PctBar value={evaluation.general_score_pct ?? 0} />
             </div>
             <div className="rounded-xl bg-gray-50 p-3">
               <div className="mb-2 flex items-center justify-between text-sm">
-                <span className="text-gray-500">امتیاز تخصصی</span>
+                <span className="text-gray-500">امتیاز تخصصی (وزن {Math.round(config.specialized_section_weight * 100).toLocaleString("fa-IR")}٪)</span>
                 <PctBadge value={evaluation.specialized_score_pct} />
               </div>
               <PctBar value={evaluation.specialized_score_pct ?? 0} />
@@ -650,14 +650,14 @@ function EditableScoring({
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
             <div className="rounded-xl bg-gray-50 p-3">
               <div className="mb-2 flex items-center justify-between text-sm">
-                <span className="text-gray-500">امتیاز عمومی</span>
+                <span className="text-gray-500">امتیاز عمومی (وزن {Math.round(config.general_section_weight * 100).toLocaleString("fa-IR")}٪)</span>
                 <PctBadge value={preview.general_pct} />
               </div>
               <PctBar value={preview.general_pct} />
             </div>
             <div className="rounded-xl bg-gray-50 p-3">
               <div className="mb-2 flex items-center justify-between text-sm">
-                <span className="text-gray-500">امتیاز تخصصی</span>
+                <span className="text-gray-500">امتیاز تخصصی (وزن {Math.round(config.specialized_section_weight * 100).toLocaleString("fa-IR")}٪)</span>
                 <PctBadge value={preview.specialized_pct} />
               </div>
               <PctBar value={preview.specialized_pct} />

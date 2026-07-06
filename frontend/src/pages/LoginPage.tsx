@@ -80,6 +80,8 @@ export function LoginPage() {
             <Field label="نام کاربری" htmlFor="login-username">
               <input
                 id="login-username"
+                name="username"
+                autoComplete="username"
                 className="w-full rounded-xl border border-gray-200 bg-white/70 px-4 py-2.5 text-sm text-gray-900 outline-none transition-all duration-200 focus:border-pulse-400"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
@@ -90,7 +92,9 @@ export function LoginPage() {
             <Field label="رمز عبور" htmlFor="login-password">
               <input
                 id="login-password"
+                name="password"
                 type="password"
+                autoComplete="current-password"
                 className="w-full rounded-xl border border-gray-200 bg-white/70 px-4 py-2.5 text-sm text-gray-900 outline-none transition-all duration-200 focus:border-pulse-400"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}

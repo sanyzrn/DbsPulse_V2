@@ -1,10 +1,11 @@
 from datetime import date, timedelta
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from app.api.deps import require_roles
+from app.api.deps import get_current_user, require_roles
+from app.api.routers.personnel import _can_view_personnel
 from app.db.session import get_db
 from app.models.enums import EvaluationStatus, PersonnelStatus, UserRole
 from app.models.evaluation import EvaluationRecord, EvaluationScore
@@ -203,8 +204,12 @@ def expiring_contracts(
 def personnel_radar(
     personnel_id: int,
     db: Session = Depends(get_db),
-    current_user: CurrentUser = Depends(require_roles(UserRole.hr)),
+    current_user: CurrentUser = Depends(get_current_user),
 ) -> list[RadarPoint]:
+    # HR همه را می‌بیند؛ ارزیاب‌ها (مسئول واحد/معاونت/مدیرعامل) فقط پرسنلی را که
+    # در حوزهٔ دسترسی/ارزیابی خودشان است — تا پیش از نمره‌دهی روند فرد را ببینند.
+    if not _can_view_personnel(db, personnel_id, current_user):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="دسترسی مجاز نیست")
     rows = db.execute(
         select(Indicator.category, func.avg(EvaluationScore.score))
         .join(EvaluationScore, EvaluationScore.indicator_id == Indicator.id)
@@ -219,8 +224,10 @@ def personnel_radar(
 def personnel_trend(
     personnel_id: int,
     db: Session = Depends(get_db),
-    current_user: CurrentUser = Depends(require_roles(UserRole.hr)),
+    current_user: CurrentUser = Depends(get_current_user),
 ) -> list[TrendPoint]:
+    if not _can_view_personnel(db, personnel_id, current_user):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="دسترسی مجاز نیست")
     records = db.scalars(
         select(EvaluationRecord)
         .where(

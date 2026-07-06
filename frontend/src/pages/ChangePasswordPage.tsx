@@ -181,5 +181,5 @@ function getPasswordStrength(pw: string): {
     { label: "خوب", color: "bg-pulse-500", textColor: "text-pulse-600" },
     { label: "قوی", color: "bg-green-500", textColor: "text-green-600" },
   ];
-  return { score, ...levels[score] };
+  return { score, ...levels[score]! };
 }

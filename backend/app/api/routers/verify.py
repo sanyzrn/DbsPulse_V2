@@ -12,18 +12,19 @@ from app.services.documents import get_document
 router = APIRouter(prefix="/api/verify", tags=["verify"])
 
 
-@router.get("/{evaluation_code}", response_model=VerificationResult)
+@router.get("/{token}", response_model=VerificationResult)
 @limiter.limit("30/minute")
 def verify_document(
     request: Request,
-    evaluation_code: str,
+    token: str,
     db: Session = Depends(get_db),
 ) -> VerificationResult:
-    """تأیید اصالت عمومی سند از روی کد ارزیابی (بدون احراز هویت؛ برای اسکن QR نسخه چاپی).
-    فقط ارزیابی‌های نهایی‌شده قابل تأییدند و فقط داده‌های غیرحساس برگردانده می‌شود."""
-    record = db.scalar(
-        select(EvaluationRecord).where(EvaluationRecord.evaluation_code == evaluation_code)
-    )
+    """تأیید اصالت عمومی سند از روی توکن تصادفی (بدون احراز هویت؛ برای اسکن QR نسخه
+    چاپی). عمداً از evaluation_code (ترتیبی و قابل‌شمارش: EVL-0001, EVL-0002, ...)
+    به‌عنوان کلید جست‌وجو استفاده نمی‌شود — وگرنه هرکسی با شمارش کد می‌توانست نام/
+    واحد/نتیجهٔ همهٔ پرسنل را استخراج کند. فقط ارزیابی‌های نهایی‌شده قابل تأییدند و
+    فقط داده‌های غیرحساس برگردانده می‌شود."""
+    record = db.scalar(select(EvaluationRecord).where(EvaluationRecord.verify_token == token))
     if record is None or record.status != EvaluationStatus.finalized:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,

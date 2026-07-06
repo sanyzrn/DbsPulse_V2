@@ -21,14 +21,14 @@ interface VerificationResult {
 
 // صفحه عمومی (بدون احراز هویت) برای تأیید اصالت سند از روی QR نسخه چاپی
 export function VerifyPage() {
-  const { code } = useParams();
+  const { token } = useParams();
   const [result, setResult] = useState<VerificationResult | null>(null);
   const [status, setStatus] = useState<"loading" | "valid" | "invalid">("loading");
 
   useEffect(() => {
     let active = true;
     axios
-      .get<VerificationResult>(`/api/verify/${code}`)
+      .get<VerificationResult>(`/api/verify/${token}`)
       .then(({ data }) => {
         if (!active) return;
         setResult(data);
@@ -40,7 +40,7 @@ export function VerifyPage() {
     return () => {
       active = false;
     };
-  }, [code]);
+  }, [token]);
 
   return (
     <div className="relative flex min-h-screen flex-col overflow-hidden">
@@ -92,10 +92,10 @@ export function VerifyPage() {
                   </svg>
                 </div>
                 <p className="text-sm font-medium text-red-700">
-                  سند معتبری با کد «{code}» یافت نشد.
+                  سند معتبری با این نشانی یافت نشد.
                 </p>
                 <p className="mt-1 text-xs text-red-600">
-                  ممکن است این سند نهایی نشده باشد یا کد اشتباه وارد شده باشد.
+                  ممکن است این سند نهایی نشده باشد یا نشانی اشتباه وارد شده باشد.
                 </p>
               </motion.div>
             )}

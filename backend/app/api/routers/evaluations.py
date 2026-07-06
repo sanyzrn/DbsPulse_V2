@@ -1,3 +1,4 @@
+import secrets
 from datetime import UTC, datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -43,6 +44,27 @@ router = APIRouter(prefix="/api/evaluations", tags=["evaluations"])
 
 def _get_record_or_404(db: Session, evaluation_id: int) -> EvaluationRecord:
     record = db.get(EvaluationRecord, evaluation_id)
+    if record is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="ارزیابی یافت نشد")
+    return record
+
+
+def _get_record_or_404_for_update(db: Session, evaluation_id: int) -> EvaluationRecord:
+    """مثل _get_record_or_404 اما با قفل ردیف (SELECT ... FOR UPDATE) — مخصوص
+    گذارهای گردش‌کار (submit/hr-approve/deputy-approve/ceo-finalize/return).
+    بدون این قفل، دو درخواست هم‌زمان (مثلاً دوبار کلیک روی «تأیید») می‌توانستند
+    هر دو از ensure_transition_allowed عبور کنند پیش از آنکه هرکدام commit شود؛
+    قفل ردیف دومین درخواست را تا commit اولی معطل نگه می‌دارد تا وضعیتِ به‌روزشده
+    را ببیند و با خطای تمیز رد شود، نه یک race بی‌صدا.
+
+    subject (Personnel) با lazy="joined" همیشه eager-join می‌شود؛ Postgres قفل
+    FOR UPDATE را روی سمت nullable یک outer join نمی‌پذیرد، پس صراحتاً فقط خودِ
+    evaluation_records قفل می‌شود (of=EvaluationRecord ⇒ «FOR UPDATE OF …»)."""
+    record = db.scalar(
+        select(EvaluationRecord)
+        .where(EvaluationRecord.id == evaluation_id)
+        .with_for_update(of=EvaluationRecord)
+    )
     if record is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="ارزیابی یافت نشد")
     return record
@@ -361,7 +383,7 @@ def submit_evaluation(
     db: Session = Depends(get_db),
     current_user: CurrentUser = Depends(require_roles(UserRole.unit_supervisor)),
 ) -> EvaluationRecord:
-    record = _get_record_or_404(db, evaluation_id)
+    record = _get_record_or_404_for_update(db, evaluation_id)
     apply_transition(
         db, record, "submit", current_user,
         before=lambda: finalize_scoring(db, record, current_user),
@@ -377,7 +399,7 @@ def hr_approve(
     db: Session = Depends(get_db),
     current_user: CurrentUser = Depends(require_roles(UserRole.hr)),
 ) -> EvaluationRecord:
-    record = _get_record_or_404(db, evaluation_id)
+    record = _get_record_or_404_for_update(db, evaluation_id)
     apply_transition(db, record, "hr_approve", current_user)
     db.commit()
     db.refresh(record)
@@ -390,7 +412,7 @@ def deputy_approve(
     db: Session = Depends(get_db),
     current_user: CurrentUser = Depends(require_roles(UserRole.deputy)),
 ) -> EvaluationRecord:
-    record = _get_record_or_404(db, evaluation_id)
+    record = _get_record_or_404_for_update(db, evaluation_id)
 
     def _before() -> None:
         # معاونت برای پرسنل «مدیر» نقش نمره‌دهنده اول را هم بازی می‌کند
@@ -409,11 +431,14 @@ def ceo_finalize(
     db: Session = Depends(get_db),
     current_user: CurrentUser = Depends(require_roles(UserRole.ceo)),
 ) -> EvaluationRecord:
-    record = _get_record_or_404(db, evaluation_id)
+    record = _get_record_or_404_for_update(db, evaluation_id)
 
     def _before() -> None:
         record.finalized_at = datetime.now(UTC)
         record.final_snapshot = build_final_snapshot(db, record)
+        # توکن تصادفی صفحهٔ تأیید عمومی؛ evaluation_code ترتیبی است و نباید کلید
+        # جست‌وجوی یک endpoint بدون احراز هویت باشد (قابل شمارش/enumeration)
+        record.verify_token = secrets.token_urlsafe(24)
 
     apply_transition(db, record, "ceo_finalize", current_user, before=_before)
     # سند PDF نهایی همین‌جا یک‌بار تولید، هش و آرشیو می‌شود تا از این پس همان بایت‌ها
@@ -442,7 +467,7 @@ def return_evaluation(
     ),
 ) -> EvaluationRecord:
     """برگشت پرونده یک مرحله به عقب با ذکر دلیل اجباری؛ امتیازهای قبلی حفظ می‌شوند."""
-    record = _get_record_or_404(db, evaluation_id)
+    record = _get_record_or_404_for_update(db, evaluation_id)
     action, comment_stage = _RETURN_ACTION_BY_ROLE[current_user.role]
 
     if action == "deputy_return" and is_manager_path(record):

@@ -3,6 +3,7 @@ import { motion } from "motion/react";
 import { useAuth } from "../auth/AuthContext";
 import { APP_NAME, APP_NAME_FA } from "../appInfo";
 import { BrandMark } from "./Brand";
+import { ErrorBoundary } from "./ErrorBoundary";
 import { Footer } from "./Footer";
 import { NotificationBell } from "./NotificationBell";
 import { ROLE_LABELS } from "../types";
@@ -50,6 +51,14 @@ export function Layout() {
 
   return (
     <div className="flex min-h-screen flex-col bg-gray-50">
+      {/* پرش به محتوای اصلی: کاربر کیبورد/screen reader مجبور نیست هر بار کل هدر
+          (برند، زنگوله، منوی کاربر، ناوبری نقش) را Tab بزند تا به محتوای صفحه برسد */}
+      <a
+        href="#main-content"
+        className="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:right-2 focus:z-50 focus:rounded-xl focus:bg-pulse-600 focus:px-4 focus:py-2 focus:text-sm focus:font-medium focus:text-white focus:shadow-lg"
+      >
+        پرش به محتوای اصلی
+      </a>
       <header className="sticky top-0 z-40 border-b border-gray-100 bg-white/80 shadow-sm backdrop-blur-xl">
         {/* خط گرادیانت بالای هدر */}
         <div className="h-0.5 w-full bg-gradient-to-l from-pulse-500 via-pulse-violet-500 to-pulse-500" />
@@ -122,16 +131,19 @@ export function Layout() {
         </nav>
       </header>
 
-      <main className="mx-auto w-full max-w-6xl flex-1 p-4 sm:p-6">
-        {/* انیمیشن انتقال صفحه — fade + slide-up با key مسیر */}
-        <motion.div
-          key={location.pathname}
-          initial={{ opacity: 0, y: 8 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.3, ease: "easeOut" }}
-        >
-          <Outlet />
-        </motion.div>
+      <main id="main-content" tabIndex={-1} className="mx-auto w-full max-w-6xl flex-1 p-4 sm:p-6">
+        {/* ErrorBoundary با key مسیر دوباره mount می‌شود تا خطای یک صفحه با رفتن به
+            صفحهٔ دیگر خودبه‌خود پاک شود، نه اینکه کاربر برای همیشه در حالت خطا بماند */}
+        <ErrorBoundary key={location.pathname} title="مشکلی در نمایش این صفحه پیش آمد">
+          {/* انیمیشن انتقال صفحه — fade + slide-up با key مسیر */}
+          <motion.div
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.3, ease: "easeOut" }}
+          >
+            <Outlet />
+          </motion.div>
+        </ErrorBoundary>
       </main>
 
       <Footer />

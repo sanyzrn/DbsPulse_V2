@@ -37,8 +37,10 @@ function App() {
   return (
     <Routes>
       <Route path="/login" element={<LoginPage />} />
-      {/* تأیید اصالت سند: عمومی و بدون احراز هویت (هدف QR نسخه چاپی) */}
-      <Route path="/verify/:code" element={<VerifyPage />} />
+      {/* تأیید اصالت سند: عمومی و بدون احراز هویت (هدف QR نسخه چاپی).
+          مقدار :token یک رشتهٔ تصادفی است، نه evaluation_code ترتیبی — عمداً، تا
+          endpoint عمومی /api/verify قابل شمارش نباشد (رجوع به backend/app/api/routers/verify.py). */}
+      <Route path="/verify/:token" element={<VerifyPage />} />
 
       <Route element={<ProtectedRoute />}>
         <Route element={<Layout />}>

@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user, require_roles
 from app.db.session import get_db
-from app.models.enums import UserRole
+from app.models.enums import EvaluationStatus, UserRole
 from app.models.evaluation import EvaluationRecord
 from app.models.evaluation_access import EvaluationAccess
 from app.models.personnel import Personnel
@@ -141,6 +141,26 @@ def update_personnel(
         if existing is not None:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST, detail="کد پرسنلی تکراری است"
+            )
+
+    # تغییر is_manager یک متغیر ساختاری گردش‌کار است (وجود/عدم‌وجود مرحلهٔ مسئول
+    # واحد). اگر ارزیابی بازی (نهایی‌نشده) روی همین فرد در جریان باشد، آن رکورد
+    # دیگر با انتظارات مسیر جدید هماهنگ نیست؛ به‌جای رفتار نامشخص، تغییر را مسدود
+    # می‌کنیم تا HR اول تکلیف ارزیابی باز را روشن کند.
+    if "is_manager" in updates and updates["is_manager"] != personnel.is_manager:
+        open_evaluation = db.scalar(
+            select(EvaluationRecord).where(
+                EvaluationRecord.subject_personnel_id == personnel.id,
+                EvaluationRecord.status != EvaluationStatus.finalized,
+            )
+        )
+        if open_evaluation is not None:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=(
+                    "این پرسنل ارزیابی باز (نهایی‌نشده) دارد؛ ابتدا آن را نهایی یا "
+                    "لغو کنید و سپس وضعیت «مدیر» را تغییر دهید"
+                ),
             )
 
     def _jsonable(value: object) -> object:

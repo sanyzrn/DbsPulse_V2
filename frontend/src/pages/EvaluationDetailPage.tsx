@@ -195,7 +195,9 @@ export function EvaluationDetailPage() {
           existing={evaluation.scores}
           evaluatorComment={evaluatorComment}
           setEvaluatorComment={setEvaluatorComment}
-          showEvaluatorComment={isSupervisorDraft}
+          showEvaluatorComment={isSupervisorDraft || isManagerInitialScoring}
+          commentLabel={isManagerInitialScoring ? "نظر کلی معاونت" : "نظر کلی مسئول واحد"}
+          nextAction={isSupervisorDraft ? "submit" : "deputy_approve"}
           onSubmitted={load}
         />
       ) : (
@@ -204,6 +206,7 @@ export function EvaluationDetailPage() {
           indicators={indicators}
           scores={evaluation.scores}
           evaluatorComment={evaluation.evaluator_comment}
+          commentLabel={evaluation.unit_supervisor_user_id === null ? "نظر کلی معاونت" : "نظر کلی مسئول واحد"}
         />
       )}
 
@@ -406,11 +409,13 @@ function ReadOnlyScoring({
   indicators,
   scores,
   evaluatorComment,
+  commentLabel,
 }: {
   config: AppConfig;
   indicators: Indicator[];
   scores: EvaluationDetail["scores"];
   evaluatorComment: string | null;
+  commentLabel: string;
 }) {
   if (scores.length === 0) {
     return (
@@ -452,7 +457,7 @@ function ReadOnlyScoring({
       </div>
       {evaluatorComment && (
         <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-card">
-          <h3 className="mb-1 text-base font-bold text-gray-900">نظر کلی مسئول واحد</h3>
+          <h3 className="mb-1 text-base font-bold text-gray-900">{commentLabel}</h3>
           <p className="text-sm text-gray-700">{evaluatorComment}</p>
         </div>
       )}
@@ -468,6 +473,8 @@ function EditableScoring({
   evaluatorComment,
   setEvaluatorComment,
   showEvaluatorComment,
+  commentLabel,
+  nextAction,
   onSubmitted,
 }: {
   config: AppConfig;
@@ -477,6 +484,8 @@ function EditableScoring({
   evaluatorComment: string;
   setEvaluatorComment: (v: string) => void;
   showEvaluatorComment: boolean;
+  commentLabel: string;
+  nextAction: "submit" | "deputy_approve";
   onSubmitted: () => void;
 }) {
   const { showSuccess, showError } = useToast();
@@ -557,10 +566,8 @@ function EditableScoring({
         await apiClient.patch(`/evaluations/${evaluationId}/evaluator-comment`, {
           evaluator_comment: evaluatorComment,
         });
-        await apiClient.post(`/evaluations/${evaluationId}/submit`);
-      } else {
-        await apiClient.post(`/evaluations/${evaluationId}/deputy-approve`);
       }
+      await apiClient.post(`/evaluations/${evaluationId}/${nextAction === "submit" ? "submit" : "deputy-approve"}`);
       showSuccess("ارزیابی با موفقیت ثبت شد");
       onSubmitted();
     } catch (err) {
@@ -629,7 +636,7 @@ function EditableScoring({
 
       {showEvaluatorComment && (
         <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-card">
-          <h3 className="mb-2 text-base font-bold text-gray-900">نظر کلی مسئول واحد</h3>
+          <h3 className="mb-2 text-base font-bold text-gray-900">{commentLabel}</h3>
           <textarea
             className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2 outline-none transition-all duration-200 focus:border-pulse-400 text-sm"
             rows={3}

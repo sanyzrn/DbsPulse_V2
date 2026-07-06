@@ -308,10 +308,23 @@ def set_evaluator_comment(
     evaluation_id: int,
     payload: EvaluatorCommentUpdate,
     db: Session = Depends(get_db),
-    current_user: CurrentUser = Depends(require_roles(UserRole.unit_supervisor)),
+    current_user: CurrentUser = Depends(get_current_user),
 ) -> EvaluationRecord:
     record = _get_record_or_404(db, evaluation_id)
-    if record.status != EvaluationStatus.draft or current_user.id != record.unit_supervisor_user_id:
+    # نمره‌دهنده اول این نظر را ثبت می‌کند: مسیر عادی مسئول واحد در draft است؛
+    # مسیر «مدیر» معاونت خودش نمره‌دهندهٔ اول است و در hr_approved این کار را می‌کند.
+    is_supervisor_draft = (
+        current_user.role == UserRole.unit_supervisor
+        and record.status == EvaluationStatus.draft
+        and current_user.id == record.unit_supervisor_user_id
+    )
+    is_manager_initial_scoring = (
+        current_user.role == UserRole.deputy
+        and record.status == EvaluationStatus.hr_approved
+        and is_manager_path(record)
+        and current_user.id == record.deputy_user_id
+    )
+    if not (is_supervisor_draft or is_manager_initial_scoring):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN, detail="امکان ثبت نظر در این مرحله وجود ندارد"
         )

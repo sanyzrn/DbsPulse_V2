@@ -27,8 +27,6 @@ const DOT_STYLES: Record<Tone, string> = {
   gray: "bg-gray-400",
 };
 
-const BAR_GRADIENT_ID = "pulse-bar-gradient";
-
 /** رنگ حلقه بر اساس tone — اما برای tone سبز/برند از گرادیانت استفاده می‌کنیم. */
 const RING_STOP_COLOR: Record<Tone, string> = {
   green: "#10b981",

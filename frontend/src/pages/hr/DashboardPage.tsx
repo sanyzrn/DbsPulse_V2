@@ -387,7 +387,7 @@ function BarByOrgUnitCard({ data }: { data: { org_unit: string; avg_final_pct: n
               <LabelList
                 dataKey="میانگین"
                 position="right"
-                formatter={(v: number) => v.toLocaleString("fa-IR")}
+                formatter={(v) => (v == null ? "" : Number(v).toLocaleString("fa-IR"))}
                 style={{ fontSize: 11, fill: "#6b7280", fontFamily: "Vazirmatn, Tahoma, sans-serif" }}
               />
             </Bar>

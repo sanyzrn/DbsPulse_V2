@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "motion/react";
 import { apiClient, extractConflictEvaluationId, extractErrorMessage } from "../../api/client";
-import { usePersonnelList } from "../../api/queries";
+import { useEvaluations, usePersonnelList } from "../../api/queries";
 import { EmployeeProfileModal } from "../../components/EmployeeProfileModal";
 import { EvaluationList } from "../../components/EvaluationList";
 import { PageHeader } from "../../ui/Card";
@@ -20,6 +20,15 @@ export function DeputyHomePage() {
     offset: 0,
   });
   const managers = (data?.items ?? []).filter((p) => p.is_manager);
+
+  // برای غیرفعال‌کردن «شروع ارزیابی جدید» وقتی ارزیابی باز از قبل هست
+  const { data: myEvaluations } = useEvaluations({ limit: 200, offset: 0 });
+  const openEvaluationByPersonnel = new Map<number, { id: number; code: string }>();
+  for (const e of myEvaluations?.items ?? []) {
+    if (e.status !== "finalized") {
+      openEvaluationByPersonnel.set(e.subject_personnel_id, { id: e.id, code: e.evaluation_code });
+    }
+  }
 
   async function startEvaluation(p: Personnel) {
     if (starting) return;
@@ -82,25 +91,44 @@ export function DeputyHomePage() {
                     </td>
                     <td className="px-3 py-2.5 text-gray-500">{p.org_unit}</td>
                     <td className="px-3 py-2.5">
-                      <button
-                        onClick={() => startEvaluation(p)}
-                        disabled={starting}
-                        className="inline-flex items-center gap-1.5 rounded-xl bg-gradient-to-bl from-pulse-50 to-pulse-violet-50 px-3 py-1.5 text-sm font-medium text-pulse-700 transition-all duration-200 hover:shadow-md disabled:opacity-50"
-                      >
-                        {startingId === p.id ? (
-                          <>
-                            <span className="h-3 w-3 animate-spin rounded-full border-2 border-pulse-300 border-t-pulse-600" />
-                            در حال ایجاد…
-                          </>
-                        ) : (
-                          <>
-                            <svg viewBox="0 0 20 20" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                              <path d="M10 4v12M4 10h12" />
-                            </svg>
-                            شروع ارزیابی جدید
-                          </>
-                        )}
-                      </button>
+                      {(() => {
+                        const open = openEvaluationByPersonnel.get(p.id);
+                        if (open) {
+                          return (
+                            <button
+                              onClick={() => navigate(`/evaluations/${open.id}`)}
+                              title={`ارزیابی باز موجود است: ${open.code}`}
+                              className="inline-flex items-center gap-1.5 rounded-xl bg-gray-100 px-3 py-1.5 text-sm font-medium text-gray-600 transition-all duration-200 hover:bg-gray-200"
+                            >
+                              <svg viewBox="0 0 20 20" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                <path d="M4 10h12M10 4l6 6-6 6" />
+                              </svg>
+                              ادامه ارزیابی باز
+                            </button>
+                          );
+                        }
+                        return (
+                          <button
+                            onClick={() => startEvaluation(p)}
+                            disabled={starting}
+                            className="inline-flex items-center gap-1.5 rounded-xl bg-gradient-to-bl from-pulse-50 to-pulse-violet-50 px-3 py-1.5 text-sm font-medium text-pulse-700 transition-all duration-200 hover:shadow-md disabled:opacity-50"
+                          >
+                            {startingId === p.id ? (
+                              <>
+                                <span className="h-3 w-3 animate-spin rounded-full border-2 border-pulse-300 border-t-pulse-600" />
+                                در حال ایجاد…
+                              </>
+                            ) : (
+                              <>
+                                <svg viewBox="0 0 20 20" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                  <path d="M10 4v12M4 10h12" />
+                                </svg>
+                                شروع ارزیابی جدید
+                              </>
+                            )}
+                          </button>
+                        );
+                      })()}
                     </td>
                   </motion.tr>
                 ))}
@@ -119,7 +147,11 @@ export function DeputyHomePage() {
       />
 
       {profilePerson && (
-        <EmployeeProfileModal personnel={profilePerson} onClose={() => setProfilePerson(null)} />
+        <EmployeeProfileModal
+          personnelId={profilePerson.id}
+          personName={profilePerson.full_name}
+          onClose={() => setProfilePerson(null)}
+        />
       )}
     </div>
   );

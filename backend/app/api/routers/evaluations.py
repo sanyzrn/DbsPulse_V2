@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user, require_roles
 from app.db.session import get_db
+from app.models.audit_log import AuditLog
 from app.models.enums import CommentStage, EvaluationStatus, PeriodStatus, UserRole
 from app.models.evaluation import EvaluationComment, EvaluationRecord, EvaluationScore
 from app.models.evaluation_access import EvaluationAccess
@@ -231,8 +232,28 @@ def list_evaluations(
             query.order_by(EvaluationRecord.created_at.desc()).limit(limit).offset(offset)
         )
     )
+    # صف بررسی نباید پرونده‌ای که قبلاً برگشت خورده و دوباره ارسال شده را از یک
+    # ثبت تازه تشخیص‌نداده نمایش دهد؛ یک کوئری دسته‌ای به‌جای N+1 در audit_log
+    returned_ids: set[int] = set()
+    if items:
+        returned_ids = set(
+            db.scalars(
+                select(AuditLog.evaluation_record_id)
+                .where(
+                    AuditLog.event_type == "evaluation_returned",
+                    AuditLog.evaluation_record_id.in_([r.id for r in items]),
+                )
+                .distinct()
+            )
+        )
     return EvaluationPage(
-        total=total, items=[EvaluationRead.model_validate(r) for r in items]
+        total=total,
+        items=[
+            EvaluationRead.model_validate(r).model_copy(
+                update={"was_returned": r.id in returned_ids}
+            )
+            for r in items
+        ],
     )
 
 
@@ -308,10 +329,23 @@ def set_evaluator_comment(
     evaluation_id: int,
     payload: EvaluatorCommentUpdate,
     db: Session = Depends(get_db),
-    current_user: CurrentUser = Depends(require_roles(UserRole.unit_supervisor)),
+    current_user: CurrentUser = Depends(get_current_user),
 ) -> EvaluationRecord:
     record = _get_record_or_404(db, evaluation_id)
-    if record.status != EvaluationStatus.draft or current_user.id != record.unit_supervisor_user_id:
+    # نمره‌دهنده اول این نظر را ثبت می‌کند: مسیر عادی مسئول واحد در draft است؛
+    # مسیر «مدیر» معاونت خودش نمره‌دهندهٔ اول است و در hr_approved این کار را می‌کند.
+    is_supervisor_draft = (
+        current_user.role == UserRole.unit_supervisor
+        and record.status == EvaluationStatus.draft
+        and current_user.id == record.unit_supervisor_user_id
+    )
+    is_manager_initial_scoring = (
+        current_user.role == UserRole.deputy
+        and record.status == EvaluationStatus.hr_approved
+        and is_manager_path(record)
+        and current_user.id == record.deputy_user_id
+    )
+    if not (is_supervisor_draft or is_manager_initial_scoring):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN, detail="امکان ثبت نظر در این مرحله وجود ندارد"
         )

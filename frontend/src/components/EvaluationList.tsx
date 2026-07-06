@@ -144,7 +144,20 @@ export function EvaluationList({
                   >
                     <td className="px-3 py-2.5 font-medium text-gray-700">{e.evaluation_code}</td>
                     <td className="px-3 py-2.5 text-gray-700">{e.subject_full_name}</td>
-                    <td className="px-3 py-2.5"><StatusBadge status={e.status} /></td>
+                    <td className="px-3 py-2.5">
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        <StatusBadge status={e.status} />
+                        {e.was_returned && (
+                          <span
+                            className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-[11px] font-medium text-amber-700"
+                            title="این پرونده قبلاً حداقل یک‌بار برگشت خورده است"
+                          >
+                            <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-amber-500" />
+                            برگشتی
+                          </span>
+                        )}
+                      </div>
+                    </td>
                     <td className="px-3 py-2.5 text-gray-500">{STAGE_LABELS[e.stage]}</td>
                     <td className="px-3 py-2.5">
                       <button

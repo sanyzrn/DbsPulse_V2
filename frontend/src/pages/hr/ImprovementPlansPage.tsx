@@ -7,6 +7,7 @@ import {
   useEligibleEvaluations,
   useImprovementPlans,
 } from "../../api/queries";
+import { EmployeeProfileModal } from "../../components/EmployeeProfileModal";
 import { PaginationControls } from "../../components/PaginationControls";
 import { useToast } from "../../components/Toast";
 import { Button } from "../../ui/Button";
@@ -37,7 +38,15 @@ const STATUS_DOT: Record<ImprovementPlanStatus, string> = {
 const inputClass =
   "w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 outline-none transition-all duration-200 focus:border-pulse-400";
 
-function CreatePlanRow({ item, onCreated }: { item: EligibleEvaluation; onCreated: () => void }) {
+function CreatePlanRow({
+  item,
+  onCreated,
+  onOpenProfile,
+}: {
+  item: EligibleEvaluation;
+  onCreated: () => void;
+  onOpenProfile: (personnelId: number, name: string) => void;
+}) {
   const { showSuccess, showError } = useToast();
   const [open, setOpen] = useState(false);
   const [title, setTitle] = useState(`برنامه بهبود ${item.personnel_full_name}`);
@@ -68,7 +77,14 @@ function CreatePlanRow({ item, onCreated }: { item: EligibleEvaluation; onCreate
       animate={{ opacity: 1 }}
       transition={{ duration: 0.2 }}
     >
-      <td className="px-3 py-2.5 text-gray-700">{item.personnel_full_name}</td>
+      <td className="px-3 py-2.5">
+        <button
+          onClick={() => onOpenProfile(item.personnel_id, item.personnel_full_name)}
+          className="text-right font-medium text-pulse-700 transition-colors hover:text-pulse-800 hover:underline"
+        >
+          {item.personnel_full_name}
+        </button>
+      </td>
       <td className="px-3 py-2.5 text-gray-500">{item.evaluation_code}</td>
       <td className="px-3 py-2.5"><PctBadge value={item.final_weighted_pct} /></td>
       <td className="px-3 py-2.5">
@@ -128,6 +144,7 @@ export function ImprovementPlansPage() {
   const queryClient = useQueryClient();
   const [statusFilter, setStatusFilter] = useState<ImprovementPlanStatus | "">("");
   const [page, setPage] = useState(0);
+  const [profilePerson, setProfilePerson] = useState<{ id: number; name: string } | null>(null);
 
   const { data: eligible = [] } = useEligibleEvaluations();
   const { data, error } = useImprovementPlans({
@@ -169,6 +186,7 @@ export function ImprovementPlansPage() {
                     key={item.evaluation_record_id}
                     item={item}
                     onCreated={refreshAll}
+                    onOpenProfile={(id, name) => setProfilePerson({ id, name })}
                   />
                 ))}
               </tbody>
@@ -224,7 +242,14 @@ export function ImprovementPlansPage() {
                   transition={{ duration: 0.2, delay: idx * 0.03 }}
                 >
                   <td className="px-3 py-2.5 font-medium text-gray-700">{p.title}</td>
-                  <td className="px-3 py-2.5 text-gray-600">{p.personnel_full_name}</td>
+                  <td className="px-3 py-2.5">
+                    <button
+                      onClick={() => setProfilePerson({ id: p.personnel_id, name: p.personnel_full_name })}
+                      className="text-right text-gray-600 transition-colors hover:text-pulse-700 hover:underline"
+                    >
+                      {p.personnel_full_name}
+                    </button>
+                  </td>
                   <td className="px-3 py-2.5 text-gray-500">{formatDate(p.review_date)}</td>
                   <td className="px-3 py-2.5">
                     <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium ${STATUS_BADGE[p.status]}`}>
@@ -254,6 +279,14 @@ export function ImprovementPlansPage() {
           onPageChange={setPage}
         />
       </Card>
+
+      {profilePerson && (
+        <EmployeeProfileModal
+          personnelId={profilePerson.id}
+          personName={profilePerson.name}
+          onClose={() => setProfilePerson(null)}
+        />
+      )}
     </div>
   );
 }

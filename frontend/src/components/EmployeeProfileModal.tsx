@@ -13,11 +13,10 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from "recharts";
-import { usePersonRadar, usePersonTrend } from "../api/queries";
+import { usePersonRadar, usePersonTrend, usePersonnelDetail } from "../api/queries";
 import { Button } from "../ui/Button";
 import { Modal } from "../ui/Modal";
 import { formatDate } from "../utils/dates";
-import type { Personnel } from "../types";
 
 const BRAND_FROM = "#b61615";
 const BRAND_TO = "#374151";
@@ -48,11 +47,39 @@ function InfoRow({ label, value }: { label: string; value: ReactNode }) {
 }
 
 /** پروفایل همیشه‌دردسترس پرسنل: اطلاعات پایه + رادار شایستگی + روند امتیاز نهایی.
- * توسط HR (از فهرست پرسنل) و ارزیاب‌ها (مسئول واحد/معاونت از فهرست افراد زیرمجموعه)
- * استفاده می‌شود؛ بک‌اند دسترسی ارزیاب را به افراد حوزهٔ خودش محدود می‌کند. */
-export function EmployeeProfileModal({ personnel, onClose }: { personnel: Personnel; onClose: () => void }) {
-  const { data: radar = [] } = usePersonRadar(personnel.id);
-  const { data: trend = [] } = usePersonTrend(personnel.id);
+ * توسط HR (از فهرست پرسنل/برنامه‌های بهبود) و ارزیاب‌ها (مسئول واحد/معاونت از فهرست
+ * افراد زیرمجموعه) استفاده می‌شود؛ بک‌اند دسترسی ارزیاب را به افراد حوزهٔ خودش محدود
+ * می‌کند. شناسه پرسنل کافی است — خود مودال جزئیات را می‌گیرد، پس فراخوان‌ها لازم
+ * نیست از قبل شیء کامل Personnel را در دست داشته باشند. */
+export function EmployeeProfileModal({
+  personnelId,
+  personName,
+  onClose,
+}: {
+  personnelId: number;
+  /** برای نمایش عنوان مودال پیش از رسیدن پاسخ personnel detail (تجربه سریع‌تر) */
+  personName?: string;
+  onClose: () => void;
+}) {
+  const { data: personnel } = usePersonnelDetail(personnelId);
+  const { data: radar = [] } = usePersonRadar(personnelId);
+  const { data: trend = [] } = usePersonTrend(personnelId);
+
+  if (!personnel) {
+    return (
+      <Modal
+        title={`پروفایل پرسنل${personName ? `: ${personName}` : ""}`}
+        onClose={onClose}
+        size="lg"
+        footer={<Button onClick={onClose}>بستن</Button>}
+      >
+        <div className="space-y-3 py-4">
+          <div className="skeleton h-24" />
+          <div className="skeleton h-64" />
+        </div>
+      </Modal>
+    );
+  }
 
   return (
     <Modal title={`پروفایل پرسنل: ${personnel.full_name}`} onClose={onClose} size="lg" footer={<Button onClick={onClose}>بستن</Button>}>

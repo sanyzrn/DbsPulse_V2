@@ -278,7 +278,11 @@ export function PersonnelPage() {
       {/* پروفایل پرسنل با کلیک روی نام از همین فهرست همیشه در دسترس است؛ به هیچ
           مرحله‌ای از گردش‌کار ارزیابی (مثل بازکردن یک پرونده خاص) گره نخورده است. */}
       {profilePerson && (
-        <EmployeeProfileModal personnel={profilePerson} onClose={() => setProfilePerson(null)} />
+        <EmployeeProfileModal
+          personnelId={profilePerson.id}
+          personName={profilePerson.full_name}
+          onClose={() => setProfilePerson(null)}
+        />
       )}
 
       {editingPersonnel && (

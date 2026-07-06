@@ -96,6 +96,7 @@ export interface EvaluationRecord {
   created_at: string;
   finalized_at: string | null;
   acknowledged_at: string | null;
+  was_returned: boolean;
 }
 
 export interface MyEvaluation {

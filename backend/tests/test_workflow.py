@@ -116,6 +116,25 @@ def test_manager_job_title_skips_supervisor_stage(client, db_session):
     )
     assert r.status_code == 200, r.text
 
+    # روی مسیر «مدیر» معاونت خودش نمره‌دهنده اول است، پس باید بتواند نظر کلی هم
+    # ثبت کند (قبلاً این endpoint فقط مسئول واحد را مجاز می‌دانست و نظر معاونت
+    # روی این مسیر بی‌صدا نادیده گرفته می‌شد)
+    r = client.patch(
+        f"/api/evaluations/{evaluation['id']}/evaluator-comment",
+        json={"evaluator_comment": "نظر کلی معاونت روی مسیر مدیر"},
+        headers=auth_header(dep),
+    )
+    assert r.status_code == 200, r.text
+    assert r.json()["evaluator_comment"] == "نظر کلی معاونت روی مسیر مدیر"
+
+    # یک مسئول واحد بی‌ربط همچنان نباید بتواند نظر ثبت کند
+    r = client.patch(
+        f"/api/evaluations/{evaluation['id']}/evaluator-comment",
+        json={"evaluator_comment": "دستکاری غیرمجاز"},
+        headers=auth_header(sup),
+    )
+    assert r.status_code == 403
+
     r = client.post(f"/api/evaluations/{evaluation['id']}/deputy-approve", headers=auth_header(dep))
     assert r.status_code == 200, r.text
     evaluation = r.json()

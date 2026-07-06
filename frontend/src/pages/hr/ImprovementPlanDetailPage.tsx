@@ -14,7 +14,7 @@ import { formatDate, formatDateTime } from "../../utils/dates";
 import { IMPROVEMENT_PLAN_STATUS_LABELS, type ImprovementGoal, type ImprovementPlanStatus } from "../../types";
 
 const inputClass =
-  "w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 outline-none transition-all duration-200 focus:border-pulse-400";
+  "w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 outline-none transition-all duration-200 focus:border-gray-400";
 
 const STATUS_BADGE: Record<ImprovementPlanStatus, string> = {
   open: "bg-pulse-50 text-pulse-700",

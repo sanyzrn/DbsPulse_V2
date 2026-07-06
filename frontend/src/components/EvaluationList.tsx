@@ -56,7 +56,7 @@ export function EvaluationList({
             <path d="M14 14l3 3" />
           </svg>
           <input
-            className="w-full rounded-xl border border-gray-200 bg-white py-1.5 pr-9 pl-3 text-sm text-gray-700 outline-none transition-all duration-200 focus:border-pulse-400 sm:w-72"
+            className="w-full rounded-xl border border-gray-200 bg-white py-1.5 pr-9 pl-3 text-sm text-gray-700 outline-none transition-all duration-200 focus:border-gray-400 sm:w-72"
             placeholder="جست‌وجو (نام پرسنل، کد ارزیابی)…"
             value={search}
             onChange={(e) => {

@@ -35,7 +35,7 @@ export function AuditLogPage() {
         <h2 className="text-base font-bold text-gray-900">گزارش رویدادها (Audit Log)</h2>
         <div className="relative">
           <select
-            className="appearance-none rounded-xl border border-gray-200 bg-white py-1.5 pr-3 pl-8 text-sm text-gray-700 outline-none transition-colors focus:border-pulse-400"
+            className="appearance-none rounded-xl border border-gray-200 bg-white py-1.5 pr-3 pl-8 text-sm text-gray-700 outline-none transition-colors focus:border-gray-400"
             value={eventType}
             onChange={(e) => {
               setEventType(e.target.value);

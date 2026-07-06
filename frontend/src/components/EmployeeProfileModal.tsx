@@ -18,8 +18,10 @@ import { Button } from "../ui/Button";
 import { Modal } from "../ui/Modal";
 import { formatDate } from "../utils/dates";
 
-const BRAND_FROM = "#b61615";
-const BRAND_TO = "#374151";
+// یک رنگ واحد برای هر دو نمودار (تک‌سری‌اند: امتیاز یک نفر) — قبلاً یک گرادیانت
+// دو‌رنگه قرمز به طوسی تیره بود که باعث می‌شد پرشدگی رادار/ناحیه کدر و شلوغ به‌نظر
+// برسد؛ یک هیوی ساده با دو سطح شفافیت، خواناتر و مینیمال‌تر است.
+const SERIES_COLOR = "#b61615";
 const GRID_STROKE = "#eef0f4";
 const AXIS_STROKE = "#e5e7eb";
 const TICK_STYLE = { fontSize: 11, fill: "#6b7280", fontFamily: "Vazirmatn, Tahoma, sans-serif" };
@@ -125,9 +127,9 @@ export function EmployeeProfileModal({
                 <ResponsiveContainer>
                   <RadarChart data={radar} margin={{ top: 12, right: 24, bottom: 12, left: 24 }}>
                     <defs>
-                      <linearGradient id="profile-radar-fill" x1="0" y1="0" x2="1" y2="1">
-                        <stop offset="0%" stopColor={BRAND_FROM} stopOpacity={0.5} />
-                        <stop offset="100%" stopColor={BRAND_TO} stopOpacity={0.2} />
+                      <linearGradient id="profile-radar-fill" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor={SERIES_COLOR} stopOpacity={0.28} />
+                        <stop offset="100%" stopColor={SERIES_COLOR} stopOpacity={0.06} />
                       </linearGradient>
                     </defs>
                     <PolarGrid stroke={GRID_STROKE} />
@@ -136,10 +138,10 @@ export function EmployeeProfileModal({
                     <Radar
                       dataKey="avg_score"
                       name="میانگین امتیاز"
-                      stroke={BRAND_FROM}
+                      stroke={SERIES_COLOR}
                       strokeWidth={2}
                       fill="url(#profile-radar-fill)"
-                      dot={{ r: 3.5, fill: BRAND_TO, strokeWidth: 0 }}
+                      dot={{ r: 3.5, fill: SERIES_COLOR, strokeWidth: 0 }}
                     />
                     <Tooltip contentStyle={TOOLTIP_STYLE} formatter={tooltipNumber} />
                   </RadarChart>
@@ -157,8 +159,8 @@ export function EmployeeProfileModal({
                   <AreaChart data={trend} margin={{ top: 12, right: 16, bottom: 12, left: 0 }}>
                     <defs>
                       <linearGradient id="profile-trend-fill" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stopColor={BRAND_FROM} stopOpacity={0.4} />
-                        <stop offset="100%" stopColor={BRAND_TO} stopOpacity={0.02} />
+                        <stop offset="0%" stopColor={SERIES_COLOR} stopOpacity={0.22} />
+                        <stop offset="100%" stopColor={SERIES_COLOR} stopOpacity={0.02} />
                       </linearGradient>
                     </defs>
                     <CartesianGrid strokeDasharray="4 4" stroke={GRID_STROKE} vertical={false} />
@@ -169,11 +171,11 @@ export function EmployeeProfileModal({
                       type="monotone"
                       dataKey="final_weighted_pct"
                       name="امتیاز نهایی"
-                      stroke={BRAND_FROM}
+                      stroke={SERIES_COLOR}
                       strokeWidth={2.5}
                       fill="url(#profile-trend-fill)"
-                      dot={{ r: 4, fill: "#fff", strokeWidth: 2.5, stroke: BRAND_TO }}
-                      activeDot={{ r: 6, fill: BRAND_TO, strokeWidth: 2, stroke: "#fff" }}
+                      dot={{ r: 4, fill: "#fff", strokeWidth: 2.5, stroke: SERIES_COLOR }}
+                      activeDot={{ r: 6, fill: SERIES_COLOR, strokeWidth: 2, stroke: "#fff" }}
                     />
                   </AreaChart>
                 </ResponsiveContainer>

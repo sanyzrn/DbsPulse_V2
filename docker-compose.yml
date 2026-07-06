@@ -1,0 +1,54 @@
+services:
+  db:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: dbspulse
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-dbspulse_dev_password}
+      POSTGRES_DB: dbspulse
+    ports:
+      # فقط روی loopback؛ دیتابیس نباید از شبکه بیرونی قابل دسترسی باشد
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - dbspulse_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U dbspulse -d dbspulse"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    build: ./backend
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql+psycopg://dbspulse:${POSTGRES_PASSWORD:-dbspulse_dev_password}@db:5432/dbspulse
+      # هشدار: مقادیر پیش‌فرض فقط برای اجرای محلی/دمو مناسب‌اند.
+      # پیش از استقرار واقعی، در فایل .env کنار همین docker-compose.yml مقادیر
+      # ENVIRONMENT=production و یک JWT_SECRET_KEY تصادفی و طولانی تنظیم کنید
+      # (در غیر این صورت برنامه در حالت production عمداً استارت نمی‌شود).
+      ENVIRONMENT: ${ENVIRONMENT:-development}
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY:-change-this-to-a-long-random-string}
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      # فقط روی loopback برای دیباگ محلی؛ ترافیک اصلی از طریق کانتینر frontend
+      # (پروکسی /api) عبور می‌کند و بک‌اند نباید مستقیماً در معرض شبکه باشد.
+      - "127.0.0.1:8000:8000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/health/ready', timeout=3)"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  frontend:
+    build: ./frontend
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      - "8080:80"
+
+volumes:
+  dbspulse_pgdata:

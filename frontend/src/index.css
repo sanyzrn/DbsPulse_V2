@@ -1,0 +1,201 @@
+@import "tailwindcss";
+
+/* ═══════════════════════════════════════════════════════════════════════
+   DbsPulse Design System — Red Accent / Grey Neutral Palette
+   ═══════════════════════════════════════════════════════════════════════ */
+
+@theme {
+  /* Font */
+  --font-sans: "Vazirmatn", "Tahoma", "Segoe UI", sans-serif;
+
+  /* ── Brand Gradient Anchors ── */
+  --color-pulse-from: #b61615;
+  --color-pulse-to: #374151;
+
+  /* ── Primary Accent Spectrum (50–950) — anchored on brand red #B61615 ── */
+  --color-pulse-50: #fef3f3;
+  --color-pulse-100: #fde5e5;
+  --color-pulse-200: #facaca;
+  --color-pulse-300: #f49f9f;
+  --color-pulse-400: #eb4847;
+  --color-pulse-500: #db1a18;
+  --color-pulse-600: #b61615;
+  --color-pulse-700: #911110;
+  --color-pulse-800: #760f0f;
+  --color-pulse-900: #5f0f0e;
+  --color-pulse-950: #360a0a;
+
+  /* ── Neutral Grey Scale (used for gradient endpoints / secondary accents) ── */
+  --color-pulse-violet-50: #f9fafb;
+  --color-pulse-violet-100: #f3f4f6;
+  --color-pulse-violet-200: #e5e7eb;
+  --color-pulse-violet-300: #d1d5db;
+  --color-pulse-violet-400: #9ca3af;
+  --color-pulse-violet-500: #6b7280;
+  --color-pulse-violet-600: #4b5563;
+  --color-pulse-violet-700: #374151;
+  --color-pulse-violet-800: #1f2937;
+  --color-pulse-violet-900: #111827;
+
+  /* ── Shadows ── */
+  --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.06), 0 1px 2px rgba(0, 0, 0, 0.04);
+  --shadow-card-hover: 0 4px 16px rgba(0, 0, 0, 0.08), 0 2px 4px rgba(0, 0, 0, 0.04);
+  --shadow-float: 0 12px 40px rgba(0, 0, 0, 0.12), 0 4px 12px rgba(0, 0, 0, 0.06);
+
+  /* ── Radius ── */
+  --radius-lg: 16px;
+  --radius-xl: 20px;
+
+  /* ── Keyframe Animations ── */
+  --animate-shimmer: shimmer 2s infinite linear;
+  --animate-float: float 6s ease-in-out infinite;
+  --animate-pulse-slow: pulse-slow 3s ease-in-out infinite;
+  --animate-gradient-shift: gradient-shift 8s ease infinite;
+  --animate-spin-slow: spin 4s linear infinite;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   Keyframe Definitions
+   ═══════════════════════════════════════════════════════════════════════ */
+
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-8px); }
+}
+
+@keyframes pulse-slow {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
+}
+
+@keyframes gradient-shift {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   CSS Custom Properties (non-@theme, available everywhere)
+   ═══════════════════════════════════════════════════════════════════════ */
+
+:root {
+  --gradient-pulse: linear-gradient(135deg, var(--color-pulse-from), var(--color-pulse-to));
+  --gradient-pulse-soft: linear-gradient(135deg, rgba(13, 148, 136, 0.08), rgba(124, 58, 237, 0.08));
+  --gradient-pulse-medium: linear-gradient(135deg, rgba(13, 148, 136, 0.15), rgba(124, 58, 237, 0.15));
+  --gradient-pulse-strong: linear-gradient(135deg, rgba(13, 148, 136, 0.25), rgba(124, 58, 237, 0.25));
+  --gradient-pulse-text: linear-gradient(135deg, var(--color-pulse-600), var(--color-pulse-violet-600));
+  --gradient-pulse-bg: linear-gradient(135deg, var(--color-pulse-50), var(--color-pulse-violet-50));
+  --gradient-pulse-bg-wide: linear-gradient(135deg, var(--color-pulse-500), var(--color-pulse-violet-600), var(--color-pulse-500));
+  --gradient-pulse-bg-wide-size: 200% 200%;
+  --gradient-border: linear-gradient(135deg, rgba(13, 148, 136, 0.2), rgba(124, 58, 237, 0.2));
+
+  /* Shimmer background for skeleton loading */
+  --shimmer-bg: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+  --shimmer-bg-size: 200% 100%;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   Global Base Styles
+   ═══════════════════════════════════════════════════════════════════════ */
+
+html,
+body {
+  font-family: "Vazirmatn", "Tahoma", "Segoe UI", sans-serif;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+body {
+  margin: 0;
+  background-color: #f8f9fb;
+  color: #1a1a2e;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   Focus Outline — keyboard navigation only (no glow/ring)
+   ═══════════════════════════════════════════════════════════════════════ */
+
+:focus-visible {
+  outline: 2px solid var(--color-pulse-600);
+  outline-offset: 2px;
+  border-radius: 8px;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   Reusable Utility Classes
+   ═══════════════════════════════════════════════════════════════════════ */
+
+/* Skeleton shimmer for loading states */
+.skeleton {
+  background: var(--shimmer-bg);
+  background-size: var(--shimmer-bg-size);
+  animation: var(--animate-shimmer);
+  border-radius: 8px;
+}
+
+/* Gradient text utility */
+.gradient-text {
+  background: var(--gradient-pulse-text);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+/* Gradient border (pseudo-element technique) */
+.gradient-border {
+  position: relative;
+  border-radius: var(--radius-xl);
+}
+
+.gradient-border::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1px;
+  background: var(--gradient-border);
+  mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  mask-composite: exclude;
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  pointer-events: none;
+}
+
+/* Glass card */
+.glass {
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  background: rgba(255, 255, 255, 0.75);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+/* Animated gradient background for login page */
+.animated-gradient-bg {
+  background: var(--gradient-pulse-bg-wide);
+  background-size: var(--gradient-pulse-bg-wide-size);
+  animation: var(--animate-gradient-shift);
+}
+
+/* Modern scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(182, 22, 21, 0.2);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(182, 22, 21, 0.4);
+}

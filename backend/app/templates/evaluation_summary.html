@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="utf-8" />
+<style>
+  @font-face {
+    font-family: "Vazirmatn";
+    src: url("fonts/Vazirmatn-Regular.woff2") format("woff2");
+    font-weight: 400;
+  }
+  @font-face {
+    font-family: "Vazirmatn";
+    src: url("fonts/Vazirmatn-Bold.woff2") format("woff2");
+    font-weight: 700;
+  }
+  @page { size: A4; margin: 18mm 14mm; }
+  body { font-family: "Vazirmatn", "Tahoma", sans-serif; font-size: 12px; color: #1a1a1d; }
+  h1 { font-size: 18px; margin: 0 0 4px; text-align: center; }
+  h2 { font-size: 14px; margin: 16px 0 6px; border-bottom: 1px solid #ccc; padding-bottom: 4px; }
+  .meta { display: flex; justify-content: space-between; flex-wrap: wrap; margin-bottom: 8px; }
+  .meta div { width: 32%; margin-bottom: 4px; }
+  .meta b { display: block; color: #666; font-size: 10px; }
+  table { width: 100%; border-collapse: collapse; margin-bottom: 10px; }
+  th, td { border: 1px solid #ddd; padding: 4px 6px; text-align: right; font-size: 11px; }
+  th { background: #f4f4f5; }
+  .scores { display: flex; gap: 10px; margin: 10px 0; }
+  .scores div { flex: 1; text-align: center; border: 1px solid #ddd; border-radius: 6px; padding: 8px; }
+  .scores b { display: block; font-size: 16px; }
+  .recommendation { background: #fdf4e3; border: 1px solid #f0dca0; padding: 8px; border-radius: 6px; margin-bottom: 10px; }
+  .signatures { display: flex; justify-content: space-between; margin-top: 40px; }
+  .signatures div { width: 22%; text-align: center; border-top: 1px solid #333; padding-top: 6px; font-size: 11px; }
+  .verify { display: flex; align-items: center; gap: 10px; margin-top: 24px; border-top: 1px dashed #ccc; padding-top: 10px; }
+  .verify img { width: 72px; height: 72px; }
+  .verify-text { font-size: 10px; color: #555; line-height: 1.6; }
+  .verify-text b { color: #1a1a1d; font-size: 11px; }
+</style>
+</head>
+<body>
+  <h1>خلاصه ارزیابی عملکرد — {{ snapshot.evaluation_code }}</h1>
+
+  <div class="meta">
+    <div><b>نام و نام خانوادگی</b>{{ snapshot.personnel.full_name }}</div>
+    <div><b>کد پرسنلی</b>{{ snapshot.personnel.personnel_code }}</div>
+    <div><b>عنوان شغلی</b>{{ snapshot.personnel.job_title }}</div>
+    <div><b>واحد سازمانی</b>{{ snapshot.personnel.org_unit }}</div>
+    <div><b>ارزیاب ({{ snapshot.evaluator.role_label }})</b>{{ snapshot.evaluator.username or '—' }}</div>
+    <div><b>تاریخ شروع ارزیابی</b>{{ snapshot.evaluation_started_at | jalali }}</div>
+    <div><b>تاریخ نهایی‌شدن</b>{{ snapshot.finalized_at | jalali }}</div>
+  </div>
+
+  <div class="scores">
+    <div><span>امتیاز عمومی</span><b>{{ snapshot.general_score_pct }}٪</b></div>
+    <div><span>امتیاز تخصصی</span><b>{{ snapshot.specialized_score_pct }}٪</b></div>
+    <div><span>امتیاز نهایی وزنی</span><b>{{ snapshot.final_weighted_pct }}٪</b></div>
+  </div>
+
+  <div class="recommendation">نتیجه پیشنهادی: {{ snapshot.recommendation }}</div>
+
+  <h2>شاخص‌های عمومی</h2>
+  <table>
+    <thead><tr><th>دسته</th><th>شرح</th><th>امتیاز</th><th>شواهد</th></tr></thead>
+    <tbody>
+      {% for s in snapshot.scores if s.section == 'general' %}
+      <tr><td>{{ s.category }}</td><td>{{ s.description }}</td><td>{{ s.score }}</td><td>{{ s.evidence_text or '—' }}</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <h2>شاخص‌های تخصصی</h2>
+  <table>
+    <thead><tr><th>دسته</th><th>شرح</th><th>امتیاز</th><th>شواهد</th></tr></thead>
+    <tbody>
+      {% for s in snapshot.scores if s.section == 'specialized' %}
+      <tr><td>{{ s.category }}</td><td>{{ s.description }}</td><td>{{ s.score }}</td><td>{{ s.evidence_text or '—' }}</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  {% if snapshot.evaluator_comment %}
+  <h2>نظر کلی ارزیاب</h2>
+  <p>{{ snapshot.evaluator_comment }}</p>
+  {% endif %}
+
+  {% if snapshot.comments %}
+  <h2>کامنت‌های مراحل بررسی</h2>
+  <table>
+    <thead><tr><th>مرحله</th><th>متن</th></tr></thead>
+    <tbody>
+      {% for c in snapshot.comments %}
+      <tr><td>{{ c.stage }}</td><td>{{ c.comment_text }}</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% endif %}
+
+  {# مسیر «مدیر»: معاونت نمره‌دهنده اول است و مرحله مسئول واحد/HR وجود ندارد #}
+  {% set manager_path = snapshot.evaluator.role_label == 'معاونت' %}
+  <div class="signatures">
+    {% if not manager_path %}
+    <div>امضای مسئول واحد</div>
+    <div>امضای منابع انسانی</div>
+    {% endif %}
+    <div>امضای معاونت</div>
+    <div>امضای مدیرعامل</div>
+  </div>
+
+  {% if verify_qr %}
+  <div class="verify">
+    <img src="{{ verify_qr }}" alt="QR تأیید اصالت" />
+    <div class="verify-text">
+      <b>تأیید اصالت سند</b>
+      برای بررسی اصالت این سند، کد QR را اسکن کنید یا به نشانی زیر مراجعه کنید:<br />
+      {{ verify_url }}
+    </div>
+  </div>
+  {% endif %}
+</body>
+</html>

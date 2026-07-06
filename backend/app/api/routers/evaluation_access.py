@@ -1,0 +1,106 @@
+from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy import select
+from sqlalchemy.orm import Session
+
+from app.api.deps import require_roles
+from app.db.session import get_db
+from app.models.enums import UserRole
+from app.models.evaluation_access import EvaluationAccess
+from app.models.personnel import Personnel
+from app.models.user import User
+from app.schemas.auth import CurrentUser
+from app.schemas.evaluation_access import EvaluationAccessRead, EvaluationAccessUpsert
+from app.services.audit import log_event
+
+router = APIRouter(prefix="/api/personnel/{personnel_id}/access", tags=["evaluation-access"])
+
+_ROLE_LABELS = {
+    UserRole.unit_supervisor: "مسئول واحد",
+    UserRole.deputy: "معاونت",
+    UserRole.ceo: "مدیرعامل",
+}
+
+
+def _ensure_active_user_with_role(db: Session, user_id: int, expected_role: UserRole) -> None:
+    """کاربر ارجاع‌شده باید موجود، فعال و با نقش درست باشد؛ در غیر این صورت پرونده‌های
+    ارزیابی با تأییدکننده‌ای ساخته می‌شوند که هرگز نمی‌تواند اقدام کند (پرونده گیر می‌کند)."""
+    label = _ROLE_LABELS[expected_role]
+    user = db.get(User, user_id)
+    if user is None or not user.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"کاربر انتخاب‌شده برای «{label}» یافت نشد یا غیرفعال است",
+        )
+    if user.role != expected_role:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"کاربر انتخاب‌شده برای «{label}» باید نقش «{label}» داشته باشد",
+        )
+
+
+@router.get("", response_model=EvaluationAccessRead | None)
+def get_access(
+    personnel_id: int,
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(require_roles(UserRole.hr)),
+) -> EvaluationAccess | None:
+    return db.scalar(select(EvaluationAccess).where(EvaluationAccess.personnel_id == personnel_id))
+
+
+@router.put("", response_model=EvaluationAccessRead)
+def upsert_access(
+    personnel_id: int,
+    payload: EvaluationAccessUpsert,
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(require_roles(UserRole.hr)),
+) -> EvaluationAccess:
+    personnel = db.get(Personnel, personnel_id)
+    if personnel is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="پرسنل یافت نشد")
+
+    if personnel.is_manager and payload.unit_supervisor_user_id is not None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=(
+                'چون این فرد به‌عنوان «مدیر» علامت خورده است، نمی‌توان دسترسی مسئول واحد را برای او '
+                "فعال کرد؛ این فرد مستقیماً توسط معاونت ارزیابی می‌شود."
+            ),
+        )
+
+    if payload.unit_supervisor_user_id is not None:
+        _ensure_active_user_with_role(db, payload.unit_supervisor_user_id, UserRole.unit_supervisor)
+    _ensure_active_user_with_role(db, payload.deputy_user_id, UserRole.deputy)
+    _ensure_active_user_with_role(db, payload.ceo_user_id, UserRole.ceo)
+
+    access = db.scalar(select(EvaluationAccess).where(EvaluationAccess.personnel_id == personnel_id))
+    if access is None:
+        access = EvaluationAccess(personnel_id=personnel_id)
+        db.add(access)
+        old_value = None
+    else:
+        old_value = {
+            "unit_supervisor_user_id": access.unit_supervisor_user_id,
+            "deputy_user_id": access.deputy_user_id,
+            "ceo_user_id": access.ceo_user_id,
+        }
+
+    access.unit_supervisor_user_id = payload.unit_supervisor_user_id
+    access.deputy_user_id = payload.deputy_user_id
+    access.ceo_user_id = payload.ceo_user_id
+    access.updated_by_user_id = current_user.id
+
+    log_event(
+        db,
+        actor_user_id=current_user.id,
+        event_type="access_updated",
+        old_value=old_value,
+        new_value={
+            "personnel_id": personnel_id,
+            "unit_supervisor_user_id": payload.unit_supervisor_user_id,
+            "deputy_user_id": payload.deputy_user_id,
+            "ceo_user_id": payload.ceo_user_id,
+        },
+    )
+    db.commit()
+    db.refresh(access)
+    return access

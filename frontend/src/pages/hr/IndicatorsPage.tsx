@@ -10,7 +10,7 @@ import { PageHeader } from "../../ui/Card";
 import type { Indicator, IndicatorSection } from "../../types";
 
 const inputClass =
-  "w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 outline-none transition-all duration-200 focus:border-pulse-400";
+  "w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 outline-none transition-all duration-200 focus:border-gray-400";
 
 export function IndicatorsPage() {
   const { showSuccess, showError } = useToast();

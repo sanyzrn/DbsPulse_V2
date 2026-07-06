@@ -78,7 +78,7 @@ export function ChangePasswordPage() {
             type="password"
             autoComplete="current-password"
             required
-            className="w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm text-gray-900 outline-none transition-all duration-200 focus:border-pulse-400"
+            className="w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm text-gray-900 outline-none transition-all duration-200 focus:border-gray-400"
             value={currentPassword}
             onChange={(e) => setCurrentPassword(e.target.value)}
           />
@@ -91,7 +91,7 @@ export function ChangePasswordPage() {
             autoComplete="new-password"
             required
             minLength={MIN_PASSWORD_LENGTH}
-            className="w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm text-gray-900 outline-none transition-all duration-200 focus:border-pulse-400"
+            className="w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm text-gray-900 outline-none transition-all duration-200 focus:border-gray-400"
             value={newPassword}
             onChange={(e) => setNewPassword(e.target.value)}
           />
@@ -118,7 +118,7 @@ export function ChangePasswordPage() {
             type="password"
             autoComplete="new-password"
             required
-            className="w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm text-gray-900 outline-none transition-all duration-200 focus:border-pulse-400"
+            className="w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm text-gray-900 outline-none transition-all duration-200 focus:border-gray-400"
             value={confirmPassword}
             onChange={(e) => setConfirmPassword(e.target.value)}
           />

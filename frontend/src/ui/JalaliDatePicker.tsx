@@ -109,7 +109,7 @@ export function JalaliDatePicker({
         aria-expanded={open}
         className={
           className ??
-          "w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-right text-sm text-gray-900 outline-none transition-colors duration-200 focus:border-pulse-400 disabled:cursor-not-allowed disabled:bg-gray-50 disabled:text-gray-400"
+          "w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-right text-sm text-gray-900 outline-none transition-colors duration-200 focus:border-gray-400 disabled:cursor-not-allowed disabled:bg-gray-50 disabled:text-gray-400"
         }
       >
         <span className={displayValue ? "" : "text-gray-400"}>{displayValue || placeholder}</span>

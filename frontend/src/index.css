@@ -50,7 +50,6 @@
   --animate-shimmer: shimmer 2s infinite linear;
   --animate-float: float 6s ease-in-out infinite;
   --animate-pulse-slow: pulse-slow 3s ease-in-out infinite;
-  --animate-gradient-shift: gradient-shift 8s ease infinite;
   --animate-spin-slow: spin 4s linear infinite;
 }
 
@@ -73,26 +72,16 @@
   50% { opacity: 0.6; }
 }
 
-@keyframes gradient-shift {
-  0% { background-position: 0% 50%; }
-  50% { background-position: 100% 50%; }
-  100% { background-position: 0% 50%; }
-}
-
 /* ═══════════════════════════════════════════════════════════════════════
    CSS Custom Properties (non-@theme, available everywhere)
    ═══════════════════════════════════════════════════════════════════════ */
 
 :root {
   --gradient-pulse: linear-gradient(135deg, var(--color-pulse-from), var(--color-pulse-to));
-  --gradient-pulse-soft: linear-gradient(135deg, rgba(13, 148, 136, 0.08), rgba(124, 58, 237, 0.08));
-  --gradient-pulse-medium: linear-gradient(135deg, rgba(13, 148, 136, 0.15), rgba(124, 58, 237, 0.15));
-  --gradient-pulse-strong: linear-gradient(135deg, rgba(13, 148, 136, 0.25), rgba(124, 58, 237, 0.25));
   --gradient-pulse-text: linear-gradient(135deg, var(--color-pulse-600), var(--color-pulse-violet-600));
-  --gradient-pulse-bg: linear-gradient(135deg, var(--color-pulse-50), var(--color-pulse-violet-50));
-  --gradient-pulse-bg-wide: linear-gradient(135deg, var(--color-pulse-500), var(--color-pulse-violet-600), var(--color-pulse-500));
-  --gradient-pulse-bg-wide-size: 200% 200%;
-  --gradient-border: linear-gradient(135deg, rgba(13, 148, 136, 0.2), rgba(124, 58, 237, 0.2));
+  /* حاشیهٔ ظریف AccentCard — قبلاً از رنگ‌های فیروزه‌ای/بنفشِ نامرتبط با پالت برند
+     استفاده می‌کرد؛ حالا با همان قرمز/طوسی برند، در شفافیت کم */
+  --gradient-border: linear-gradient(135deg, rgba(219, 26, 24, 0.18), rgba(107, 114, 128, 0.18));
 
   /* Shimmer background for skeleton loading */
   --shimmer-bg: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
@@ -121,7 +110,7 @@ body {
    ═══════════════════════════════════════════════════════════════════════ */
 
 :focus-visible {
-  outline: 2px solid var(--color-pulse-600);
+  outline: 2px solid var(--color-pulse-violet-400);
   outline-offset: 2px;
   border-radius: 8px;
 }
@@ -172,13 +161,6 @@ body {
   -webkit-backdrop-filter: blur(16px);
   background: rgba(255, 255, 255, 0.75);
   border: 1px solid rgba(255, 255, 255, 0.3);
-}
-
-/* Animated gradient background for login page */
-.animated-gradient-bg {
-  background: var(--gradient-pulse-bg-wide);
-  background-size: var(--gradient-pulse-bg-wide-size);
-  animation: var(--animate-gradient-shift);
 }
 
 /* Modern scrollbar */

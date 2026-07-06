@@ -31,13 +31,13 @@ export function LoginPage() {
   }
 
   return (
-    <div className="relative flex min-h-screen flex-col overflow-hidden">
-      {/* پس‌زمینه گرادیانت متحرک */}
-      <div className="absolute inset-0 -z-10 animated-gradient-bg opacity-90" />
-      {/* حباب‌های شناور تزئینی */}
-      <div className="pointer-events-none absolute -right-20 -top-20 -z-10 h-72 w-72 rounded-full bg-white/20 blur-3xl" style={{ animation: "var(--animate-float)" }} />
-      <div className="pointer-events-none absolute -bottom-32 -left-20 -z-10 h-96 w-96 rounded-full bg-pulse-violet-300/20 blur-3xl" style={{ animation: "var(--animate-float)", animationDelay: "2s" }} />
-      <div className="pointer-events-none absolute right-1/3 top-1/4 -z-10 h-48 w-48 rounded-full bg-pulse-200/30 blur-3xl" style={{ animation: "var(--animate-float)", animationDelay: "4s" }} />
+    <div className="relative flex min-h-screen flex-col overflow-hidden bg-gray-50">
+      {/* یک المان محو و خاموش، به‌جای گرادیانت متحرک رنگی قبلی — صرفاً کمی حس زندگی
+          به پس‌زمینهٔ ساده می‌دهد، بدون رقابت با محتوای فرم */}
+      <div
+        className="pointer-events-none absolute -right-24 -top-24 -z-10 h-96 w-96 rounded-full bg-gray-200/50 blur-3xl"
+        style={{ animation: "var(--animate-float)" }}
+      />
 
       <div className="flex flex-1 items-center justify-center p-4">
         <motion.div
@@ -54,23 +54,23 @@ export function LoginPage() {
               transition={{ duration: 0.6, delay: 0.1, type: "spring", stiffness: 200 }}
               className="mb-4"
             >
-              <div className="rounded-3xl bg-white/30 p-3 backdrop-blur-md">
-                <BrandMark className="h-16 w-16 drop-shadow-lg" />
+              <div className="rounded-3xl bg-white p-3 shadow-card">
+                <BrandMark className="h-16 w-16" />
               </div>
             </motion.div>
-            <h1 dir="ltr" className="text-3xl font-extrabold tracking-tight text-white drop-shadow-sm">
+            <h1 dir="ltr" className="text-3xl font-extrabold tracking-tight text-gray-900">
               {APP_NAME}
             </h1>
-            <p className="mt-1 text-sm font-semibold text-white/90">{APP_NAME_FA}</p>
-            <p className="mt-2 max-w-xs text-xs leading-relaxed text-white/70">{APP_TAGLINE}</p>
+            <p className="mt-1 text-sm font-semibold text-gray-600">{APP_NAME_FA}</p>
+            <p className="mt-2 max-w-xs text-xs leading-relaxed text-gray-400">{APP_TAGLINE}</p>
           </div>
 
-          {/* کارت ورود — شیشه‌ای */}
+          {/* کارت ورود */}
           <motion.form
             onSubmit={handleSubmit}
-            className="rounded-3xl border border-white/40 bg-white/80 p-6 shadow-float backdrop-blur-xl"
-            initial={{ opacity: 0, y: 16 }}
-            animate={{ opacity: 1, y: 0 }}
+            className="rounded-3xl border border-gray-100 bg-white p-6 shadow-float"
+            initial={{ opacity: 0, scale: 0.95, y: 12 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
             transition={{ duration: 0.6, delay: 0.2 }}
           >
             <p className="mb-6 text-sm text-gray-600">
@@ -82,7 +82,7 @@ export function LoginPage() {
                 id="login-username"
                 name="username"
                 autoComplete="username"
-                className="w-full rounded-xl border border-gray-200 bg-white/70 px-4 py-2.5 text-sm text-gray-900 outline-none transition-all duration-200 focus:border-pulse-400"
+                className="w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm text-gray-900 outline-none transition-all duration-200 focus:border-gray-400"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
                 autoFocus
@@ -95,7 +95,7 @@ export function LoginPage() {
                 name="password"
                 type="password"
                 autoComplete="current-password"
-                className="w-full rounded-xl border border-gray-200 bg-white/70 px-4 py-2.5 text-sm text-gray-900 outline-none transition-all duration-200 focus:border-pulse-400"
+                className="w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm text-gray-900 outline-none transition-all duration-200 focus:border-gray-400"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
               />
@@ -122,7 +122,6 @@ export function LoginPage() {
   );
 }
 
-/** فیلد فرم با فاصله‌گذاری استاندارد. */
 function Field({
   label,
   htmlFor,

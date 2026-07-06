@@ -36,7 +36,7 @@ const STATUS_DOT: Record<ImprovementPlanStatus, string> = {
 };
 
 const inputClass =
-  "w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 outline-none transition-all duration-200 focus:border-pulse-400";
+  "w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 outline-none transition-all duration-200 focus:border-gray-400";
 
 function CreatePlanRow({
   item,
@@ -200,7 +200,7 @@ export function ImprovementPlansPage() {
         actions={
           <div className="relative">
             <select
-              className="appearance-none rounded-xl border border-gray-200 bg-white py-1.5 pr-3 pl-8 text-sm text-gray-700 outline-none transition-colors focus:border-pulse-400"
+              className="appearance-none rounded-xl border border-gray-200 bg-white py-1.5 pr-3 pl-8 text-sm text-gray-700 outline-none transition-colors focus:border-gray-400"
               value={statusFilter}
               onChange={(e) => {
                 setStatusFilter(e.target.value as ImprovementPlanStatus | "");

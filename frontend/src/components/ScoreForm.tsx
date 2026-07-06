@@ -250,7 +250,7 @@ export function ScoreFormTable({
                       <textarea
                         aria-label={`شواهد عینی شاخص: ${ind.category}`}
                         className={`w-full rounded-xl border px-3 py-2 text-sm text-gray-800 outline-none transition-all duration-200 ${
-                          invalid ? "border-red-300 focus:border-red-400" : "border-gray-200 focus:border-pulse-400"
+                          invalid ? "border-red-300 focus:border-red-400" : "border-gray-200 focus:border-gray-400"
                         }`}
                         rows={2}
                         value={draft.evidence_text}

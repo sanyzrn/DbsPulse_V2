@@ -34,10 +34,10 @@ import { formatDate } from "../../utils/dates";
 import type { EvaluationStatus } from "../../types";
 
 /* ═══════════════════════════════════════════════════════════════════════
-   پالت گرادیانت امضای DbsPulse (teal → violet)
+   نمودارهای این صفحه تک‌سری‌اند (بزرگی/magnitude) — یک هیو واحد به‌جای گرادیانت
+   دورنگهٔ قبلی (قرمز به طوسی تیره) که کدر و شلوغ به‌نظر می‌رسید
    ═══════════════════════════════════════════════════════════════════════ */
-const BRAND_FROM = "#b61615"; // pulse-600
-const BRAND_TO = "#374151"; // pulse-violet-700
+const SERIES_COLOR = "#b61615"; // pulse-600
 const GRID_STROKE = "#eef0f4";
 const AXIS_STROKE = "#e5e7eb";
 
@@ -186,7 +186,7 @@ export function DashboardPage() {
         <h2 className="mb-3 text-base font-bold text-gray-900">نمودار رادار شایستگی و روند فرد</h2>
         <div className="relative mb-4">
           <select
-            className="w-full appearance-none rounded-xl border border-gray-200 bg-white px-4 py-2.5 pl-10 text-sm text-gray-700 outline-none transition-all duration-200 focus:border-pulse-400 sm:w-80"
+            className="w-full appearance-none rounded-xl border border-gray-200 bg-white px-4 py-2.5 pl-10 text-sm text-gray-700 outline-none transition-all duration-200 focus:border-gray-400 sm:w-80"
             value={selectedPersonId ?? ""}
             onChange={(e) => setSelectedPersonId(e.target.value ? Number(e.target.value) : null)}
           >
@@ -213,9 +213,9 @@ export function DashboardPage() {
                   <ResponsiveContainer>
                     <RadarChart data={radar} margin={{ top: 12, right: 24, bottom: 12, left: 24 }}>
                       <defs>
-                        <linearGradient id="radar-fill" x1="0" y1="0" x2="1" y2="1">
-                          <stop offset="0%" stopColor={BRAND_FROM} stopOpacity={0.5} />
-                          <stop offset="100%" stopColor={BRAND_TO} stopOpacity={0.2} />
+                        <linearGradient id="radar-fill" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="0%" stopColor={SERIES_COLOR} stopOpacity={0.28} />
+                          <stop offset="100%" stopColor={SERIES_COLOR} stopOpacity={0.06} />
                         </linearGradient>
                       </defs>
                       <PolarGrid stroke={GRID_STROKE} />
@@ -224,10 +224,10 @@ export function DashboardPage() {
                       <Radar
                         dataKey="avg_score"
                         name="میانگین امتیاز"
-                        stroke={BRAND_FROM}
+                        stroke={SERIES_COLOR}
                         strokeWidth={2}
                         fill="url(#radar-fill)"
-                        dot={{ r: 3.5, fill: BRAND_TO, strokeWidth: 0 }}
+                        dot={{ r: 3.5, fill: SERIES_COLOR, strokeWidth: 0 }}
                       />
                       <Tooltip contentStyle={TOOLTIP_STYLE} formatter={tooltipNumber} />
                     </RadarChart>
@@ -245,8 +245,8 @@ export function DashboardPage() {
                     <AreaChart data={trend} margin={{ top: 12, right: 16, bottom: 12, left: 0 }}>
                       <defs>
                         <linearGradient id="trend-fill" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="0%" stopColor={BRAND_FROM} stopOpacity={0.4} />
-                          <stop offset="100%" stopColor={BRAND_TO} stopOpacity={0.02} />
+                          <stop offset="0%" stopColor={SERIES_COLOR} stopOpacity={0.22} />
+                          <stop offset="100%" stopColor={SERIES_COLOR} stopOpacity={0.02} />
                         </linearGradient>
                       </defs>
                       <CartesianGrid strokeDasharray="4 4" stroke={GRID_STROKE} vertical={false} />
@@ -257,11 +257,11 @@ export function DashboardPage() {
                         type="monotone"
                         dataKey="final_weighted_pct"
                         name="امتیاز نهایی"
-                        stroke={BRAND_FROM}
+                        stroke={SERIES_COLOR}
                         strokeWidth={2.5}
                         fill="url(#trend-fill)"
-                        dot={{ r: 4, fill: "#fff", strokeWidth: 2.5, stroke: BRAND_TO }}
-                        activeDot={{ r: 6, fill: BRAND_TO, strokeWidth: 2, stroke: "#fff" }}
+                        dot={{ r: 4, fill: "#fff", strokeWidth: 2.5, stroke: SERIES_COLOR }}
+                        activeDot={{ r: 6, fill: SERIES_COLOR, strokeWidth: 2, stroke: "#fff" }}
                         animationDuration={1200}
                       />
                     </AreaChart>
@@ -359,7 +359,7 @@ function Table({ title, headers, rows }: { title: string; headers: string[]; row
   );
 }
 
-/** نمودار میله‌ای میانگین به تفکیک واحد با گرادیانت. */
+/** نمودار میله‌ای میانگین به تفکیک واحد. */
 function BarByOrgUnitCard({ data }: { data: { org_unit: string; avg_final_pct: number; count: number }[] }) {
   if (data.length === 0) return null;
   const chartData = data.map((u) => ({
@@ -373,17 +373,11 @@ function BarByOrgUnitCard({ data }: { data: { org_unit: string; avg_final_pct: n
       <div style={{ height: Math.max(220, data.length * 48) }}>
         <ResponsiveContainer>
           <BarChart data={chartData} layout="vertical" margin={{ top: 4, right: 24, bottom: 4, left: 8 }}>
-            <defs>
-              <linearGradient id="bar-fill" x1="0" y1="0" x2="1" y2="0">
-                <stop offset="0%" stopColor={BRAND_FROM} />
-                <stop offset="100%" stopColor={BRAND_TO} />
-              </linearGradient>
-            </defs>
             <CartesianGrid strokeDasharray="4 4" stroke={GRID_STROKE} horizontal={false} />
             <XAxis type="number" domain={[0, 100]} tick={TICK_STYLE} tickLine={false} axisLine={{ stroke: AXIS_STROKE }} />
             <YAxis type="category" dataKey="name" tick={{ ...TICK_STYLE, fontSize: 11 }} tickLine={false} axisLine={false} width={90} />
-            <Tooltip contentStyle={TOOLTIP_STYLE} formatter={tooltipNumber} cursor={{ fill: "rgba(13,148,136,0.05)" }} />
-            <Bar dataKey="میانگین" radius={[0, 6, 6, 0]} fill="url(#bar-fill)" animationDuration={1000}>
+            <Tooltip contentStyle={TOOLTIP_STYLE} formatter={tooltipNumber} cursor={{ fill: "rgba(107,114,128,0.06)" }} />
+            <Bar dataKey="میانگین" radius={[0, 6, 6, 0]} fill={SERIES_COLOR} animationDuration={1000}>
               <LabelList
                 dataKey="میانگین"
                 position="right"
@@ -447,7 +441,7 @@ function ExpiringContractsCard() {
           </button>
           <div className="relative">
             <select
-              className="appearance-none rounded-xl border border-gray-200 bg-white px-3 py-1.5 pl-8 text-sm text-gray-700 outline-none transition-colors focus:border-pulse-400"
+              className="appearance-none rounded-xl border border-gray-200 bg-white px-3 py-1.5 pl-8 text-sm text-gray-700 outline-none transition-colors focus:border-gray-400"
               value={days}
               onChange={(e) => setDays(Number(e.target.value))}
             >

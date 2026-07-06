@@ -30,7 +30,7 @@ const emptyForm = {
 
 /** کلاس استاندارد فیلد ورودی مدرن. */
 const inputClass =
-  "w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 outline-none transition-all duration-200 focus:border-pulse-400";
+  "w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 outline-none transition-all duration-200 focus:border-gray-400";
 
 export function PersonnelPage() {
   const { showSuccess, showError } = useToast();
@@ -141,7 +141,7 @@ export function PersonnelPage() {
                   type="checkbox"
                   checked={form.is_manager}
                   onChange={(e) => setForm({ ...form, is_manager: e.target.checked })}
-                  className="h-4 w-4 rounded border-gray-300 text-pulse-500 focus:ring-pulse-400"
+                  className="h-4 w-4 rounded border-gray-300 text-pulse-500 focus:ring-gray-400"
                 />
                 پرسنل مدیریتی (ارزیابی مستقیم توسط معاونت، بدون مسئول واحد)
               </label>
@@ -162,7 +162,7 @@ export function PersonnelPage() {
                 <path d="M14 14l3 3" />
               </svg>
               <input
-                className="w-full rounded-xl border border-gray-200 bg-white py-1.5 pr-9 pl-3 text-sm text-gray-700 outline-none transition-all duration-200 focus:border-pulse-400 sm:w-80"
+                className="w-full rounded-xl border border-gray-200 bg-white py-1.5 pr-9 pl-3 text-sm text-gray-700 outline-none transition-all duration-200 focus:border-gray-400 sm:w-80"
                 placeholder="جست‌وجو (نام، کد پرسنلی، عنوان شغلی، واحد)…"
                 value={search}
                 onChange={(e) => {
@@ -411,7 +411,7 @@ function EditPersonnelModal({ personnel, onClose }: { personnel: Personnel; onCl
             type="checkbox"
             checked={form.is_manager}
             onChange={(e) => setForm({ ...form, is_manager: e.target.checked })}
-            className="h-4 w-4 rounded border-gray-300 text-pulse-500 focus:ring-pulse-400"
+            className="h-4 w-4 rounded border-gray-300 text-pulse-500 focus:ring-gray-400"
           />
           پرسنل مدیریتی
         </label>

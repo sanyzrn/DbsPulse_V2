@@ -195,7 +195,7 @@ export function DashboardPage() {
         <h2 className="mb-3 text-base font-bold text-gray-900">نمودار رادار شایستگی و روند فرد</h2>
         <div className="relative mb-4">
           <select
-            className="w-full appearance-none rounded-xl border border-gray-200 bg-white px-4 py-2.5 pl-10 text-sm text-gray-700 outline-none transition-all duration-200 focus:border-gray-400 sm:w-80"
+            className="w-full appearance-none rounded-xl border border-gray-200 bg-gray-100 px-4 py-2.5 pl-10 text-sm text-gray-700 outline-none transition-colors duration-150 focus:border-pulse-500 focus:bg-white sm:w-80"
             value={selectedPersonId ?? ""}
             onChange={(e) => setSelectedPersonId(e.target.value ? Number(e.target.value) : null)}
           >
@@ -414,7 +414,7 @@ function ExpiringContractsCard() {
           </button>
           <div className="relative">
             <select
-              className="appearance-none rounded-xl border border-gray-200 bg-white px-3 py-1.5 pl-8 text-sm text-gray-700 outline-none transition-colors focus:border-gray-400"
+              className="appearance-none rounded-xl border border-gray-200 bg-gray-100 px-3 py-1.5 pl-8 text-sm text-gray-700 outline-none transition-colors duration-150 focus:border-pulse-500 focus:bg-white"
               value={days}
               onChange={(e) => setDays(Number(e.target.value))}
             >

@@ -252,8 +252,10 @@ export function ScoreFormTable({
                     <div>
                       <textarea
                         aria-label={`شواهد عینی شاخص: ${ind.category}`}
-                        className={`w-full rounded-xl border px-3 py-2 text-sm text-gray-800 outline-none transition-all duration-200 ${
-                          invalid ? "border-red-300 focus:border-red-400" : "border-gray-200 focus:border-gray-400"
+                        className={`w-full rounded-xl border px-3 py-2 text-sm text-gray-800 outline-none transition-colors duration-150 ${
+                          invalid
+                            ? "border-red-400 bg-red-50 focus:border-red-500"
+                            : "border-gray-200 bg-gray-100 focus:border-pulse-500 focus:bg-white"
                         }`}
                         rows={2}
                         value={draft.evidence_text}

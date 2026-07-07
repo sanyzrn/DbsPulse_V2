@@ -232,7 +232,7 @@ export function EvaluationDetailPage() {
         {canComment && (
           <div className="mt-3">
             <textarea
-              className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2 outline-none transition-all duration-200 focus:border-gray-400 text-sm"
+              className="w-full rounded-xl border border-gray-200 bg-gray-100 px-3 py-2 outline-none transition-colors duration-150 focus:border-pulse-500 focus:bg-white text-sm"
               rows={2}
               value={newComment}
               onChange={(e) => setNewComment(e.target.value)}
@@ -638,7 +638,7 @@ function EditableScoring({
         <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-card">
           <h3 className="mb-2 text-base font-bold text-gray-900">{commentLabel}</h3>
           <textarea
-            className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2 outline-none transition-all duration-200 focus:border-gray-400 text-sm"
+            className="w-full rounded-xl border border-gray-200 bg-gray-100 px-3 py-2 outline-none transition-colors duration-150 focus:border-pulse-500 focus:bg-white text-sm"
             rows={3}
             value={evaluatorComment}
             onChange={(e) => setEvaluatorComment(e.target.value)}

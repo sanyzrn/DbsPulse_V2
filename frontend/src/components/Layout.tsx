@@ -58,9 +58,9 @@ export function Layout() {
         پرش به محتوای اصلی
       </a>
 
-      <div className="mx-auto flex w-full max-w-6xl flex-1 flex-col px-4 pt-4 sm:px-6">
+      <div className="mx-auto flex w-full max-w-6xl flex-1 flex-col px-4 pt-6 pb-6 sm:px-6">
         {/* هدر شناور: کارت گرد و سایه‌دار، جدا از لبه‌های صفحه — نه نوار تمام‌عرض چسبیده به بالا */}
-        <header className="sticky top-4 z-40 rounded-3xl border border-gray-100 bg-white shadow-float">
+        <header className="sticky top-6 z-40 rounded-3xl border border-gray-100 bg-white shadow-float">
           <div className="flex items-center justify-between gap-4 px-4 py-2.5 sm:px-5">
             <NavLink
               to="/"

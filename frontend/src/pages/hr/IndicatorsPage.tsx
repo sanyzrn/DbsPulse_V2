@@ -7,6 +7,7 @@ import { useConfirm } from "../../components/ConfirmDialog";
 import { useToast } from "../../components/Toast";
 import { Button } from "../../ui/Button";
 import { PageHeader } from "../../ui/Card";
+import { Table } from "../../ui/Table";
 import type { Indicator, IndicatorSection } from "../../types";
 
 const inputClass =
@@ -145,55 +146,37 @@ export function IndicatorsPage() {
         {loadError != null && (
           <p className="mb-2 text-sm text-red-600">{extractErrorMessage(loadError)}</p>
         )}
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-gray-100 bg-gradient-to-l from-pulse-50/50 to-pulse-violet-50/50">
-                <th className="px-3 py-2.5 text-right text-xs font-semibold text-gray-600">ترتیب</th>
-                <th className="px-3 py-2.5 text-right text-xs font-semibold text-gray-600">دسته</th>
-                <th className="px-3 py-2.5 text-right text-xs font-semibold text-gray-600">شرح</th>
-                <th className="px-3 py-2.5 text-right text-xs font-semibold text-gray-600">وضعیت</th>
-                <th className="px-3 py-2.5 text-right text-xs font-semibold text-gray-600"></th>
-              </tr>
-            </thead>
-            <tbody>
-              {indicators.map((ind, idx) => (
-                <motion.tr
-                  key={ind.id}
-                  className="border-b border-gray-50 transition-colors last:border-0 hover:bg-pulse-50/30"
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  transition={{ duration: 0.2, delay: idx * 0.03 }}
-                >
-                  <td className="px-3 py-2.5 text-gray-500">{ind.display_order}</td>
-                  <td className="px-3 py-2.5 font-medium text-gray-700">{ind.category}</td>
-                  <td className="px-3 py-2.5 text-gray-600">{ind.description}</td>
-                  <td className="px-3 py-2.5">
-                    {ind.is_active ? (
-                      <span className="inline-flex items-center gap-1.5 rounded-full bg-green-50 px-2.5 py-0.5 text-xs font-medium text-green-700">
-                        <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-green-500" />
-                        فعال
-                      </span>
-                    ) : (
-                      <span className="inline-flex items-center gap-1.5 rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-medium text-gray-500">
-                        <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-gray-400" />
-                        غیرفعال
-                      </span>
-                    )}
-                  </td>
-                  <td className="px-3 py-2.5">
-                    <button onClick={() => toggleActive(ind)} className="text-sm font-medium text-pulse-600 hover:text-pulse-700">
-                      {ind.is_active ? "غیرفعال کردن" : "فعال کردن"}
-                    </button>
-                  </td>
-                </motion.tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-        {indicators.length === 0 && (
-          <p className="mt-3 text-center text-sm text-gray-400">شاخصی تعریف نشده است.</p>
-        )}
+        <Table
+          bordered={false}
+          headers={["ترتیب", "دسته", "شرح", "وضعیت", ""]}
+          rowKeys={indicators.map((ind) => ind.id)}
+          emptyMessage="شاخصی تعریف نشده است."
+          rows={indicators.map((ind) => [
+            <span key="order" className="text-gray-500">
+              {ind.display_order}
+            </span>,
+            <span key="category" className="font-medium text-gray-700">
+              {ind.category}
+            </span>,
+            <span key="desc" className="text-gray-600">
+              {ind.description}
+            </span>,
+            ind.is_active ? (
+              <span key="status" className="inline-flex items-center gap-1.5 rounded-full bg-green-50 px-2.5 py-0.5 text-xs font-medium text-green-700">
+                <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-green-500" />
+                فعال
+              </span>
+            ) : (
+              <span key="status" className="inline-flex items-center gap-1.5 rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-medium text-gray-500">
+                <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-gray-400" />
+                غیرفعال
+              </span>
+            ),
+            <button key="action" onClick={() => toggleActive(ind)} className="text-sm font-medium text-pulse-600 hover:text-pulse-700">
+              {ind.is_active ? "غیرفعال کردن" : "فعال کردن"}
+            </button>,
+          ])}
+        />
       </div>
     </div>
   );

@@ -1,7 +1,7 @@
 import { useState } from "react";
-import { motion } from "motion/react";
 import { extractErrorMessage } from "../../api/client";
 import { useAuditLog } from "../../api/queries";
+import { Table } from "../../ui/Table";
 import { AUDIT_EVENT_LABELS, type AuditLogEntry } from "../../types";
 
 const PAGE_SIZE = 20;
@@ -56,42 +56,27 @@ export function AuditLogPage() {
       </div>
 
       {items.length > 0 && (
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-gray-100 bg-gradient-to-l from-pulse-50/50 to-pulse-violet-50/50">
-                <th className="px-3 py-2.5 text-right text-xs font-semibold text-gray-600">زمان</th>
-                <th className="px-3 py-2.5 text-right text-xs font-semibold text-gray-600">رویداد</th>
-                <th className="px-3 py-2.5 text-right text-xs font-semibold text-gray-600">انجام‌دهنده</th>
-                <th className="px-3 py-2.5 text-right text-xs font-semibold text-gray-600">کد ارزیابی</th>
-                <th className="px-3 py-2.5 text-right text-xs font-semibold text-gray-600">جزئیات</th>
-              </tr>
-            </thead>
-            <tbody>
-              {items.map((entry, idx) => (
-                <motion.tr
-                  key={entry.id}
-                  className="border-b border-gray-50 align-top transition-colors last:border-0 hover:bg-pulse-50/30"
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  transition={{ duration: 0.15, delay: Math.min(idx * 0.02, 0.3) }}
-                >
-                  <td className="whitespace-nowrap px-3 py-2.5 text-gray-500">
-                    {new Date(entry.created_at).toLocaleString("fa-IR")}
-                  </td>
-                  <td className="px-3 py-2.5">
-                    <span className="inline-flex items-center rounded-lg bg-gradient-to-bl from-pulse-50 to-pulse-violet-50 px-2 py-0.5 text-xs font-medium text-pulse-700">
-                      {AUDIT_EVENT_LABELS[entry.event_type] ?? entry.event_type}
-                    </span>
-                  </td>
-                  <td className="px-3 py-2.5 text-gray-700">{entry.actor_username ?? `#${entry.actor_user_id}`}</td>
-                  <td className="px-3 py-2.5 text-gray-500">{entry.evaluation_code ?? "—"}</td>
-                  <td className="max-w-md px-3 py-2.5 text-xs text-gray-500">{formatDetails(entry)}</td>
-                </motion.tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <Table
+          bordered={false}
+          cellAlign="top"
+          headers={["زمان", "رویداد", "انجام‌دهنده", "کد ارزیابی", "جزئیات"]}
+          rowKeys={items.map((entry) => entry.id)}
+          rows={items.map((entry) => [
+            <span key="time" className="whitespace-nowrap text-gray-500">
+              {new Date(entry.created_at).toLocaleString("fa-IR")}
+            </span>,
+            <span key="event" className="inline-flex items-center rounded-lg bg-gradient-to-bl from-pulse-50 to-pulse-violet-50 px-2 py-0.5 text-xs font-medium text-pulse-700">
+              {AUDIT_EVENT_LABELS[entry.event_type] ?? entry.event_type}
+            </span>,
+            entry.actor_username ?? `#${entry.actor_user_id}`,
+            <span key="code" className="text-gray-500">
+              {entry.evaluation_code ?? "—"}
+            </span>,
+            <span key="details" className="block max-w-md text-xs text-gray-500">
+              {formatDetails(entry)}
+            </span>,
+          ])}
+        />
       )}
 
       {error && <p className="mt-4 text-center text-sm text-red-600">{error}</p>}

@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from "react";
+import { useState } from "react";
 import {
   Radar,
   RadarChart,
@@ -30,6 +30,7 @@ import {
 import { StatusBadge } from "../../components/StatusBadge";
 import { useToast } from "../../components/Toast";
 import { CountUp, PctBadge, ScoreRing } from "../../ui/Meters";
+import { Table } from "../../ui/Table";
 import { formatDate } from "../../utils/dates";
 import type { EvaluationStatus } from "../../types";
 
@@ -154,6 +155,8 @@ export function DashboardPage() {
             e.subordinate_count.toLocaleString("fa-IR"),
             e.evaluation_count.toLocaleString("fa-IR"),
           ])}
+          animateRows={false}
+          emptyMessage="داده‌ای موجود نیست."
         />
         <Table
           title="کمترین میانگین به تفکیک شاخص"
@@ -162,6 +165,8 @@ export function DashboardPage() {
             i.category,
             <ScoreOutOfFive key="score" value={i.avg_score} />,
           ])}
+          animateRows={false}
+          emptyMessage="داده‌ای موجود نیست."
         />
         <Table
           title="کمترین میانگین به تفکیک واحد"
@@ -170,6 +175,8 @@ export function DashboardPage() {
             u.org_unit,
             <PctBadge key="pct" value={u.avg_final_pct} />,
           ])}
+          animateRows={false}
+          emptyMessage="داده‌ای موجود نیست."
         />
         <Table
           title="کمترین امتیاز به تفکیک فرد"
@@ -178,6 +185,8 @@ export function DashboardPage() {
             p.full_name,
             <PctBadge key="pct" value={p.final_weighted_pct} />,
           ])}
+          animateRows={false}
+          emptyMessage="داده‌ای موجود نیست."
         />
       </div>
 
@@ -323,42 +332,6 @@ function DashboardSkeleton() {
 }
 
 /** جدول مدرن با هدر گرادیانت و هاور. */
-function Table({ title, headers, rows }: { title: string; headers: string[]; rows: ReactNode[][] }) {
-  return (
-    <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-card">
-      <h3 className="mb-3 text-base font-bold text-gray-900">{title}</h3>
-      {rows.length === 0 ? (
-        <p className="py-6 text-center text-sm text-gray-400">داده‌ای موجود نیست.</p>
-      ) : (
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-gray-100 bg-gradient-to-l from-pulse-50/50 to-pulse-violet-50/50">
-                {headers.map((h) => (
-                  <th key={h} className="px-3 py-2.5 text-right text-xs font-semibold text-gray-600">
-                    {h}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((row, idx) => (
-                <tr key={idx} className="border-b border-gray-50 transition-colors last:border-0 hover:bg-pulse-50/30">
-                  {row.map((cell, cIdx) => (
-                    <td key={cIdx} className="px-3 py-2.5 text-gray-700">
-                      {cell}
-                    </td>
-                  ))}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-    </div>
-  );
-}
-
 /** نمودار میله‌ای میانگین به تفکیک واحد. */
 function BarByOrgUnitCard({ data }: { data: { org_unit: string; avg_final_pct: number; count: number }[] }) {
   if (data.length === 0) return null;

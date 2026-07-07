@@ -37,6 +37,13 @@
   --color-pulse-violet-800: #1f2937;
   --color-pulse-violet-900: #111827;
 
+  /* ── Page Background (warm cream, replaces plain cool grey) ── */
+  --color-cream-50: #edebe6;
+
+  /* ── Dark Surface (charcoal) — hero/emphasis cards on the light cream bg ── */
+  --color-charcoal-800: #363a40;
+  --color-charcoal-900: #2a2d31;
+
   /* ── Shadows ── */
   --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.06), 0 1px 2px rgba(0, 0, 0, 0.04);
   --shadow-card-hover: 0 4px 16px rgba(0, 0, 0, 0.08), 0 2px 4px rgba(0, 0, 0, 0.04);
@@ -45,6 +52,7 @@
   /* ── Radius ── */
   --radius-lg: 16px;
   --radius-xl: 20px;
+  --radius-2xl: 24px;
 
   /* ── Keyframe Animations ── */
   --animate-shimmer: shimmer 2s infinite linear;
@@ -101,7 +109,7 @@ body {
 
 body {
   margin: 0;
-  background-color: #f8f9fb;
+  background-color: #edebe6;
   color: #1a1a2e;
 }
 
@@ -161,6 +169,68 @@ body {
   -webkit-backdrop-filter: blur(16px);
   background: rgba(255, 255, 255, 0.75);
   border: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   Score Slider — input[type=range] بومی برای امتیازدهی ۱ تا ۵
+   ═══════════════════════════════════════════════════════════════════════ */
+
+.score-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 20px;
+  background: transparent;
+  cursor: pointer;
+}
+
+.score-slider:focus-visible {
+  outline: none;
+}
+
+/* Track */
+.score-slider::-webkit-slider-runnable-track {
+  height: 8px;
+  border-radius: 999px;
+  background: linear-gradient(to left, #ef4444, #f97316, #f59e0b, #84cc16, #10b981);
+}
+
+.score-slider::-moz-range-track {
+  height: 8px;
+  border-radius: 999px;
+  background: linear-gradient(to left, #ef4444, #f97316, #f59e0b, #84cc16, #10b981);
+}
+
+/* Thumb */
+.score-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  height: 20px;
+  width: 20px;
+  margin-top: -6px;
+  border-radius: 50%;
+  background: #fff;
+  border: 3px solid var(--score-color, var(--color-pulse-600));
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.18);
+  transition: transform 0.15s ease;
+}
+
+.score-slider::-moz-range-thumb {
+  height: 20px;
+  width: 20px;
+  border-radius: 50%;
+  background: #fff;
+  border: 3px solid var(--score-color, var(--color-pulse-600));
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.18);
+  transition: transform 0.15s ease;
+}
+
+.score-slider:active::-webkit-slider-thumb,
+.score-slider:focus-visible::-webkit-slider-thumb {
+  transform: scale(1.15);
+}
+
+.score-slider:active::-moz-range-thumb,
+.score-slider:focus-visible::-moz-range-thumb {
+  transform: scale(1.15);
 }
 
 /* Modern scrollbar */

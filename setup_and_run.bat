@@ -17,9 +17,7 @@ set "ROOT=%~dp0"
 set "ROOT=%ROOT:~0,-1%"
 set "BACKEND=%ROOT%\backend"
 set "FRONTEND=%ROOT%\frontend"
-set "VENV=%BACKEND%\venv"
-
-set "DATABASE_URL=postgresql+psycopg://postgres:Sany1910@localhost:5432/dbspulsenew"
+set "VENV=%BACKEND%\.venv"
 
 echo ============================================================
 echo  DbsPulse setup starting
@@ -89,7 +87,12 @@ if exist "%REQ_MARKER%" (
 
 if "%NEED_INSTALL%"=="1" (
     echo    Installing/updating Python packages ^(this can take a while^)...
-    "%PY%" -m pip install --upgrade pip >nul
+    "%PY%" -m pip install --upgrade pip
+    if errorlevel 1 (
+        echo [ERROR] Failed to upgrade pip. Check the log above.
+        pause
+        exit /b 1
+    )
     "%PIP%" install -r "%REQ_FILE%"
     if errorlevel 1 (
         echo [ERROR] pip install failed. Check the log above.
@@ -102,31 +105,32 @@ if "%NEED_INSTALL%"=="1" (
 )
 
 REM ------------------------------------------------------------
-REM 3. Backend .env (ensure DATABASE_URL is set as requested)
+REM 3. Backend .env
 REM ------------------------------------------------------------
 echo [3/6] Backend environment file...
 set "ENV_FILE=%BACKEND%\.env"
 if not exist "%ENV_FILE%" (
-    echo    No .env found, creating one from .env.example...
+    echo    No .env found, creating one from .env.example ^(safe local defaults^)...
     copy /y "%BACKEND%\.env.example" "%ENV_FILE%" >nul
+    echo    Edit "%ENV_FILE%" if your local PostgreSQL user/password/database differ
+    echo    from the defaults in .env.example.
+) else (
+    echo    .env already exists, leaving your settings untouched.
 )
-
-REM Rewrite/insert DATABASE_URL line via the companion helper script
-"%PY%" "%ROOT%\_set_env_var.py" "%ENV_FILE%" "DATABASE_URL" "%DATABASE_URL%"
-
-echo    DATABASE_URL set to: %DATABASE_URL%
 
 REM ------------------------------------------------------------
 REM 4. Database migrations (Alembic)
 REM ------------------------------------------------------------
 echo [4/6] Running database migrations...
 pushd "%BACKEND%"
-set "DATABASE_URL=%DATABASE_URL%"
 "%PY%" -m alembic upgrade head
 if errorlevel 1 (
-    echo [WARNING] Alembic migration failed. Make sure PostgreSQL is running
-    echo           and that database "dbspulsenew" exists, then re-run this script.
+    popd
+    echo [ERROR] Alembic migration failed. Make sure PostgreSQL is running and that
+    echo         the database/user in "%ENV_FILE%" ^(DATABASE_URL^) exist, then re-run
+    echo         this script. See README.md for the local PostgreSQL setup commands.
     pause
+    exit /b 1
 )
 popd
 
@@ -159,8 +163,24 @@ start "DbsPulse Backend (uvicorn - port 8000)" /D "%BACKEND%" cmd /k ""%VENV%\Sc
 start "DbsPulse Frontend (vite - port 5173)" /D "%FRONTEND%" cmd /k "npm run dev"
 
 echo.
-echo Waiting for servers to warm up...
-timeout /t 6 /nobreak >nul
+echo Waiting for the backend to come up...
+set "BACKEND_READY=0"
+where curl >nul 2>nul
+if errorlevel 1 (
+    REM curl not available on this system — fall back to a fixed wait
+    timeout /t 8 /nobreak >nul
+) else (
+    for /l %%i in (1,1,30) do (
+        if "!BACKEND_READY!"=="0" (
+            curl -s -o nul -f "http://localhost:8000/api/health"
+            if not errorlevel 1 (
+                set "BACKEND_READY=1"
+            ) else (
+                timeout /t 1 /nobreak >nul
+            )
+        )
+    )
+)
 
 start "" "http://localhost:5173"
 

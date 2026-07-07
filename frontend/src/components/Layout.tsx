@@ -6,7 +6,7 @@ import { BrandMark } from "./Brand";
 import { ErrorBoundary } from "./ErrorBoundary";
 import { Footer } from "./Footer";
 import { NotificationBell } from "./NotificationBell";
-import { ROLE_LABELS } from "../types";
+import { ProfileMenu } from "./ProfileMenu";
 
 const NAV_BY_ROLE: Record<string, { to: string; label: string }[]> = {
   hr: [
@@ -50,7 +50,7 @@ export function Layout() {
     }`;
 
   return (
-    <div className="flex min-h-screen flex-col bg-gray-50">
+    <div className="flex min-h-screen flex-col bg-cream-50">
       {/* پرش به محتوای اصلی: کاربر کیبورد/screen reader مجبور نیست هر بار کل هدر
           (برند، زنگوله، منوی کاربر، ناوبری نقش) را Tab بزند تا به محتوای صفحه برسد */}
       <a
@@ -77,41 +77,7 @@ export function Layout() {
           <div className="flex items-center gap-1 sm:gap-2">
             <NotificationBell />
             <span aria-hidden className="mx-1 hidden h-6 w-px bg-gray-200 sm:block" />
-            <span className="flex items-center gap-2">
-              <span className="rounded-full bg-gradient-to-br from-pulse-500 to-pulse-violet-600 p-0.5">
-                <span
-                  aria-hidden
-                  className="flex h-7 w-7 items-center justify-center rounded-full bg-white text-sm font-bold gradient-text"
-                >
-                  {user.username.charAt(0).toUpperCase()}
-                </span>
-              </span>
-              <span className="hidden leading-tight md:block">
-                <span className="block text-sm font-medium text-gray-800">{user.username}</span>
-                <span className="block text-[11px] text-gray-500">{ROLE_LABELS[user.role]}</span>
-              </span>
-            </span>
-            <NavLink
-              to="/change-password"
-              title="تغییر رمز عبور"
-              className="rounded-xl p-2 text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-700"
-            >
-              <svg viewBox="0 0 20 20" className="h-4.5 w-4.5" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                <circle cx="7" cy="10" r="4" />
-                <path d="M11 10h6m-2 0v3m-2.5-3v2" />
-              </svg>
-              <span className="sr-only">تغییر رمز عبور</span>
-            </NavLink>
-            <button
-              onClick={handleLogout}
-              className="flex items-center gap-1.5 rounded-xl border border-gray-200 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 shadow-sm transition-all duration-200 hover:bg-gray-50 hover:shadow-md"
-            >
-              <svg viewBox="0 0 20 20" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                <path d="M13 7l3 3-3 3m3-3H8m2 6H5a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1h5" />
-              </svg>
-              <span className="hidden sm:inline">خروج</span>
-              <span className="sr-only sm:hidden">خروج</span>
-            </button>
+            <ProfileMenu user={user} onLogout={handleLogout} />
           </div>
         </div>
 

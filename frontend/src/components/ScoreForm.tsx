@@ -24,21 +24,24 @@ const SCORE_LABELS: Record<number, string> = {
   5: "عالی",
 };
 
-/** رنگ دکمه انتخاب‌شده بر اساس بار معنایی امتیاز — با گرادیانت برای امتیازهای بالا. */
-const SELECTED_TONE: Record<number, string> = {
-  1: "bg-red-500 text-white shadow-md shadow-red-500/30",
-  2: "bg-amber-500 text-white shadow-md shadow-amber-500/30",
-  3: "bg-gradient-to-br from-gray-500 to-gray-600 text-white shadow-md shadow-gray-500/20",
-  4: "bg-gradient-to-br from-pulse-400 to-pulse-500 text-white shadow-md shadow-pulse-500/30",
-  5: "bg-gradient-to-br from-pulse-500 to-pulse-violet-600 text-white shadow-md shadow-pulse-violet-500/30",
+/** رنگ معنایی هر پله امتیاز — همان قرارداد سه‌رنگ قرمز/کهربایی/سبز که در Meters.tsx
+ * برای درصدها استفاده می‌شود (سبز = مطلوب، قرمز = نیازمند توجه)، اینجا در ۵ پله. قبلاً
+ * امتیازهای ۴ و ۵ (خوب و عالی) از طیف قرمز برند رنگ می‌گرفتند که با امتیاز ۱ (ضعیف)
+ * از یک خانواده رنگ بودند و در نگاه اول گمراه‌کننده بود. */
+const SCORE_TONE_COLOR: Record<number, string> = {
+  1: "#ef4444", // red-500 — ضعیف
+  2: "#f97316", // orange-500 — کمتر از انتظار
+  3: "#f59e0b", // amber-500 — مطابق انتظار
+  4: "#84cc16", // lime-500 — فراتر از انتظار
+  5: "#10b981", // emerald-500 — عالی (همان سبزِ tone مطلوب در Meters.tsx)
 };
 
 const READONLY_TONE: Record<number, string> = {
   1: "bg-red-50 text-red-700 ring-1 ring-red-100",
-  2: "bg-amber-50 text-amber-700 ring-1 ring-amber-100",
-  3: "bg-gray-100 text-gray-700 ring-1 ring-gray-200",
-  4: "bg-pulse-50 text-pulse-700 ring-1 ring-pulse-100",
-  5: "bg-gradient-to-bl from-pulse-50 to-pulse-violet-50 text-pulse-700 ring-1 ring-pulse-200",
+  2: "bg-orange-50 text-orange-700 ring-1 ring-orange-100",
+  3: "bg-amber-50 text-amber-700 ring-1 ring-amber-100",
+  4: "bg-lime-50 text-lime-700 ring-1 ring-lime-100",
+  5: "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-100",
 };
 
 function initialDrafts(indicators: Indicator[], existing: EvaluationScoreRow[]): ScoreDraft[] {
@@ -141,8 +144,9 @@ export function scoredRows(drafts: ScoreDraft[]) {
   }));
 }
 
-/** کنترل قطعه‌ای (segmented) امتیازدهی ۱ تا ۵ — جایگزین مدرن dropdown قبلی.
- * دکمه فعال‌شده گرادیانت و سایه دارد؛ هاور روی دکمه‌های غیرفعال نرم است. */
+/** اسلایدر امتیازدهی ۱ تا ۵ — input[type=range] بومی (پیمایش با کیبورد/درگ/کلیک
+ * روی track، معنای slider برای screen reader به‌صورت پیش‌فرض) با رنگ‌بندی معنایی
+ * قرمز→سبز که با گزینه‌های دکمه‌ای گسسته قبلی هم قابل‌دسترس‌تر است و هم شسته‌رفته‌تر. */
 export function SegmentedScore({
   value,
   onChange,
@@ -152,30 +156,29 @@ export function SegmentedScore({
   onChange: (score: number) => void;
   label?: string;
 }) {
+  const color = SCORE_TONE_COLOR[value];
+
   return (
-    <div
-      role="radiogroup"
-      aria-label={label ?? "امتیاز"}
-      className="inline-flex rounded-xl border border-gray-100 bg-gray-50 p-1"
-    >
-      {SCORE_VALUES.map((n) => (
-        <button
-          key={n}
-          type="button"
-          role="radio"
-          aria-checked={value === n}
-          aria-label={`${n.toLocaleString("fa-IR")} — ${SCORE_LABELS[n]}`}
-          title={SCORE_LABELS[n]}
-          onClick={() => onChange(n)}
-          className={`relative h-9 w-9 rounded-lg text-sm font-bold transition-all duration-200 ${
-            value === n
-              ? SELECTED_TONE[n]
-              : "text-gray-500 hover:bg-white hover:text-gray-800 hover:shadow-sm"
-          }`}
-        >
-          {n.toLocaleString("fa-IR")}
-        </button>
-      ))}
+    <div className="w-full max-w-52">
+      <input
+        type="range"
+        min={1}
+        max={5}
+        step={1}
+        value={value}
+        onChange={(e) => onChange(Number(e.target.value))}
+        aria-label={label ?? "امتیاز"}
+        aria-valuetext={`${value.toLocaleString("fa-IR")} — ${SCORE_LABELS[value]}`}
+        className="score-slider w-full"
+        style={{ "--score-color": color } as React.CSSProperties}
+      />
+      <div className="mt-1 flex items-center justify-between text-[10px] text-gray-400">
+        {SCORE_VALUES.map((n) => (
+          <span key={n} className={n === value ? "font-bold" : undefined} style={n === value ? { color } : undefined}>
+            {n.toLocaleString("fa-IR")}
+          </span>
+        ))}
+      </div>
     </div>
   );
 }

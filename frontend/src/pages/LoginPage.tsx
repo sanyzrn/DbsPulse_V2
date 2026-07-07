@@ -31,7 +31,7 @@ export function LoginPage() {
   }
 
   return (
-    <div className="relative flex min-h-screen flex-col overflow-hidden bg-gray-50">
+    <div className="relative flex min-h-screen flex-col overflow-hidden bg-cream-50">
       {/* یک المان محو و خاموش، به‌جای گرادیانت متحرک رنگی قبلی — صرفاً کمی حس زندگی
           به پس‌زمینهٔ ساده می‌دهد، بدون رقابت با محتوای فرم */}
       <div

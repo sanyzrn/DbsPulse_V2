@@ -1,6 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { act, render, renderHook, screen } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
+import { act, fireEvent, render, renderHook, screen } from "@testing-library/react";
 import { NEUTRAL_SCORE, ScoreFormTable, computePreview, scoredRows, useScoreForm } from "./ScoreForm";
 import { DEFAULT_APP_CONFIG, type Indicator } from "../types";
 
@@ -89,7 +88,7 @@ describe("scoredRows", () => {
 });
 
 describe("ScoreFormTable", () => {
-  it("renders a 1..5 segmented control with the neutral score pre-selected", () => {
+  it("renders a 1..5 range slider with the neutral score pre-selected", () => {
     render(
       <ScoreFormTable
         section="general"
@@ -99,17 +98,15 @@ describe("ScoreFormTable", () => {
         onEvidenceChange={() => {}}
       />
     );
-    const radios = screen.getAllByRole("radio");
-    expect(radios).toHaveLength(5);
-    const selected = radios.filter((r) => r.getAttribute("aria-checked") === "true");
-    expect(selected).toHaveLength(1);
-    expect(selected[0]).toHaveAccessibleName(/۳/);
+    const slider = screen.getByRole("slider");
+    expect(slider).toHaveValue(String(NEUTRAL_SCORE));
+    expect(slider).toHaveAccessibleName(/امتیاز/);
     // امتیاز خنثی از شواهد معاف است، پس textarea غیرفعال می‌ماند
     const textarea = screen.getByRole("textbox");
     expect(textarea).toBeDisabled();
   });
 
-  it("reports the chosen score through onScoreChange", async () => {
+  it("reports the chosen score through onScoreChange", () => {
     const onScoreChange = vi.fn();
     render(
       <ScoreFormTable
@@ -120,7 +117,8 @@ describe("ScoreFormTable", () => {
         onEvidenceChange={() => {}}
       />
     );
-    await userEvent.click(screen.getByRole("radio", { name: /عالی/ }));
+    const slider = screen.getByRole("slider");
+    fireEvent.change(slider, { target: { value: "5" } });
     expect(onScoreChange).toHaveBeenCalledWith(1, 5);
   });
 

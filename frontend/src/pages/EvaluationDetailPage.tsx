@@ -172,7 +172,7 @@ export function EvaluationDetailPage() {
               </div>
               <PctBar value={evaluation.specialized_score_pct ?? 0} />
             </div>
-            <div className="flex items-center justify-between gap-3 rounded-xl border border-pulse-100 bg-gradient-to-bl from-pulse-50/60 to-pulse-violet-50/40 p-3">
+            <div className="flex items-center justify-between gap-3 rounded-xl border border-pulse-100 bg-pulse-50/50 p-3">
               <span className="text-sm font-medium text-gray-700">امتیاز نهایی وزنی</span>
               <ScoreRing value={evaluation.final_weighted_pct} size={56} />
             </div>
@@ -215,7 +215,7 @@ export function EvaluationDetailPage() {
         {evaluation.comments.length === 0 && <p className="text-sm text-gray-400">کامنتی ثبت نشده است.</p>}
         <ul className="space-y-2">
           {evaluation.comments.map((c) => (
-            <li key={c.id} className="rounded-xl border border-gray-100 bg-gradient-to-l from-gray-50/70 to-transparent p-3 text-sm">
+            <li key={c.id} className="rounded-xl border border-gray-100 bg-gray-50/70 p-3 text-sm">
               <p className="mb-1 flex items-center gap-2 text-xs text-gray-500">
                 <span className="inline-flex items-center rounded-md bg-pulse-50 px-1.5 py-0.5 font-medium text-pulse-700">
                   {STAGE_LABELS[c.stage]}
@@ -258,7 +258,7 @@ export function EvaluationDetailPage() {
                   setBusy(false);
                 }
               }}
-              className="mt-2 rounded-xl bg-gradient-to-bl from-gray-700 to-gray-800 px-4 py-2 text-sm font-medium text-white shadow-md shadow-gray-500/20 transition-all duration-200 hover:shadow-lg disabled:opacity-50"
+              className="mt-2 rounded-xl bg-gray-800 px-4 py-2 text-sm font-medium text-white shadow-md shadow-gray-500/20 transition-all duration-200 hover:bg-gray-900 hover:shadow-lg disabled:opacity-50"
             >
               ثبت کامنت
             </button>
@@ -581,7 +581,7 @@ function EditableScoring({
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-pulse-100 bg-gradient-to-l from-pulse-50/60 to-pulse-violet-50/40 px-4 py-3 shadow-card">
+      <div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-pulse-100 bg-pulse-50/50 px-4 py-3 shadow-card">
         <p className="flex items-center gap-2 text-sm text-gray-600">
           <svg viewBox="0 0 20 20" className="h-4 w-4 text-pulse-500" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
             <circle cx="10" cy="10" r="8" />
@@ -669,7 +669,7 @@ function EditableScoring({
               </div>
               <PctBar value={preview.specialized_pct} />
             </div>
-            <div className="flex items-center justify-between gap-3 rounded-xl border border-pulse-100 bg-gradient-to-bl from-pulse-50/60 to-pulse-violet-50/40 p-3">
+            <div className="flex items-center justify-between gap-3 rounded-xl border border-pulse-100 bg-pulse-50/50 p-3">
               <span className="text-sm font-medium text-gray-700">امتیاز نهایی وزنی</span>
               <ScoreRing value={preview.final_pct} size={56} />
             </div>

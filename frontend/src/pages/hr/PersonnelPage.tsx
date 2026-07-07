@@ -192,7 +192,7 @@ export function PersonnelPage() {
                 <span key="job" className="text-gray-600">
                   {p.job_title}
                   {p.is_manager && (
-                    <span className="mr-1.5 rounded-full bg-gradient-to-bl from-amber-50 to-amber-100 px-2 py-0.5 text-[11px] font-medium text-amber-700">
+                    <span className="mr-1.5 rounded-full bg-amber-50 px-2 py-0.5 text-[11px] font-medium text-amber-700">
                       مدیر
                     </span>
                   )}

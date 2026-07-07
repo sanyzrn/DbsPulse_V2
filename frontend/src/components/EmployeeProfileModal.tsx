@@ -110,7 +110,7 @@ export function EmployeeProfileModal({
           <InfoRow label="پایان قرارداد" value={formatDate(personnel.contract_end_date)} />
           {personnel.is_manager && (
             <div className="sm:col-span-2">
-              <span className="inline-flex items-center gap-1.5 rounded-full bg-gradient-to-bl from-amber-50 to-amber-100 px-2.5 py-0.5 text-xs font-medium text-amber-700">
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-50 px-2.5 py-0.5 text-xs font-medium text-amber-700">
                 پرسنل مدیریتی (ارزیابی مستقیم توسط معاونت)
               </span>
             </div>

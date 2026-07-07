@@ -174,7 +174,7 @@ export function ImprovementPlansPage() {
           <TableScroll>
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-gray-100 bg-gradient-to-l from-pulse-50/50 to-pulse-violet-50/50">
+                <tr className="border-b border-gray-100">
                   <th className="px-3 py-2.5 text-right text-xs font-semibold text-gray-600">پرسنل</th>
                   <th className="px-3 py-2.5 text-right text-xs font-semibold text-gray-600">پرونده</th>
                   <th className="px-3 py-2.5 text-right text-xs font-semibold text-gray-600">نتیجه</th>

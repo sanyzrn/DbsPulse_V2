@@ -87,7 +87,7 @@ export function IndicatorsPage() {
             {section === s && (
               <motion.span
                 layoutId="indicator-tab"
-                className="absolute inset-0 rounded-xl bg-gradient-to-bl from-pulse-500 to-pulse-violet-600 shadow-sm"
+                className="absolute inset-0 rounded-xl bg-charcoal-900 shadow-sm"
                 transition={{ type: "spring", stiffness: 400, damping: 32 }}
               />
             )}

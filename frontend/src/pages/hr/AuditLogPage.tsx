@@ -65,7 +65,7 @@ export function AuditLogPage() {
             <span key="time" className="whitespace-nowrap text-gray-500">
               {new Date(entry.created_at).toLocaleString("fa-IR")}
             </span>,
-            <span key="event" className="inline-flex items-center rounded-lg bg-gradient-to-bl from-pulse-50 to-pulse-violet-50 px-2 py-0.5 text-xs font-medium text-pulse-700">
+            <span key="event" className="inline-flex items-center rounded-lg bg-pulse-50 px-2 py-0.5 text-xs font-medium text-pulse-700">
               {AUDIT_EVENT_LABELS[entry.event_type] ?? entry.event_type}
             </span>,
             entry.actor_username ?? `#${entry.actor_user_id}`,

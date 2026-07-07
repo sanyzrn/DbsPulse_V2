@@ -206,7 +206,7 @@ export function ScoreFormTable({
   return (
     <div className="overflow-x-auto rounded-2xl border border-gray-100 bg-white shadow-card">
       <table className="w-full text-sm">
-        <thead className="bg-gradient-to-l from-pulse-50/50 to-pulse-violet-50/50 text-xs text-gray-600">
+        <thead className="border-b border-gray-100 text-xs text-gray-600">
           <tr>
             <th className="px-3 py-3 text-right font-semibold">شاخص کلیدی</th>
             <th className="px-3 py-3 text-right font-semibold">مصداق رفتاری/عملکردی</th>

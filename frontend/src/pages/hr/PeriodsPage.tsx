@@ -140,7 +140,7 @@ function OpenPeriodCard({ period, onClose }: { period: EvaluationPeriod; onClose
 
   return (
     <motion.div
-      className="gradient-border rounded-2xl bg-white p-5 shadow-card"
+      className="rounded-2xl border-2 border-pulse-100 bg-white p-5 shadow-card"
       initial={{ opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.4 }}

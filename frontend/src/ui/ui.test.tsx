@@ -18,7 +18,7 @@ describe("Button", () => {
     const btn = screen.getByRole("button", { name: "ثبت" });
     expect(btn).toHaveAttribute("type", "submit");
     expect(btn.className).toContain("extra");
-    expect(btn.className).toContain("from-pulse-500");
+    expect(btn.className).toContain("bg-pulse-600");
   });
 
   it("secondary variant uses the outline style", () => {

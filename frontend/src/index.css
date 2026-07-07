@@ -85,12 +85,6 @@
    ═══════════════════════════════════════════════════════════════════════ */
 
 :root {
-  --gradient-pulse: linear-gradient(135deg, var(--color-pulse-from), var(--color-pulse-to));
-  --gradient-pulse-text: linear-gradient(135deg, var(--color-pulse-600), var(--color-pulse-violet-600));
-  /* حاشیهٔ ظریف AccentCard — قبلاً از رنگ‌های فیروزه‌ای/بنفشِ نامرتبط با پالت برند
-     استفاده می‌کرد؛ حالا با همان قرمز/طوسی برند، در شفافیت کم */
-  --gradient-border: linear-gradient(135deg, rgba(219, 26, 24, 0.18), rgba(107, 114, 128, 0.18));
-
   /* Shimmer background for skeleton loading */
   --shimmer-bg: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
   --shimmer-bg-size: 200% 100%;
@@ -133,34 +127,6 @@ body {
   background-size: var(--shimmer-bg-size);
   animation: var(--animate-shimmer);
   border-radius: 8px;
-}
-
-/* Gradient text utility */
-.gradient-text {
-  background: var(--gradient-pulse-text);
-  -webkit-background-clip: text;
-  background-clip: text;
-  -webkit-text-fill-color: transparent;
-}
-
-/* Gradient border (pseudo-element technique) */
-.gradient-border {
-  position: relative;
-  border-radius: var(--radius-xl);
-}
-
-.gradient-border::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  border-radius: inherit;
-  padding: 1px;
-  background: var(--gradient-border);
-  mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
-  mask-composite: exclude;
-  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
-  -webkit-mask-composite: xor;
-  pointer-events: none;
 }
 
 /* Glass card */

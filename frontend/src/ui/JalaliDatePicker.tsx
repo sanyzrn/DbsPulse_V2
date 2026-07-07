@@ -130,7 +130,7 @@ export function JalaliDatePicker({
             exit={{ opacity: 0, y: -6, scale: 0.97 }}
             transition={{ duration: 0.15, ease: "easeOut" }}
           >
-            <div className="flex items-center justify-between border-b border-gray-100 bg-gradient-to-l from-pulse-50/50 to-pulse-violet-50/50 px-2 py-2">
+            <div className="flex items-center justify-between border-b border-gray-100 px-2 py-2">
               <button
                 type="button"
                 onClick={() => goMonth(1)}

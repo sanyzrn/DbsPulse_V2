@@ -38,31 +38,15 @@ export function ProfileMenu({ user, onLogout }: { user: CurrentUser; onLogout: (
         onClick={() => setOpen((v) => !v)}
         aria-label="منوی پروفایل"
         aria-expanded={open}
-        className="flex items-center gap-2 rounded-xl p-1 transition-colors hover:bg-gray-100"
+        className={`flex h-9 w-9 items-center justify-center rounded-full border transition-colors sm:h-10 sm:w-10 ${
+          open
+            ? "border-charcoal-900 bg-charcoal-900 text-white"
+            : "border-gray-200 text-gray-600 hover:bg-gray-100 hover:text-gray-900"
+        }`}
       >
-        <span className="rounded-full bg-gradient-to-br from-pulse-500 to-pulse-violet-600 p-0.5">
-          <span
-            aria-hidden
-            className="flex h-7 w-7 items-center justify-center rounded-full bg-white text-sm font-bold gradient-text"
-          >
-            {user.username.charAt(0).toUpperCase()}
-          </span>
-        </span>
-        <span className="hidden leading-tight md:block">
-          <span className="block text-sm font-medium text-gray-800">{user.username}</span>
-          <span className="block text-[11px] text-gray-500">{ROLE_LABELS[user.role]}</span>
-        </span>
-        <svg
-          viewBox="0 0 20 20"
-          className={`h-3.5 w-3.5 text-gray-400 transition-transform duration-200 ${open ? "rotate-180" : ""}`}
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="1.8"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          aria-hidden="true"
-        >
-          <path d="M5 7.5l5 5 5-5" />
+        <svg viewBox="0 0 20 20" className="h-4.5 w-4.5" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+          <circle cx="10" cy="7" r="3.4" />
+          <path d="M4 17c1.2-3.4 4.2-5 6-5s4.8 1.6 6 5" />
         </svg>
       </button>
 
@@ -75,18 +59,14 @@ export function ProfileMenu({ user, onLogout }: { user: CurrentUser; onLogout: (
             exit={{ opacity: 0, y: -8, scale: 0.97 }}
             transition={{ duration: 0.2, ease: "easeOut" }}
           >
-            <div className="flex items-center gap-3 border-b border-gray-100 bg-gradient-to-l from-pulse-50/50 to-pulse-violet-50/50 px-4 py-3">
-              <span className="rounded-full bg-gradient-to-br from-pulse-500 to-pulse-violet-600 p-0.5">
-                <span
-                  aria-hidden
-                  className="flex h-9 w-9 items-center justify-center rounded-full bg-white text-base font-bold gradient-text"
-                >
-                  {user.username.charAt(0).toUpperCase()}
-                </span>
+            {/* هدر تیره — همان زبان بصری کارت‌های «hero» تیره‌ی باقی اپ */}
+            <div className="flex items-center gap-3 bg-charcoal-900 px-4 py-3.5">
+              <span className="flex h-11 w-11 flex-none items-center justify-center rounded-full border-2 border-white/15 bg-pulse-600 text-base font-bold text-white">
+                {user.username.charAt(0).toUpperCase()}
               </span>
               <span className="min-w-0 leading-tight">
-                <span className="block truncate text-sm font-bold text-gray-900">{user.username}</span>
-                <span className="mt-0.5 inline-block rounded-full bg-white px-2 py-0.5 text-[11px] font-medium text-gray-600 ring-1 ring-gray-200">
+                <span className="block truncate text-sm font-bold text-white">{user.username}</span>
+                <span className="mt-1 inline-block rounded-full bg-white/15 px-2 py-0.5 text-[11px] font-medium text-white/85">
                   {ROLE_LABELS[user.role]}
                 </span>
               </span>
@@ -96,12 +76,14 @@ export function ProfileMenu({ user, onLogout }: { user: CurrentUser; onLogout: (
               <NavLink
                 to="/change-password"
                 onClick={() => setOpen(false)}
-                className="flex items-center gap-2.5 rounded-xl px-3 py-2 text-sm text-gray-700 transition-colors hover:bg-gray-50"
+                className="group flex items-center gap-2.5 rounded-xl px-2.5 py-2 text-sm text-gray-700 transition-colors hover:bg-gray-50"
               >
-                <svg viewBox="0 0 20 20" className="h-4.5 w-4.5 text-gray-400" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                  <circle cx="7" cy="10" r="4" />
-                  <path d="M11 10h6m-2 0v3m-2.5-3v2" />
-                </svg>
+                <span className="flex h-8 w-8 flex-none items-center justify-center rounded-lg bg-gray-100 text-gray-600 transition-colors group-hover:bg-charcoal-900 group-hover:text-white">
+                  <svg viewBox="0 0 20 20" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <circle cx="7" cy="10" r="4" />
+                    <path d="M11 10h6m-2 0v3m-2.5-3v2" />
+                  </svg>
+                </span>
                 تغییر رمز عبور
               </NavLink>
               <button
@@ -109,11 +91,13 @@ export function ProfileMenu({ user, onLogout }: { user: CurrentUser; onLogout: (
                   setOpen(false);
                   onLogout();
                 }}
-                className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-sm text-pulse-600 transition-colors hover:bg-pulse-50"
+                className="group flex w-full items-center gap-2.5 rounded-xl px-2.5 py-2 text-sm text-pulse-600 transition-colors hover:bg-pulse-50"
               >
-                <svg viewBox="0 0 20 20" className="h-4.5 w-4.5" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                  <path d="M13 7l3 3-3 3m3-3H8m2 6H5a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1h5" />
-                </svg>
+                <span className="flex h-8 w-8 flex-none items-center justify-center rounded-lg bg-pulse-50 text-pulse-600 transition-colors group-hover:bg-pulse-600 group-hover:text-white">
+                  <svg viewBox="0 0 20 20" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <path d="M13 7l3 3-3 3m3-3H8m2 6H5a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1h5" />
+                  </svg>
+                </span>
                 خروج
               </button>
             </div>

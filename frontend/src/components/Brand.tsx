@@ -1,6 +1,6 @@
 import { motion } from "motion/react";
 
-/** نشان‌های موقت برنامه و توسعه‌دهنده — با گرادیانت قرمز به خاکستری تیره.
+/** نشان‌های موقت برنامه و توسعه‌دهنده — قرمز برند، تک‌رنگ.
  * نشان اصلی شامل موج پالس متحرک است که هویت «DbsPulse» را منتقل می‌کند. */
 
 export function BrandMark({ className = "h-9 w-9" }: { className?: string }) {
@@ -12,10 +12,6 @@ export function BrandMark({ className = "h-9 w-9" }: { className?: string }) {
       initial={false}
     >
       <defs>
-        <linearGradient id="brand-mark-gradient" x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0" stopColor="#b61615" />
-          <stop offset="1" stopColor="#374151" />
-        </linearGradient>
         <filter id="brand-mark-glow">
           <feGaussianBlur stdDeviation="0.6" result="blur" />
           <feMerge>
@@ -24,7 +20,7 @@ export function BrandMark({ className = "h-9 w-9" }: { className?: string }) {
           </feMerge>
         </filter>
       </defs>
-      <rect width="32" height="32" rx="9" fill="url(#brand-mark-gradient)" />
+      <rect width="32" height="32" rx="9" fill="#b61615" />
       {/* خط پالس متحرک — موج قلب/ضربان */}
       <motion.path
         d="M5 17h4l2-6 4.5 11 2.5-7 1.5 3.5h7"
@@ -45,13 +41,7 @@ export function BrandMark({ className = "h-9 w-9" }: { className?: string }) {
 export function DevMark({ className = "h-4 w-4" }: { className?: string }) {
   return (
     <svg viewBox="0 0 20 20" className={className} aria-hidden="true">
-      <defs>
-        <linearGradient id="dev-mark-gradient" x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0" stopColor="#b61615" />
-          <stop offset="1" stopColor="#374151" />
-        </linearGradient>
-      </defs>
-      <rect width="20" height="20" rx="6" fill="url(#dev-mark-gradient)" />
+      <rect width="20" height="20" rx="6" fill="#b61615" />
       <text
         x="10"
         y="13.5"

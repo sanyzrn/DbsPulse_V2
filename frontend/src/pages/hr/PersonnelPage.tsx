@@ -30,7 +30,7 @@ const emptyForm = {
 
 /** کلاس استاندارد فیلد ورودی مدرن. */
 const inputClass =
-  "w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 outline-none transition-all duration-200 focus:border-gray-400";
+  "w-full rounded-xl border border-gray-200 bg-gray-100 px-3 py-2 text-sm text-gray-900 outline-none transition-colors duration-150 focus:border-pulse-500 focus:bg-white";
 
 export function PersonnelPage() {
   const { showSuccess, showError } = useToast();
@@ -162,7 +162,7 @@ export function PersonnelPage() {
                 <path d="M14 14l3 3" />
               </svg>
               <input
-                className="w-full rounded-xl border border-gray-200 bg-white py-1.5 pr-9 pl-3 text-sm text-gray-700 outline-none transition-all duration-200 focus:border-gray-400 sm:w-80"
+                className="w-full rounded-xl border border-gray-200 bg-gray-100 py-1.5 pr-9 pl-3 text-sm text-gray-700 outline-none transition-colors duration-150 focus:border-pulse-500 focus:bg-white sm:w-80"
                 placeholder="جست‌وجو (نام، کد پرسنلی، عنوان شغلی، واحد)…"
                 value={search}
                 onChange={(e) => {

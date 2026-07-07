@@ -117,6 +117,15 @@ body {
   border-radius: 8px;
 }
 
+/* فیلدهای متنی خودشان با تغییر رنگ border فوکوس را نشان می‌دهند (مثل UI.html)؛
+   اگر روی آن‌ها هم outline پیش‌فرض بالا اضافه شود، دو خط دور فیلد دیده می‌شود. */
+input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):focus-visible,
+textarea:focus-visible,
+select:focus-visible,
+.field-trigger:focus-visible {
+  outline: none;
+}
+
 /* ═══════════════════════════════════════════════════════════════════════
    Reusable Utility Classes
    ═══════════════════════════════════════════════════════════════════════ */

@@ -6,6 +6,7 @@ import { STAGE_LABELS, type EvaluationStatus } from "../types";
 import { StatusBadge } from "./StatusBadge";
 import { PaginationControls } from "./PaginationControls";
 import { Table } from "../ui/Table";
+import { EmptyState } from "../ui/Card";
 
 const PAGE_SIZE = 10;
 
@@ -108,17 +109,7 @@ export function EvaluationList({
       )}
 
       {/* حالت خالی */}
-      {data && data.items.length === 0 && (
-        <div className="flex flex-col items-center justify-center py-10 text-center">
-          <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-pulse-50 to-pulse-violet-50">
-            <svg viewBox="0 0 24 24" className="h-6 w-6 text-pulse-400" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2" />
-              <rect x="9" y="3" width="6" height="4" rx="1" />
-            </svg>
-          </div>
-          <p className="text-sm text-gray-400">موردی یافت نشد.</p>
-        </div>
-      )}
+      {data && data.items.length === 0 && <EmptyState />}
 
       {data && data.items.length > 0 && (
         <>

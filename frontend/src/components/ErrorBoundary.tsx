@@ -53,7 +53,7 @@ export class ErrorBoundary extends Component<Props, State> {
           </p>
           <button
             onClick={() => window.location.reload()}
-            className="rounded-xl bg-gradient-to-bl from-pulse-500 to-pulse-violet-600 px-5 py-2.5 text-sm font-medium text-white shadow-md shadow-pulse-500/20 transition-all duration-200 hover:shadow-lg"
+            className="rounded-xl bg-pulse-600 px-5 py-2.5 text-sm font-medium text-white shadow-md shadow-pulse-500/20 transition-all duration-200 hover:bg-pulse-700 hover:shadow-lg"
           >
             بارگذاری مجدد
           </button>

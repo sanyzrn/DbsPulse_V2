@@ -43,21 +43,21 @@ export function VerifyPage() {
   }, [token]);
 
   return (
-    <div className="relative flex min-h-screen flex-col overflow-hidden">
-      {/* پس‌زمینه گرادیانت ملایم */}
-      <div className="absolute inset-0 -z-10 bg-gradient-to-br from-pulse-50 via-white to-pulse-violet-50" />
-      <div className="pointer-events-none absolute -right-20 -top-20 -z-10 h-72 w-72 rounded-full bg-pulse-200/30 blur-3xl" />
-      <div className="pointer-events-none absolute -bottom-32 -left-20 -z-10 h-96 w-96 rounded-full bg-pulse-violet-200/30 blur-3xl" />
+    <div className="relative flex min-h-screen flex-col overflow-hidden bg-cream-50">
+      <div
+        className="pointer-events-none absolute -right-24 -top-24 -z-10 h-96 w-96 rounded-full bg-gray-200/50 blur-3xl"
+        style={{ animation: "var(--animate-float)" }}
+      />
 
       <div className="flex flex-1 items-center justify-center p-4">
         <motion.div
-          className="w-full max-w-md rounded-3xl border border-white/40 bg-white/80 p-6 shadow-float backdrop-blur-xl"
+          className="w-full max-w-md rounded-3xl border border-gray-100 bg-white p-6 shadow-float"
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5, ease: "easeOut" }}
         >
           <div className="mb-5 flex flex-col items-center text-center">
-            <div className="mb-2 rounded-2xl bg-gradient-to-br from-pulse-50 to-pulse-violet-50 p-2">
+            <div className="mb-2 rounded-2xl bg-pulse-50 p-2">
               <BrandMark className="h-10 w-10" />
             </div>
             <p dir="ltr" className="text-xs font-bold text-gray-400">{APP_NAME}</p>
@@ -107,8 +107,8 @@ export function VerifyPage() {
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
               >
-                <div className="mb-4 flex flex-col items-center rounded-2xl bg-gradient-to-br from-green-50 to-pulse-50 p-4 text-center">
-                  <div className="mb-1 flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-br from-green-400 to-pulse-500 shadow-md shadow-green-500/20">
+                <div className="mb-4 flex flex-col items-center rounded-2xl bg-green-50 p-4 text-center">
+                  <div className="mb-1 flex h-12 w-12 items-center justify-center rounded-full bg-green-500 shadow-md shadow-green-500/20">
                     <svg viewBox="0 0 24 24" className="h-6 w-6 text-white" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
                       <path d="M5 13l4 4L19 7" />
                     </svg>

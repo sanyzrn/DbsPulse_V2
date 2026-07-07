@@ -32,7 +32,7 @@ export function EvaluationActionButton({
     <button
       onClick={onStart}
       disabled={starting}
-      className="inline-flex items-center gap-1.5 rounded-xl bg-gradient-to-bl from-pulse-50 to-pulse-violet-50 px-3 py-1.5 text-sm font-medium text-pulse-700 transition-all duration-200 hover:shadow-md disabled:opacity-50"
+      className="inline-flex items-center gap-1.5 rounded-xl bg-pulse-50 px-3 py-1.5 text-sm font-medium text-pulse-700 transition-all duration-200 hover:shadow-md disabled:opacity-50"
     >
       {isStartingThis ? (
         <>

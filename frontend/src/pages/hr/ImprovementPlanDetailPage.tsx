@@ -242,7 +242,7 @@ export function ImprovementPlanDetailPage() {
                   disabled={!isOpen}
                   className={`flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-md border-2 transition-all ${
                     goal.is_done
-                      ? "border-pulse-500 bg-gradient-to-br from-pulse-500 to-pulse-violet-600"
+                      ? "border-pulse-500 bg-pulse-600"
                       : "border-gray-300 hover:border-pulse-400"
                   } ${!isOpen ? "cursor-default" : "cursor-pointer"}`}
                   aria-label={`انجام‌شدن هدف: ${goal.description}`}

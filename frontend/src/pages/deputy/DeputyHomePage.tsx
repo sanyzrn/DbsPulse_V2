@@ -63,7 +63,7 @@ export function DeputyHomePage() {
       {managers.length > 0 && (
         <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-card">
           <h2 className="mb-4 flex items-center gap-2 text-base font-bold text-gray-900">
-            <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-gradient-to-br from-amber-50 to-amber-100 text-amber-600">
+            <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-amber-50 text-amber-600">
               <svg viewBox="0 0 20 20" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M10 2l2.4 5 5.6.6-4 4 1.2 5.4-5.2-3-5.2 3 1.2-5.4-4-4 5.6-.6L10 2z" />
               </svg>

@@ -51,9 +51,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
               exit={{ opacity: 0, y: 12, scale: 0.95 }}
               transition={{ type: "spring", stiffness: 400, damping: 30 }}
               className={`pointer-events-auto flex items-center gap-2.5 rounded-2xl px-4 py-2.5 text-sm font-medium shadow-float ring-1 ring-black/5 ${
-                t.kind === "success"
-                  ? "bg-gradient-to-bl from-pulse-500 to-pulse-600 text-white"
-                  : "bg-gradient-to-bl from-red-500 to-pulse-violet-600 text-white"
+                t.kind === "success" ? "bg-green-600 text-white" : "bg-pulse-600 text-white"
               }`}
             >
               <span aria-hidden className="flex h-5 w-5 items-center justify-center rounded-full bg-white/20">

@@ -76,7 +76,7 @@ function MyEvaluationCard({ item, index }: { item: MyEvaluation; index: number }
           </dl>
         </div>
         {item.recommendation && (
-          <p className="mt-3 flex items-center gap-2 rounded-xl bg-gradient-to-l from-amber-50/70 to-transparent px-3 py-2 text-sm">
+          <p className="mt-3 flex items-center gap-2 rounded-xl bg-amber-50/70 px-3 py-2 text-sm">
             <span aria-hidden>💡</span>
             <span><span className="text-xs text-gray-500">پیشنهاد سامانه: </span>{item.recommendation}</span>
           </p>
@@ -119,7 +119,7 @@ function MyPlanCard({ plan, index }: { plan: ImprovementPlanDetail; index: numbe
               <span
                 className={`flex h-4 w-4 flex-shrink-0 items-center justify-center rounded border-2 ${
                   goal.is_done
-                    ? "border-pulse-500 bg-gradient-to-br from-pulse-500 to-pulse-violet-600"
+                    ? "border-pulse-500 bg-pulse-600"
                     : "border-gray-300"
                 }`}
               >

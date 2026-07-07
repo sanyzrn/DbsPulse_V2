@@ -74,7 +74,7 @@ export function DashboardPage() {
         <div>
           <h1 className="text-2xl font-extrabold text-gray-900">داشبورد تحلیلی</h1>
           <p className="mt-1 text-sm text-gray-500">نمای کلی از وضعیت ارزیابی‌های عملکرد سازمان</p>
-          <div className="mt-3 h-0.5 w-16 rounded-full bg-gradient-to-l from-pulse-500 to-pulse-violet-500" />
+          <div className="mt-3 h-0.5 w-16 rounded-full bg-pulse-500" />
         </div>
         <ExcelExportButton />
       </div>
@@ -88,7 +88,7 @@ export function DashboardPage() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.4 }}
         >
-          <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-pulse-50 to-pulse-violet-50 text-pulse-600" aria-hidden>
+          <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-pulse-50 text-pulse-600" aria-hidden>
             <svg viewBox="0 0 20 20" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
               <path d="M7 3h6l4 4v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h3z" />
               <path d="M7 11l2 2 4-4" />
@@ -123,7 +123,7 @@ export function DashboardPage() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.4, delay: 0.1 }}
         >
-          <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-pulse-50 to-pulse-violet-50 text-pulse-violet-600" aria-hidden>
+          <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gray-100 text-gray-600" aria-hidden>
             <svg viewBox="0 0 20 20" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
               <path d="M3 7l7-4 7 4-7 4-7-4z" />
               <path d="M3 7v6l7 4 7-4V7" />
@@ -289,15 +289,15 @@ function tooltipNumber(value: unknown): string {
   return typeof value === "number" ? value.toLocaleString("fa-IR") : String(value);
 }
 
-/** نمایش امتیاز ۰ تا ۵ به‌صورت نوار کوچک گرادیانت + عدد. */
+/** نمایش امتیاز ۰ تا ۵ به‌صورت نوار کوچک تک‌رنگ + عدد. */
 function ScoreOutOfFive({ value }: { value: number }) {
   const pct = Math.max(0, Math.min(100, (value / 5) * 100));
-  const color = pct >= 70 ? "from-green-400 to-pulse-500" : pct >= 50 ? "from-amber-400 to-amber-500" : "from-red-400 to-red-500";
+  const color = pct >= 70 ? "bg-green-500" : pct >= 50 ? "bg-amber-500" : "bg-red-500";
   return (
     <span className="inline-flex items-center gap-2">
       <span className="h-1.5 w-16 overflow-hidden rounded-full bg-gray-100">
         <motion.span
-          className={`block h-full rounded-full bg-gradient-to-l ${color}`}
+          className={`block h-full rounded-full ${color}`}
           initial={{ width: 0 }}
           whileInView={{ width: `${pct}%` }}
           viewport={{ once: true }}
@@ -393,7 +393,7 @@ function ExpiringContractsCard() {
   }
 
   return (
-    <div className="gradient-border rounded-2xl bg-white p-5 shadow-card">
+    <div className="rounded-2xl border-2 border-amber-100 bg-white p-5 shadow-card">
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
         <h2 className="flex items-center gap-2 text-base font-bold text-gray-900">
           <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-amber-50 text-amber-600">

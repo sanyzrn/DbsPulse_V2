@@ -99,7 +99,7 @@ export function PctBadge({ value }: { value: number | null }) {
   );
 }
 
-/** نوار پیشرفت افقی ۰ تا ۱۰۰ با گرادیانت و انیمیشن عرض. */
+/** نوار پیشرفت افقی ۰ تا ۱۰۰ با انیمیشن عرض. */
 export function PctBar({
   value,
   tone,
@@ -111,18 +111,11 @@ export function PctBar({
 }) {
   const clamped = Math.max(0, Math.min(100, value));
   const resolved = tone ?? toneOf(clamped);
-  const isBrand = resolved === "green";
   return (
     <div className={`h-2 w-full overflow-hidden rounded-full bg-gray-100 ${className}`}>
       <motion.div
         className="h-full rounded-full"
-        style={
-          isBrand
-            ? {
-                background: "var(--gradient-pulse)",
-              }
-            : { backgroundColor: RING_STOP_COLOR[resolved] }
-        }
+        style={{ backgroundColor: RING_STOP_COLOR[resolved] }}
         initial={{ width: 0 }}
         animate={{ width: `${clamped}%` }}
         transition={{ duration: 1, ease: "easeOut" }}
@@ -131,7 +124,7 @@ export function PctBar({
   );
 }
 
-/** حلقه (گیج دایره‌ای) امتیاز ۰ تا ۱۰۰ با گرادیانت و عدد متحرک در مرکز. */
+/** حلقه (گیج دایره‌ای) امتیاز ۰ تا ۱۰۰ با عدد متحرک در مرکز. */
 export function ScoreRing({
   value,
   size = 72,
@@ -146,18 +139,11 @@ export function ScoreRing({
   const circumference = 2 * Math.PI * radius;
   const clamped = value === null ? 0 : Math.max(0, Math.min(100, value));
   const tone: Tone = value === null ? "gray" : toneOf(clamped);
-  const useGradient = tone === "green";
 
   return (
     <div className="inline-flex flex-col items-center gap-1">
       <div className="relative" style={{ width: size, height: size }}>
         <svg width={size} height={size} className="-rotate-90">
-          <defs>
-            <linearGradient id={`ring-grad-${size}`} x1="0" y1="0" x2="1" y2="1">
-              <stop offset="0" stopColor="var(--color-pulse-500)" />
-              <stop offset="1" stopColor="var(--color-pulse-violet-600)" />
-            </linearGradient>
-          </defs>
           {/* مسیر پس‌زمینه */}
           <circle
             cx={size / 2}
@@ -173,7 +159,7 @@ export function ScoreRing({
             cy={size / 2}
             r={radius}
             fill="none"
-            stroke={useGradient ? `url(#ring-grad-${size})` : RING_STOP_COLOR[tone]}
+            stroke={RING_STOP_COLOR[tone]}
             strokeWidth={stroke}
             strokeLinecap="round"
             strokeDasharray={circumference}

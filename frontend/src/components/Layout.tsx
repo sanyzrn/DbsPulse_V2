@@ -43,10 +43,8 @@ export function Layout() {
   }
 
   const navLinkClass = ({ isActive }: { isActive: boolean }) =>
-    `whitespace-nowrap rounded-xl px-3.5 py-1.5 text-sm transition-all duration-200 ${
-      isActive
-        ? "bg-gradient-to-bl from-pulse-500/10 to-pulse-violet-500/10 font-semibold text-pulse-700"
-        : "text-gray-500 hover:bg-gray-100 hover:text-gray-800"
+    `whitespace-nowrap rounded-full px-3.5 py-1.5 text-sm transition-colors duration-150 ${
+      isActive ? "bg-charcoal-900 font-semibold text-white" : "text-gray-500 hover:text-gray-900"
     }`;
 
   return (
@@ -59,32 +57,31 @@ export function Layout() {
       >
         پرش به محتوای اصلی
       </a>
-      <header className="sticky top-0 z-40 border-b border-gray-100 bg-white/80 shadow-sm backdrop-blur-xl">
-        {/* خط گرادیانت بالای هدر */}
-        <div className="h-0.5 w-full bg-gradient-to-l from-pulse-500 via-pulse-violet-500 to-pulse-500" />
-        {/* ردیف اول: برند + منوی کاربر */}
-        <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-2.5">
-          <NavLink to="/" className="flex items-center gap-3" aria-label={APP_NAME}>
-            <BrandMark className="h-9 w-9" />
-            <span className="leading-tight">
-              <span dir="ltr" className="block text-sm font-extrabold tracking-tight text-gray-900">
-                {APP_NAME}
+
+      <div className="mx-auto flex w-full max-w-6xl flex-1 flex-col px-4 pt-4 sm:px-6">
+        {/* هدر شناور: کارت گرد و سایه‌دار، جدا از لبه‌های صفحه — نه نوار تمام‌عرض چسبیده به بالا */}
+        <header className="sticky top-4 z-40 rounded-3xl border border-gray-100 bg-white shadow-float">
+          <div className="flex items-center justify-between gap-4 px-4 py-2.5 sm:px-5">
+            <NavLink
+              to="/"
+              className="flex items-center gap-2.5 rounded-full border border-gray-200 py-1.5 pl-4 pr-2"
+              aria-label={APP_NAME}
+            >
+              <BrandMark className="h-7 w-7" />
+              <span dir="ltr" className="text-sm font-extrabold tracking-tight text-gray-900">
+                {APP_NAME_FA}
               </span>
-              <span className="block text-[11px] text-gray-500">{APP_NAME_FA}</span>
-            </span>
-          </NavLink>
+            </NavLink>
 
-          <div className="flex items-center gap-1 sm:gap-2">
-            <NotificationBell />
-            <span aria-hidden className="mx-1 hidden h-6 w-px bg-gray-200 sm:block" />
-            <ProfileMenu user={user} onLogout={handleLogout} />
+            <div className="flex items-center gap-2">
+              <NotificationBell />
+              <ProfileMenu user={user} onLogout={handleLogout} />
+            </div>
           </div>
-        </div>
 
-        {/* ردیف دوم: ناوبری — در عرض‌های کم به‌صورت افقی اسکرول می‌خورد */}
-        <nav className="border-t border-gray-50" aria-label="منوی اصلی">
-          <div className="mx-auto max-w-6xl overflow-x-auto px-4">
-            <ul className="flex gap-1 py-1.5">
+          {/* ناوبری — در عرض‌های کم به‌صورت افقی اسکرول می‌خورد */}
+          <nav className="border-t border-gray-100 px-3 py-2 sm:px-4" aria-label="منوی اصلی">
+            <ul className="flex gap-1 overflow-x-auto">
               {links.map((link) => (
                 <li key={link.to}>
                   <NavLink to={link.to} className={navLinkClass}>
@@ -93,26 +90,26 @@ export function Layout() {
                 </li>
               ))}
             </ul>
-          </div>
-        </nav>
-      </header>
+          </nav>
+        </header>
 
-      <main id="main-content" tabIndex={-1} className="mx-auto w-full max-w-6xl flex-1 p-4 sm:p-6">
-        {/* ErrorBoundary با key مسیر دوباره mount می‌شود تا خطای یک صفحه با رفتن به
-            صفحهٔ دیگر خودبه‌خود پاک شود، نه اینکه کاربر برای همیشه در حالت خطا بماند */}
-        <ErrorBoundary key={location.pathname} title="مشکلی در نمایش این صفحه پیش آمد">
-          {/* انیمیشن انتقال صفحه — fade + slide-up با key مسیر */}
-          <motion.div
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.3, ease: "easeOut" }}
-          >
-            <Outlet />
-          </motion.div>
-        </ErrorBoundary>
-      </main>
+        <main id="main-content" tabIndex={-1} className="flex-1 py-4 sm:py-6">
+          {/* ErrorBoundary با key مسیر دوباره mount می‌شود تا خطای یک صفحه با رفتن به
+              صفحهٔ دیگر خودبه‌خود پاک شود، نه اینکه کاربر برای همیشه در حالت خطا بماند */}
+          <ErrorBoundary key={location.pathname} title="مشکلی در نمایش این صفحه پیش آمد">
+            {/* انیمیشن انتقال صفحه — fade + slide-up با key مسیر */}
+            <motion.div
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.3, ease: "easeOut" }}
+            >
+              <Outlet />
+            </motion.div>
+          </ErrorBoundary>
+        </main>
 
-      <Footer />
+        <Footer />
+      </div>
     </div>
   );
 }

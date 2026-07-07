@@ -56,7 +56,11 @@ export function NotificationBell() {
         onClick={() => setOpen((v) => !v)}
         aria-label={`اعلان‌ها${unread > 0 ? ` (${unread.toLocaleString("fa-IR")} خوانده‌نشده)` : ""}`}
         aria-expanded={open}
-        className="relative rounded-xl p-2 text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-700"
+        className={`relative flex h-9 w-9 items-center justify-center rounded-full border transition-colors sm:h-10 sm:w-10 ${
+          open
+            ? "border-charcoal-900 bg-charcoal-900 text-white"
+            : "border-gray-200 text-gray-600 hover:bg-gray-100 hover:text-gray-900"
+        }`}
       >
         <svg
           viewBox="0 0 20 20"
@@ -72,7 +76,7 @@ export function NotificationBell() {
           <path d="M8.5 15.5a1.6 1.6 0 0 0 3 0" />
         </svg>
         {unread > 0 && (
-          <span className="absolute -left-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-gradient-to-br from-pulse-500 to-pulse-violet-600 px-1 text-[10px] font-bold text-white ring-2 ring-white">
+          <span className="absolute -left-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-pulse-600 px-1 text-[10px] font-bold text-white ring-2 ring-white">
             {unread.toLocaleString("fa-IR")}
           </span>
         )}
@@ -87,7 +91,7 @@ export function NotificationBell() {
             exit={{ opacity: 0, y: -8, scale: 0.97 }}
             transition={{ duration: 0.2, ease: "easeOut" }}
           >
-            <div className="flex items-center justify-between border-b border-gray-100 bg-gradient-to-l from-pulse-50/50 to-pulse-violet-50/50 px-3 py-2.5">
+            <div className="flex items-center justify-between border-b border-gray-100 px-3 py-2.5">
               <span className="text-sm font-bold text-gray-900">اعلان‌ها</span>
               {unread > 0 && (
                 <button onClick={markAllRead} className="text-xs font-medium text-pulse-600 hover:underline">

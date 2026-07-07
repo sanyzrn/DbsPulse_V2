@@ -36,7 +36,7 @@ export function Table({
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-gray-100 bg-gradient-to-l from-pulse-50/50 to-pulse-violet-50/50">
+              <tr className="border-b border-gray-100">
                 {headers.map((h, i) => (
                   <th key={i} className="px-3 py-2.5 text-right text-xs font-semibold text-gray-600">
                     {h}

@@ -83,9 +83,9 @@ export function EvaluationList({
                 setActiveTabKey(tab.key);
                 setPage(0);
               }}
-              className={`rounded-lg px-3 py-1.5 text-sm font-medium transition-all duration-200 ${
+              className={`rounded-lg px-3 py-1.5 text-sm font-medium transition-colors duration-150 ${
                 tab.key === activeTabKey
-                  ? "bg-white text-pulse-700 shadow-sm"
+                  ? "bg-charcoal-900 text-white"
                   : "text-gray-500 hover:text-gray-800"
               }`}
             >

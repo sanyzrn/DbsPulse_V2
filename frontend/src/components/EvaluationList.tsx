@@ -1,11 +1,11 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { motion } from "motion/react";
 import { extractErrorMessage } from "../api/client";
 import { useDebouncedValue, useEvaluations } from "../api/queries";
 import { STAGE_LABELS, type EvaluationStatus } from "../types";
 import { StatusBadge } from "./StatusBadge";
 import { PaginationControls } from "./PaginationControls";
+import { Table } from "../ui/Table";
 
 const PAGE_SIZE = 10;
 
@@ -122,59 +122,42 @@ export function EvaluationList({
 
       {data && data.items.length > 0 && (
         <>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-gray-100 bg-gradient-to-l from-pulse-50/50 to-pulse-violet-50/50">
-                  <th className="px-3 py-2.5 text-right text-xs font-semibold text-gray-600">کد ارزیابی</th>
-                  <th className="px-3 py-2.5 text-right text-xs font-semibold text-gray-600">پرسنل</th>
-                  <th className="px-3 py-2.5 text-right text-xs font-semibold text-gray-600">وضعیت</th>
-                  <th className="px-3 py-2.5 text-right text-xs font-semibold text-gray-600">مرحله</th>
-                  <th className="px-3 py-2.5 text-right text-xs font-semibold text-gray-600"></th>
-                </tr>
-              </thead>
-              <tbody>
-                {data.items.map((e, idx) => (
-                  <motion.tr
-                    key={e.id}
-                    className="border-b border-gray-50 transition-colors last:border-0 hover:bg-pulse-50/30"
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    transition={{ duration: 0.2, delay: idx * 0.03 }}
+          <Table
+            bordered={false}
+            headers={["کد ارزیابی", "پرسنل", "وضعیت", "مرحله", ""]}
+            rowKeys={data.items.map((e) => e.id)}
+            rows={data.items.map((e) => [
+              <span key="code" className="font-medium text-gray-700">
+                {e.evaluation_code}
+              </span>,
+              e.subject_full_name,
+              <div key="status" className="flex flex-wrap items-center gap-1.5">
+                <StatusBadge status={e.status} />
+                {e.was_returned && (
+                  <span
+                    className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-[11px] font-medium text-amber-700"
+                    title="این پرونده قبلاً حداقل یک‌بار برگشت خورده است"
                   >
-                    <td className="px-3 py-2.5 font-medium text-gray-700">{e.evaluation_code}</td>
-                    <td className="px-3 py-2.5 text-gray-700">{e.subject_full_name}</td>
-                    <td className="px-3 py-2.5">
-                      <div className="flex flex-wrap items-center gap-1.5">
-                        <StatusBadge status={e.status} />
-                        {e.was_returned && (
-                          <span
-                            className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-[11px] font-medium text-amber-700"
-                            title="این پرونده قبلاً حداقل یک‌بار برگشت خورده است"
-                          >
-                            <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-amber-500" />
-                            برگشتی
-                          </span>
-                        )}
-                      </div>
-                    </td>
-                    <td className="px-3 py-2.5 text-gray-500">{STAGE_LABELS[e.stage]}</td>
-                    <td className="px-3 py-2.5">
-                      <button
-                        onClick={() => navigate(`/evaluations/${e.id}`)}
-                        className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-sm font-medium text-pulse-600 transition-colors hover:bg-pulse-50 hover:text-pulse-700"
-                      >
-                        مشاهده
-                        <svg viewBox="0 0 20 20" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                          <path d="M7 5l5 5-5 5" />
-                        </svg>
-                      </button>
-                    </td>
-                  </motion.tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                    <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-amber-500" />
+                    برگشتی
+                  </span>
+                )}
+              </div>,
+              <span key="stage" className="text-gray-500">
+                {STAGE_LABELS[e.stage]}
+              </span>,
+              <button
+                key="action"
+                onClick={() => navigate(`/evaluations/${e.id}`)}
+                className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-sm font-medium text-pulse-600 transition-colors hover:bg-pulse-50 hover:text-pulse-700"
+              >
+                مشاهده
+                <svg viewBox="0 0 20 20" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M7 5l5 5-5 5" />
+                </svg>
+              </button>,
+            ])}
+          />
           <PaginationControls
             page={page}
             totalPages={totalPages}

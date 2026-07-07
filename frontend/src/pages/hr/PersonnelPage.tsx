@@ -1,6 +1,5 @@
 import { useEffect, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { motion } from "motion/react";
 import { apiClient, extractErrorMessage } from "../../api/client";
 import {
   useDebouncedValue,
@@ -13,6 +12,7 @@ import { useToast } from "../../components/Toast";
 import { Button } from "../../ui/Button";
 import { PageHeader } from "../../ui/Card";
 import { Modal } from "../../ui/Modal";
+import { Table } from "../../ui/Table";
 import { JalaliDatePicker } from "../../ui/JalaliDatePicker";
 import type { AppUser, EvaluationAccess, Personnel } from "../../types";
 
@@ -175,86 +175,62 @@ export function PersonnelPage() {
           {loadError != null && (
             <p className="mb-2 text-sm text-red-600">{extractErrorMessage(loadError)}</p>
           )}
-          {data && data.items.length > 0 && (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-gray-100 bg-gradient-to-l from-pulse-50/50 to-pulse-violet-50/50">
-                    <th className="px-3 py-2.5 text-right text-xs font-semibold text-gray-600">نام</th>
-                    <th className="px-3 py-2.5 text-right text-xs font-semibold text-gray-600">عنوان شغلی</th>
-                    <th className="px-3 py-2.5 text-right text-xs font-semibold text-gray-600">واحد</th>
-                    <th className="px-3 py-2.5 text-right text-xs font-semibold text-gray-600">وضعیت</th>
-                    <th className="px-3 py-2.5 text-right text-xs font-semibold text-gray-600"></th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {data.items.map((p, idx) => (
-                    <motion.tr
-                      key={p.id}
-                      className="border-b border-gray-50 transition-colors last:border-0 hover:bg-pulse-50/30"
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                      transition={{ duration: 0.2, delay: idx * 0.03 }}
-                    >
-                      <td className="px-3 py-2.5 font-medium text-gray-700">
-                        <button
-                          onClick={() => setProfilePerson(p)}
-                          className="rounded-md text-right text-pulse-700 underline decoration-pulse-200 decoration-dotted underline-offset-4 transition-colors hover:text-pulse-800"
-                          title="مشاهده پروفایل"
-                        >
-                          {p.full_name}
-                        </button>
-                      </td>
-                      <td className="px-3 py-2.5 text-gray-600">
-                        {p.job_title}
-                        {p.is_manager && (
-                          <span className="mr-1.5 rounded-full bg-gradient-to-bl from-amber-50 to-amber-100 px-2 py-0.5 text-[11px] font-medium text-amber-700">
-                            مدیر
-                          </span>
-                        )}
-                      </td>
-                      <td className="px-3 py-2.5 text-gray-500">{p.org_unit}</td>
-                      <td className="px-3 py-2.5">
-                        {p.status === "active" ? (
-                          <span className="inline-flex items-center gap-1.5 rounded-full bg-green-50 px-2.5 py-0.5 text-xs font-medium text-green-700">
-                            <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-green-500" />
-                            فعال
-                          </span>
-                        ) : (
-                          <span className="inline-flex items-center gap-1.5 rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-medium text-gray-500">
-                            <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-gray-400" />
-                            غیرفعال
-                          </span>
-                        )}
-                      </td>
-                      <td className="px-3 py-2.5">
-                        <div className="flex items-center gap-3">
-                          <button
-                            onClick={() => setEditingPersonnel(p)}
-                            className="text-sm font-medium text-gray-600 hover:text-gray-800"
-                          >
-                            ویرایش
-                          </button>
-                          <button
-                            onClick={() => setSelected(p)}
-                            className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-sm font-medium text-pulse-600 transition-colors hover:bg-pulse-50"
-                          >
-                            <svg viewBox="0 0 20 20" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-                              <path d="M10 12a2 2 0 1 0 0-4 2 2 0 0 0 0 4z" />
-                              <path d="M2 10s3-5 8-5 8 5 8 5-3 5-8 5-8-5-8-5z" />
-                            </svg>
-                            تنظیم دسترسی
-                          </button>
-                        </div>
-                      </td>
-                    </motion.tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-          {data && data.items.length === 0 && (
-            <p className="mt-3 text-center text-sm text-gray-400">موردی یافت نشد.</p>
+          {data && (
+            <Table
+              bordered={false}
+              headers={["نام", "عنوان شغلی", "واحد", "وضعیت", ""]}
+              rowKeys={data.items.map((p) => p.id)}
+              rows={data.items.map((p) => [
+                <button
+                  key="name"
+                  onClick={() => setProfilePerson(p)}
+                  className="rounded-md text-right font-medium text-pulse-700 underline decoration-pulse-200 decoration-dotted underline-offset-4 transition-colors hover:text-pulse-800"
+                  title="مشاهده پروفایل"
+                >
+                  {p.full_name}
+                </button>,
+                <span key="job" className="text-gray-600">
+                  {p.job_title}
+                  {p.is_manager && (
+                    <span className="mr-1.5 rounded-full bg-gradient-to-bl from-amber-50 to-amber-100 px-2 py-0.5 text-[11px] font-medium text-amber-700">
+                      مدیر
+                    </span>
+                  )}
+                </span>,
+                <span key="unit" className="text-gray-500">
+                  {p.org_unit}
+                </span>,
+                p.status === "active" ? (
+                  <span key="status" className="inline-flex items-center gap-1.5 rounded-full bg-green-50 px-2.5 py-0.5 text-xs font-medium text-green-700">
+                    <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-green-500" />
+                    فعال
+                  </span>
+                ) : (
+                  <span key="status" className="inline-flex items-center gap-1.5 rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-medium text-gray-500">
+                    <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-gray-400" />
+                    غیرفعال
+                  </span>
+                ),
+                <div key="actions" className="flex items-center gap-3">
+                  <button
+                    onClick={() => setEditingPersonnel(p)}
+                    className="text-sm font-medium text-gray-600 hover:text-gray-800"
+                  >
+                    ویرایش
+                  </button>
+                  <button
+                    onClick={() => setSelected(p)}
+                    className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-sm font-medium text-pulse-600 transition-colors hover:bg-pulse-50"
+                  >
+                    <svg viewBox="0 0 20 20" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M10 12a2 2 0 1 0 0-4 2 2 0 0 0 0 4z" />
+                      <path d="M2 10s3-5 8-5 8 5 8 5-3 5-8 5-8-5-8-5z" />
+                    </svg>
+                    تنظیم دسترسی
+                  </button>
+                </div>,
+              ])}
+            />
           )}
           <PaginationControls
             page={page}

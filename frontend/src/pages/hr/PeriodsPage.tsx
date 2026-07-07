@@ -8,6 +8,7 @@ import { useToast } from "../../components/Toast";
 import { Button } from "../../ui/Button";
 import { PageHeader } from "../../ui/Card";
 import { CountUp, PctBar } from "../../ui/Meters";
+import { Table } from "../../ui/Table";
 import { JalaliDatePicker } from "../../ui/JalaliDatePicker";
 import { formatDate } from "../../utils/dates";
 import type { EvaluationPeriod } from "../../types";
@@ -99,50 +100,31 @@ export function PeriodsPage() {
         {loadError != null && (
           <p className="mb-2 text-sm text-red-600">{extractErrorMessage(loadError)}</p>
         )}
-        {periods.length === 0 ? (
-          <p className="py-6 text-center text-sm text-gray-400">هنوز دوره‌ای تعریف نشده است.</p>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-gray-100 bg-gradient-to-l from-pulse-50/50 to-pulse-violet-50/50">
-                  <th className="px-3 py-2.5 text-right text-xs font-semibold text-gray-600">نام</th>
-                  <th className="px-3 py-2.5 text-right text-xs font-semibold text-gray-600">بازه</th>
-                  <th className="px-3 py-2.5 text-right text-xs font-semibold text-gray-600">وضعیت</th>
-                </tr>
-              </thead>
-              <tbody>
-                {periods.map((p, idx) => (
-                  <motion.tr
-                    key={p.id}
-                    className="border-b border-gray-50 transition-colors last:border-0 hover:bg-pulse-50/30"
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    transition={{ duration: 0.2, delay: idx * 0.03 }}
-                  >
-                    <td className="px-3 py-2.5 font-medium text-gray-700">{p.name}</td>
-                    <td className="px-3 py-2.5 text-gray-500">
-                      {formatDate(p.starts_on)} تا {formatDate(p.ends_on)}
-                    </td>
-                    <td className="px-3 py-2.5">
-                      {p.status === "open" ? (
-                        <span className="inline-flex items-center gap-1.5 rounded-full bg-green-50 px-2.5 py-0.5 text-xs font-medium text-green-700">
-                          <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-green-500" />
-                          باز
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center gap-1.5 rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-medium text-gray-500">
-                          <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-gray-400" />
-                          بسته
-                        </span>
-                      )}
-                    </td>
-                  </motion.tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
+        <Table
+          bordered={false}
+          headers={["نام", "بازه", "وضعیت"]}
+          rowKeys={periods.map((p) => p.id)}
+          emptyMessage="هنوز دوره‌ای تعریف نشده است."
+          rows={periods.map((p) => [
+            <span key="name" className="font-medium text-gray-700">
+              {p.name}
+            </span>,
+            <span key="range" className="text-gray-500">
+              {formatDate(p.starts_on)} تا {formatDate(p.ends_on)}
+            </span>,
+            p.status === "open" ? (
+              <span key="status" className="inline-flex items-center gap-1.5 rounded-full bg-green-50 px-2.5 py-0.5 text-xs font-medium text-green-700">
+                <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-green-500" />
+                باز
+              </span>
+            ) : (
+              <span key="status" className="inline-flex items-center gap-1.5 rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-medium text-gray-500">
+                <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-gray-400" />
+                بسته
+              </span>
+            ),
+          ])}
+        />
       </div>
     </div>
   );

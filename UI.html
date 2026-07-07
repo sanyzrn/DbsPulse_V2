@@ -1,0 +1,1365 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DbsPulse — UI Kit</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<style>
+  :root{
+    --bg: #ECEBE7;
+    --bg-2: #E2E1DC;
+    --surface: #FFFFFF;
+    --surface-dark: #2A2D31;
+    --surface-dark-2: #34373C;
+    --surface-dark-3: #3E4147;
+    --primary: #B61615;
+    --primary-dark: #8C1010;
+    --primary-tint: #F5DBDA;
+    --grey-900: #2A2D31;
+    --grey-800: #34373C;
+    --grey-700: #4B4D52;
+    --grey-500: #86888D;
+    --grey-400: #B0AFAB;
+    --grey-300: #D3D2CD;
+    --grey-200: #E8E7E2;
+    --grey-100: #F1F0EC;
+    --success: #1E8E5A;
+    --success-tint: #DCF3E7;
+    --info: #2E6FB8;
+    --info-tint: #DCE8F7;
+    --warning: #B8791E;
+    --warning-tint: #F6E8D2;
+    --danger: #C0392B;
+    --danger-tint: #F7DEDB;
+    --radius-sm: 10px;
+    --radius-md: 16px;
+    --radius-lg: 22px;
+    --radius-pill: 999px;
+    --shadow: 0 1px 2px rgba(30,30,35,.04), 0 8px 24px rgba(30,30,35,.06);
+    --shadow-lg: 0 10px 40px rgba(30,30,35,.12), 0 2px 6px rgba(30,30,35,.06);
+    --shadow-dark: 0 12px 30px rgba(30,30,35,.28);
+  }
+
+  *{ box-sizing:border-box; }
+  html,body{ margin:0; padding:0; }
+  body{
+    background: var(--bg);
+    background-image: radial-gradient(circle at 90% -10%, #F3D7D6 0%, transparent 45%);
+    font-family: 'Vazirmatn', sans-serif;
+    color: var(--grey-900);
+    min-height:100vh;
+    -webkit-font-smoothing:antialiased;
+  }
+
+  .shell{ max-width:1360px; margin:0 auto; padding:20px 20px 80px; }
+
+  /* ---------- HEADER ---------- */
+  header.topbar{
+    display:flex; align-items:center; justify-content:space-between;
+    background:var(--surface);
+    border-radius: var(--radius-lg);
+    padding:14px 20px;
+    box-shadow: var(--shadow);
+    gap:16px;
+    position:relative;
+    z-index:50;
+  }
+  .brand{
+    display:flex; align-items:center; gap:10px;
+    border:1px solid var(--grey-200);
+    border-radius: var(--radius-pill);
+    padding:8px 16px;
+    background: var(--surface);
+  }
+  .brand .mark{
+    width:26px; height:26px; border-radius:50%;
+    background: conic-gradient(from 220deg, var(--primary), var(--primary-dark), var(--primary));
+    position:relative; flex:none;
+  }
+  .brand .mark::after{
+    content:""; position:absolute; inset:6px; border-radius:50%; background:var(--surface);
+  }
+  .brand .mark::before{
+    content:""; position:absolute; top:50%; right:2px; left:2px; height:2px;
+    background: var(--primary);
+    clip-path: polygon(0% 50%, 20% 50%, 30% 10%, 42% 90%, 54% 30%, 62% 70%, 72% 50%, 100% 50%, 100% 40%, 72% 40%, 66% 20%, 54% 80%, 44% 0%, 32% 100%, 24% 40%, 0% 40%);
+    transform: translateY(-50%);
+  }
+  .brand span{ font-weight:700; font-size:15px; letter-spacing:.2px; }
+
+  nav.mainnav{
+    display:flex; align-items:center; gap:4px;
+    background: var(--grey-200);
+    padding:4px; border-radius: var(--radius-pill);
+  }
+  nav.mainnav a{
+    text-decoration:none; color:var(--grey-700); font-size:13.5px; font-weight:500;
+    padding:9px 16px; border-radius:var(--radius-pill); transition:.15s ease;
+  }
+  nav.mainnav a.active{ background:var(--surface-dark); color:#fff; }
+  nav.mainnav a:hover:not(.active){ color:var(--grey-900); }
+
+  .head-actions{ display:flex; align-items:center; gap:10px; position:relative; }
+  .icon-btn{
+    width:38px; height:38px; border-radius:50%; border:1px solid var(--grey-200);
+    background:var(--surface); display:flex; align-items:center; justify-content:center;
+    cursor:pointer; position:relative; color:var(--grey-700);
+    transition:.15s ease;
+  }
+  .icon-btn:hover{ background:var(--grey-200); color:var(--grey-900); }
+  .icon-btn.active{ background:var(--surface-dark); color:#fff; border-color:var(--surface-dark); }
+  .icon-btn .dot{
+    position:absolute; top:6px; left:7px; width:8px; height:8px; border-radius:50%;
+    background:var(--primary); border:2px solid var(--surface);
+  }
+  .icon-btn .count{
+    position:absolute; top:-4px; left:-4px; min-width:18px; height:18px; padding:0 5px;
+    border-radius:99px; background:var(--primary); color:#fff; font-size:10.5px; font-weight:700;
+    display:flex; align-items:center; justify-content:center; border:2px solid var(--surface);
+  }
+
+  /* ---------- POPOVER (نوتیفیکیشن / پروفایل) ---------- */
+  .popover{
+    position:absolute; top:calc(100% + 14px); left:0;
+    width:360px; background:var(--surface);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-lg);
+    border:1px solid var(--grey-200);
+    opacity:0; transform:translateY(-6px) scale(.98); pointer-events:none;
+    transition: opacity .18s ease, transform .18s ease;
+    z-index:60; overflow:hidden;
+  }
+  .popover.open{ opacity:1; transform:translateY(0) scale(1); pointer-events:auto; }
+  .popover::before{
+    content:""; position:absolute; top:-6px; width:12px; height:12px;
+    background:var(--surface); transform:rotate(45deg);
+    border-top:1px solid var(--grey-200); border-right:1px solid var(--grey-200);
+  }
+  #notifPop::before{ right:14px; }
+  #profilePop::before{ right:14px; }
+  #profilePop{ width:300px; }
+
+  .pop-head{
+    display:flex; align-items:center; justify-content:space-between;
+    padding:14px 18px; border-bottom:1px solid var(--grey-200);
+  }
+  .pop-head h4{ margin:0; font-size:14.5px; font-weight:700; display:flex; align-items:center; gap:8px; }
+  .pop-head .cnt-badge{
+    background:var(--primary-tint); color:var(--primary-dark);
+    padding:2px 9px; border-radius:99px; font-size:11px; font-weight:700;
+  }
+  .pop-head .link-btn{
+    background:transparent; border:none; color:var(--primary); font-family:inherit;
+    font-size:12.5px; font-weight:600; cursor:pointer; padding:6px 8px; border-radius:8px;
+  }
+  .pop-head .link-btn:hover{ background:var(--primary-tint); }
+
+  .notif-tabs{
+    display:flex; gap:4px; padding:10px 14px 4px; border-bottom:1px solid var(--grey-200);
+  }
+  .notif-tab{
+    padding:7px 12px; border-radius:99px; font-size:12.5px; font-weight:600;
+    color:var(--grey-500); cursor:pointer; transition:.15s ease;
+    display:flex; align-items:center; gap:6px; user-select:none;
+  }
+  .notif-tab:hover{ color:var(--grey-900); }
+  .notif-tab.active{ background:var(--grey-900); color:#fff; }
+  .notif-tab .num{
+    background:rgba(255,255,255,.2); padding:1px 6px; border-radius:99px; font-size:10.5px;
+  }
+  .notif-tab:not(.active) .num{ background:var(--grey-200); color:var(--grey-700); }
+
+  .notif-list{ max-height:340px; overflow-y:auto; padding:6px 0; }
+  .notif-list::-webkit-scrollbar{ width:6px; }
+  .notif-list::-webkit-scrollbar-thumb{ background:var(--grey-300); border-radius:99px; }
+
+  .notif-empty{
+    display:none; flex-direction:column; align-items:center; justify-content:center;
+    gap:10px; padding:40px 20px; color:var(--grey-500); text-align:center;
+  }
+  .notif-empty svg{ color:var(--grey-400); }
+  .notif-empty p{ margin:0; font-size:13px; }
+
+  .notif-item{
+    display:flex; gap:12px; padding:12px 18px; cursor:pointer;
+    transition:background .15s ease; position:relative; align-items:flex-start;
+  }
+  .notif-item:hover{ background:var(--grey-100); }
+  .notif-item.unread::before{
+    content:""; position:absolute; right:8px; top:22px; width:6px; height:6px;
+    border-radius:50%; background:var(--primary);
+  }
+  .notif-icon{
+    width:36px; height:36px; border-radius:12px; flex:none;
+    display:flex; align-items:center; justify-content:center;
+  }
+  .notif-icon.success{ background:var(--success-tint); color:var(--success); }
+  .notif-icon.warning{ background:var(--warning-tint); color:var(--warning); }
+  .notif-icon.danger{ background:var(--danger-tint); color:var(--danger); }
+  .notif-icon.info{ background:var(--info-tint); color:var(--info); }
+  .notif-body{ flex:1; min-width:0; }
+  .notif-title{ font-size:13px; font-weight:600; color:var(--grey-900); margin:0 0 3px; }
+  .notif-desc{ font-size:12px; color:var(--grey-700); margin:0 0 4px; line-height:1.55; }
+  .notif-time{ font-size:11px; color:var(--grey-500); display:flex; align-items:center; gap:4px; }
+
+  .pop-foot{
+    display:flex; gap:8px; padding:12px 14px; border-top:1px solid var(--grey-200);
+    background:var(--grey-100);
+  }
+  .pop-foot .btn{ flex:1; padding:9px 14px; font-size:12.5px; justify-content:center; }
+
+  /* پروفایل پاپ‌آور */
+  .prof-head{
+    display:flex; align-items:center; gap:12px; padding:16px 18px;
+    background: linear-gradient(135deg, var(--grey-900), var(--surface-dark-2));
+    color:#fff; position:relative;
+  }
+  .prof-head .avatar-lg{
+    width:52px; height:52px; border-radius:50%; background:var(--primary);
+    color:#fff; display:flex; align-items:center; justify-content:center;
+    font-size:16px; font-weight:800; flex:none; border:3px solid rgba(255,255,255,.18);
+    position:relative;
+  }
+  .prof-head .avatar-lg::after{
+    content:""; position:absolute; bottom:-1px; left:-1px; width:14px; height:14px;
+    border-radius:50%; background:var(--success); border:2.5px solid var(--surface-dark);
+  }
+  .prof-head .prof-info h5{ margin:0 0 3px; font-size:14.5px; font-weight:700; }
+  .prof-head .prof-info p{ margin:0; font-size:11.5px; color:rgba(255,255,255,.7); }
+  .prof-head .role-tag{
+    display:inline-block; margin-top:5px; background:rgba(255,255,255,.14);
+    padding:2px 9px; border-radius:99px; font-size:10.5px; font-weight:600;
+  }
+
+  .prof-menu{ padding:8px 0; }
+  .prof-item{
+    display:flex; align-items:center; gap:12px; padding:11px 18px; cursor:pointer;
+    font-size:13px; color:var(--grey-700); transition:.15s ease; position:relative;
+  }
+  .prof-item:hover{ background:var(--grey-100); color:var(--grey-900); }
+  .prof-item .prof-ic{
+    width:32px; height:32px; border-radius:10px; background:var(--grey-200);
+    display:flex; align-items:center; justify-content:center; color:var(--grey-700);
+    flex:none; transition:.15s ease;
+  }
+  .prof-item:hover .prof-ic{ background:var(--grey-900); color:#fff; }
+  .prof-item.danger{ color:var(--danger); }
+  .prof-item.danger .prof-ic{ background:var(--danger-tint); color:var(--danger); }
+  .prof-item.danger:hover{ background:var(--danger-tint); }
+  .prof-item.danger:hover .prof-ic{ background:var(--danger); color:#fff; }
+  .prof-item .kbd{
+    margin-right:auto; margin-left:0; font-size:10.5px; color:var(--grey-500);
+    background:var(--grey-200); padding:2px 6px; border-radius:6px; font-weight:600;
+  }
+  .prof-sep{ height:1px; background:var(--grey-200); margin:6px 12px; }
+
+  /* backdrop */
+  .backdrop{
+    position:fixed; inset:0; background:transparent; z-index:55; display:none;
+  }
+  .backdrop.open{ display:block; }
+
+  /* ---------- PAGE INTRO ---------- */
+  .intro{ margin:28px 4px 20px; }
+  .intro h1{ font-size:30px; font-weight:800; margin:0 0 6px; }
+  .intro p{ margin:0; color:var(--grey-700); font-size:14.5px; }
+
+  /* ---------- GRID ---------- */
+  .grid{ display:grid; grid-template-columns: repeat(12, 1fr); gap:18px; margin-top:18px; }
+  .col-3{ grid-column: span 3; }
+  .col-4{ grid-column: span 4; }
+  .col-5{ grid-column: span 5; }
+  .col-6{ grid-column: span 6; }
+  .col-7{ grid-column: span 7; }
+  .col-8{ grid-column: span 8; }
+  .col-12{ grid-column: span 12; }
+  @media (max-width:980px){ .grid > [class*="col-"]{ grid-column: span 12; } }
+
+  .card{
+    background:var(--surface); border-radius:var(--radius-lg); padding:22px;
+    box-shadow:var(--shadow); border:1px solid rgba(30,30,35,.03);
+  }
+  .card.dark{
+    background: var(--surface-dark); color:#fff; box-shadow:var(--shadow-dark);
+    border:none;
+  }
+  .card.dark .muted{ color:#9C9DA1; }
+  .card-head{ display:flex; align-items:center; justify-content:space-between; margin-bottom:16px; }
+  .card-head h3{ margin:0; font-size:15.5px; font-weight:700; }
+  .muted{ color:var(--grey-500); font-size:12.5px; }
+
+  .pill-btn{
+    width:34px; height:34px; border-radius:50%; border:none; cursor:pointer;
+    background:var(--grey-200); color:var(--grey-900); display:flex; align-items:center; justify-content:center;
+    transition:.15s ease;
+  }
+  .pill-btn:hover{ background:var(--grey-300); }
+  .card.dark .pill-btn{ background:rgba(255,255,255,.1); color:#fff; }
+  .card.dark .pill-btn:hover{ background:rgba(255,255,255,.18); }
+
+  /* section label */
+  .section-label{
+    display:flex; align-items:center; gap:10px; margin:36px 4px 14px;
+    font-size:12.5px; font-weight:700; color:var(--grey-500); text-transform:uppercase; letter-spacing:.06em;
+  }
+  .section-label::after{ content:""; flex:1; height:1px; background:var(--grey-300); }
+
+  /* ---------- BUTTONS ---------- */
+  .row{ display:flex; flex-wrap:wrap; gap:12px; align-items:center; }
+  .btn{
+    font-family:inherit; font-size:14px; font-weight:600; border-radius:var(--radius-pill);
+    padding:11px 22px; border:none; cursor:pointer; display:inline-flex; align-items:center; gap:8px;
+    transition:transform .12s ease, box-shadow .12s ease, background .12s ease;
+  }
+  .btn:active{ transform:scale(.97); }
+  .btn-primary{ background:var(--primary); color:#fff; box-shadow:0 8px 18px rgba(182,22,21,.28); }
+  .btn-primary:hover{ background:var(--primary-dark); }
+  .btn-dark{ background:var(--surface-dark); color:#fff; }
+  .btn-dark:hover{ background:var(--grey-900); }
+  .btn-outline{ background:transparent; color:var(--grey-900); border:1.5px solid var(--grey-300); }
+  .btn-outline:hover{ border-color:var(--grey-900); }
+  .btn-ghost{ background:var(--grey-200); color:var(--grey-900); }
+  .btn-ghost:hover{ background:var(--grey-300); }
+  .btn-danger-o{ background:var(--danger-tint); color:var(--danger); }
+  .btn-danger-o:hover{ background:var(--danger); color:#fff; }
+  .btn-success-o{ background:var(--success-tint); color:var(--success); }
+  .btn-success-o:hover{ background:var(--success); color:#fff; }
+  .btn-sm{ padding:8px 16px; font-size:13px; }
+  .btn[disabled]{ opacity:.45; cursor:not-allowed; }
+  .btn .spin{
+    width:14px; height:14px; border-radius:50%; border:2px solid rgba(255,255,255,.4); border-top-color:#fff;
+    animation:spin .7s linear infinite;
+  }
+  @keyframes spin{ to{ transform:rotate(360deg); } }
+
+  /* ---------- FORM ELEMENTS ---------- */
+  .form-grid{ display:grid; grid-template-columns:1fr 1fr; gap:18px; }
+  @media (max-width:600px){ .form-grid{ grid-template-columns:1fr; } }
+  .field{ display:flex; flex-direction:column; gap:7px; }
+  .field label{ font-size:13px; font-weight:600; color:var(--grey-700); }
+  .field input, .field textarea, .field select{
+    font-family:inherit; font-size:14px; padding:12px 14px; border-radius:var(--radius-sm);
+    border:1.5px solid var(--grey-200); background:var(--bg-2); color:var(--grey-900);
+    outline:none; transition:border-color .15s ease, background .15s ease;
+  }
+  .field input:focus, .field textarea:focus, .field select:focus{
+    border-color:var(--primary); background:#fff;
+  }
+  .field .hint{ font-size:12px; color:var(--grey-500); }
+  .field.error input{ border-color:var(--danger); background:var(--danger-tint); }
+  .field.error .hint{ color:var(--danger); }
+  .field textarea{ resize:vertical; min-height:88px; font-family:inherit; }
+
+  /* toggle switch */
+  .switch{ position:relative; display:inline-block; width:42px; height:24px; }
+  .switch input{ display:none; }
+  .switch .slider{
+    position:absolute; inset:0; background:var(--grey-300); border-radius:99px;
+    cursor:pointer; transition:.2s ease;
+  }
+  .switch .slider::before{
+    content:""; position:absolute; top:3px; right:3px; width:18px; height:18px;
+    background:#fff; border-radius:50%; transition:.2s ease;
+  }
+  .switch input:checked + .slider{ background:var(--primary); }
+  .switch input:checked + .slider::before{ transform:translateX(-18px); }
+
+  /* dropdown menu */
+  .menu-wrap{ position:relative; display:inline-block; }
+  .menu-trigger{
+    display:flex; align-items:center; gap:10px; background:var(--bg-2); border:1.5px solid var(--grey-200);
+    border-radius:var(--radius-sm); padding:11px 14px; font-size:14px; cursor:pointer; min-width:220px;
+    justify-content:space-between;
+  }
+  .menu-panel{
+    position:absolute; top:calc(100% + 8px); right:0; left:0; background:#fff; border-radius:var(--radius-md);
+    box-shadow:var(--shadow); border:1px solid var(--grey-200); padding:8px; display:none; z-index:10;
+  }
+  .menu-wrap.open .menu-panel{ display:block; }
+  .menu-wrap.open .chevron{ transform:rotate(180deg); }
+  .menu-item{
+    display:flex; align-items:center; gap:10px; padding:10px 12px; border-radius:10px; font-size:13.5px;
+    cursor:pointer; color:var(--grey-700);
+  }
+  .menu-item:hover{ background:var(--grey-200); color:var(--grey-900); }
+  .menu-item.sel{ background:var(--primary-tint); color:var(--primary-dark); font-weight:600; }
+  .chevron{ transition:transform .15s ease; color:var(--grey-500); }
+
+  /* ============================================================
+     امتیاز شایستگی — اسلایدر بازطراحی‌شده
+     ============================================================ */
+  .comp-rating{ margin-top:4px; }
+  .comp-rating-head{
+    display:flex; align-items:center; justify-content:space-between; margin-bottom:14px;
+  }
+  .comp-rating-label{
+    display:inline-flex; align-items:center; gap:9px;
+    padding:7px 16px 7px 14px; border-radius:var(--radius-pill);
+    font-size:14px; font-weight:700; color:#fff;
+    background:var(--grey-700);
+    transition: background .25s ease;
+  }
+  .comp-rating-label .lvl-emoji{ font-size:15px; line-height:1; }
+  .comp-rating-score{
+    font-size:12.5px; font-weight:700; color:var(--grey-500);
+  }
+  .comp-rating-score b{ color:var(--grey-900); font-size:15px; }
+
+  .comp-slider{
+    position:relative; height:14px; border-radius:99px; cursor:pointer;
+    background: linear-gradient(90deg,
+      var(--success) 0%, #7CB342 30%, var(--warning) 55%, #E0673C 78%, var(--danger) 100%);
+    /* در RTL جهت گرادیان معکوس می‌شود تا «عالی» سمت راست و «نیازمند بهبود» سمت چپ باشد */
+    box-shadow: inset 0 1px 3px rgba(0,0,0,.18);
+    touch-action:none; user-select:none;
+    margin: 6px 8px 0;
+  }
+  .comp-slider-fill{
+    position:absolute; top:0; bottom:0; right:0; border-radius:99px;
+    background: rgba(255,255,255,.0);
+    pointer-events:none;
+  }
+  .comp-slider-thumb{
+    position:absolute; top:50%; right:0; transform:translate(50%,-50%);
+    width:26px; height:26px; border-radius:50%; background:#fff;
+    box-shadow: 0 2px 8px rgba(30,30,35,.28), 0 0 0 2px rgba(255,255,255,.9) inset;
+    border:3px solid var(--grey-700);
+    cursor:grab; transition: border-color .25s ease, transform .1s ease;
+    display:flex; align-items:center; justify-content:center;
+  }
+  .comp-slider-thumb::after{
+    content:""; width:8px; height:8px; border-radius:50%; background:var(--grey-700);
+    transition: background .25s ease;
+  }
+  .comp-slider-thumb:active{ cursor:grabbing; transform:translate(50%,-50%) scale(1.1); }
+  .comp-slider:focus{ outline:none; }
+  .comp-slider:focus .comp-slider-thumb{
+    box-shadow: 0 2px 8px rgba(30,30,35,.28), 0 0 0 4px var(--primary-tint);
+  }
+
+  .comp-ticks{
+    display:flex; justify-content:space-between; margin:14px 8px 0;
+  }
+  .comp-tick{
+    display:flex; flex-direction:column; align-items:center; gap:6px;
+    flex:1; text-align:center; cursor:pointer;
+    /* در RTL اولین تیک سمت راست است؛ ترتیب داده‌ها را طوری می‌چینیم که با گرادیان بخواند */
+  }
+  .comp-tick .dot{
+    width:9px; height:9px; border-radius:50%; background:var(--grey-300);
+    transition: background .2s ease, transform .2s ease;
+  }
+  .comp-tick .lbl{
+    font-size:11px; font-weight:600; color:var(--grey-500); transition:color .2s ease;
+    line-height:1.3;
+  }
+  .comp-tick.on .dot{ transform:scale(1.35); }
+  .comp-tick.on .lbl{ color:var(--grey-900); font-weight:700; }
+  .comp-tick:hover .lbl{ color:var(--grey-700); }
+
+  /* ---------- BADGES ---------- */
+  .badge{
+    display:inline-flex; align-items:center; gap:6px; padding:5px 12px; border-radius:var(--radius-pill);
+    font-size:12px; font-weight:700;
+  }
+  .badge::before{ content:""; width:6px; height:6px; border-radius:50%; }
+  .badge.success{ background:var(--success-tint); color:var(--success); }
+  .badge.success::before{ background:var(--success); }
+  .badge.warning{ background:var(--warning-tint); color:var(--warning); }
+  .badge.warning::before{ background:var(--warning); }
+  .badge.danger{ background:var(--danger-tint); color:var(--danger); }
+  .badge.danger::before{ background:var(--danger); }
+  .badge.info{ background:var(--info-tint); color:var(--info); }
+  .badge.info::before{ background:var(--info); }
+  .badge.neutral{ background:var(--grey-200); color:var(--grey-700); }
+  .badge.neutral::before{ background:var(--grey-500); }
+
+  /* ---------- TABLE ---------- */
+  .table-toolbar{
+    display:flex; align-items:center; justify-content:space-between; gap:12px;
+    margin-bottom:16px; flex-wrap:wrap;
+  }
+  .table-search{
+    display:flex; align-items:center; gap:8px; background:var(--bg-2);
+    border:1.5px solid var(--grey-200); border-radius:var(--radius-pill);
+    padding:8px 14px; min-width:240px; color:var(--grey-500);
+    transition:border-color .15s ease, background .15s ease;
+  }
+  .table-search:focus-within{ border-color:var(--primary); background:#fff; }
+  .table-search input{
+    border:none; background:transparent; outline:none; font-family:inherit;
+    font-size:13px; color:var(--grey-900); flex:1;
+  }
+  .filter-chips{ display:flex; gap:6px; flex-wrap:wrap; }
+  .chip{
+    padding:7px 13px; border-radius:99px; font-size:12.5px; font-weight:600;
+    background:var(--grey-200); color:var(--grey-700); cursor:pointer;
+    transition:.15s ease; border:1.5px solid transparent; user-select:none;
+  }
+  .chip:hover{ border-color:var(--grey-300); }
+  .chip.active{ background:var(--surface-dark); color:#fff; }
+
+  table.data{ width:100%; border-collapse:separate; border-spacing:0 10px; font-size:13.5px; }
+  table.data thead th{
+    text-align:right; font-size:12px; color:var(--grey-500); font-weight:700; padding:0 16px 6px;
+    text-transform:uppercase; letter-spacing:.04em;
+  }
+  table.data tbody tr{
+    background:var(--bg-2);
+    box-shadow: 0 1px 2px rgba(30,30,35,.03);
+    transition: background .15s ease, transform .15s ease, box-shadow .15s ease;
+  }
+  table.data tbody tr td:first-child{ border-radius:0 14px 14px 0; }
+  table.data tbody tr td:last-child{ border-radius:14px 0 0 14px; }
+  table.data td{ padding:14px 16px; vertical-align:middle; }
+  table.data tbody tr:hover{
+    background:#fff;
+    box-shadow: 0 6px 18px rgba(30,30,35,.08);
+    transform: translateY(-1px);
+  }
+  .table-empty-row td{
+    text-align:center; color:var(--grey-500); padding:30px 16px; background:transparent !important;
+    box-shadow:none !important;
+  }
+  .person{ display:flex; align-items:center; gap:10px; }
+  .avatar{
+    width:36px; height:36px; border-radius:50%; background:var(--surface-dark); color:#fff;
+    display:flex; align-items:center; justify-content:center; font-size:12.5px; font-weight:700; flex:none;
+    position:relative;
+  }
+  .avatar.online::after{
+    content:""; position:absolute; bottom:-1px; left:-1px; width:10px; height:10px;
+    border-radius:50%; background:var(--success); border:2px solid var(--bg-2);
+  }
+  .avatar.a1{ background:linear-gradient(135deg,#B61615,#8C1010); }
+  .avatar.a2{ background:linear-gradient(135deg,#2E6FB8,#1E4F87); }
+  .avatar.a3{ background:linear-gradient(135deg,#1E8E5A,#0F5B39); }
+  .avatar.a4{ background:linear-gradient(135deg,#B8791E,#7F5211); }
+  .avatar.a5{ background:linear-gradient(135deg,#5E3EAC,#3D2373); }
+  .person .name{ font-weight:700; font-size:13.5px; }
+  .person .role{ font-size:11.5px; color:var(--grey-500); }
+  .bar-mini{
+    width:90px; height:6px; border-radius:99px; background:var(--grey-300); overflow:hidden;
+    position:relative;
+  }
+  .bar-mini span{ display:block; height:100%; background:var(--primary); border-radius:99px; transition:width .3s ease; }
+  .bar-mini.s-high span{ background: linear-gradient(90deg, var(--success), #26B36F); }
+  .bar-mini.s-mid span{ background: linear-gradient(90deg, var(--warning), #D69534); }
+  .bar-mini.s-low span{ background: linear-gradient(90deg, var(--danger), #E05545); }
+  .bar-cell{ display:flex; align-items:center; gap:10px; }
+  .bar-cell .val{ font-size:12.5px; font-weight:700; color:var(--grey-700); min-width:32px; }
+  .row-actions{ display:flex; gap:6px; justify-content:flex-end; }
+  .act-btn{
+    width:30px; height:30px; border-radius:8px; border:1px solid var(--grey-300);
+    background:var(--surface); color:var(--grey-700); cursor:pointer;
+    display:flex; align-items:center; justify-content:center; transition:.15s ease;
+  }
+  .act-btn:hover{ background:var(--grey-900); color:#fff; border-color:var(--grey-900); }
+  .act-btn.danger:hover{ background:var(--danger); border-color:var(--danger); }
+
+  /* ---------- STAT PILLS ---------- */
+  .stat-pill{
+    display:flex; align-items:center; gap:10px; background:var(--surface); border:1px solid var(--grey-200);
+    border-radius:var(--radius-pill); padding:8px 8px 8px 18px;
+    transition:.15s ease;
+  }
+  .stat-pill:hover{ transform:translateY(-2px); box-shadow:var(--shadow); }
+  .stat-pill .ring{
+    width:44px; height:44px; border-radius:50%; display:flex; align-items:center; justify-content:center;
+    font-size:11.5px; font-weight:800; color:#fff; flex:none;
+  }
+  .stat-pill .lbl{ font-size:12.5px; color:var(--grey-700); font-weight:600; }
+  .stat-pill .trend{
+    display:inline-flex; align-items:center; gap:2px; font-size:10.5px; margin-right:6px;
+    padding:1px 6px; border-radius:99px; font-weight:700;
+  }
+  .stat-pill .trend.up{ background:var(--success-tint); color:var(--success); }
+  .stat-pill .trend.down{ background:var(--danger-tint); color:var(--danger); }
+
+  /* ---------- CHARTS ---------- */
+  .chart-box{ position:relative; height:220px; }
+  .kpi-row{ display:flex; align-items:baseline; gap:8px; margin-bottom:4px; }
+  .kpi-num{ font-size:34px; font-weight:800; }
+  .kpi-tag{ background:rgba(255,255,255,.1); padding:4px 10px; border-radius:99px; font-size:12px; font-weight:700; }
+  .card.dark .kpi-tag{ background:var(--primary); }
+
+  footer.appfooter{
+    display:flex; align-items:center; justify-content:space-between; gap:12px;
+    margin-top:40px; padding:16px 22px; background:var(--surface); border-radius:var(--radius-lg);
+    box-shadow:var(--shadow); font-size:12.5px; color:var(--grey-500); flex-wrap:wrap;
+  }
+  footer.appfooter .fbrand{ display:flex; align-items:center; gap:8px; font-weight:700; color:var(--grey-900); }
+  footer.appfooter .fdev{ display:flex; align-items:center; gap:8px; }
+  footer.appfooter .fdev .devlogo{
+    width:20px; height:20px; border-radius:6px; background:var(--grey-200); display:flex; align-items:center;
+    justify-content:center; font-size:10px; font-weight:800; color:var(--grey-700);
+  }
+  footer.appfooter a{ color:inherit; text-decoration:none; }
+  footer.appfooter a:hover{ color:var(--primary); }
+</style>
+</head>
+<body>
+<div class="shell">
+
+  <!-- BACKDROP for popovers -->
+  <div class="backdrop" id="backdrop"></div>
+
+  <!-- HEADER -->
+  <header class="topbar">
+    <div class="brand"><span class="mark"></span><span>DbsPulse</span></div>
+    <nav class="mainnav">
+      <a href="#" class="active">داشبورد</a>
+      <a href="#">پرسنل</a>
+      <a href="#">ارزیابی‌ها</a>
+      <a href="#">گزارش‌ها</a>
+      <a href="#">تنظیمات</a>
+    </nav>
+    <div class="head-actions">
+
+      <!-- NOTIFICATION BUTTON + POPOVER -->
+      <button class="icon-btn" id="notifBtn" title="اعلان‌ها" aria-label="اعلان‌ها">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8a6 6 0 10-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/></svg>
+        <span class="count">۴</span>
+      </button>
+
+      <div class="popover" id="notifPop">
+        <div class="pop-head">
+          <h4>
+            اعلان‌ها
+            <span class="cnt-badge">۴ خوانده نشده</span>
+          </h4>
+          <button class="link-btn" onclick="markAllRead()">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="vertical-align:-2px; margin-left:4px;"><polyline points="20 6 9 17 4 12"/></svg>
+            خواندن همه
+          </button>
+        </div>
+
+        <div class="notif-tabs">
+          <div class="notif-tab active" data-cat="all">همه <span class="num">۴</span></div>
+          <div class="notif-tab" data-cat="eval">ارزیابی‌ها <span class="num">۲</span></div>
+          <div class="notif-tab" data-cat="system">سیستم <span class="num">۱</span></div>
+          <div class="notif-tab" data-cat="message">پیام‌ها <span class="num">۱</span></div>
+        </div>
+
+        <div class="notif-list">
+          <div class="notif-item unread" data-cat="eval">
+            <div class="notif-icon success">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="20 6 9 17 4 12"/></svg>
+            </div>
+            <div class="notif-body">
+              <p class="notif-title">ارزیابی نهایی‌شد</p>
+              <p class="notif-desc">ارزیابی سارا احمدی توسط مدیر واحد تأیید و نهایی شد.</p>
+              <span class="notif-time">
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                ۵ دقیقه پیش
+              </span>
+            </div>
+          </div>
+          <div class="notif-item unread" data-cat="eval">
+            <div class="notif-icon warning">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 9v4"/><path d="M12 17h.01"/><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/></svg>
+            </div>
+            <div class="notif-body">
+              <p class="notif-title">ارزیابی در انتظار تأیید</p>
+              <p class="notif-desc">۳ ارزیابی جدید در انتظار بررسی و تأیید شما هستند.</p>
+              <span class="notif-time">
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                ۳۲ دقیقه پیش
+              </span>
+            </div>
+          </div>
+          <div class="notif-item unread" data-cat="message">
+            <div class="notif-icon info">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
+            </div>
+            <div class="notif-body">
+              <p class="notif-title">پیام جدید از تیم منابع انسانی</p>
+              <p class="notif-desc">لطفاً گزارش دوره‌ای بهار ۱۴۰۴ را تا پایان هفته ارسال کنید.</p>
+              <span class="notif-time">
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                ۲ ساعت پیش
+              </span>
+            </div>
+          </div>
+          <div class="notif-item unread" data-cat="eval">
+            <div class="notif-icon danger">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+            </div>
+            <div class="notif-body">
+              <p class="notif-title">ارزیابی برگشت خورد</p>
+              <p class="notif-desc">ارزیابی نیلوفر کریمی برای تکمیل اطلاعات به شما ارجاع داده شد.</p>
+              <span class="notif-time">
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                دیروز
+              </span>
+            </div>
+          </div>
+          <div class="notif-item" data-cat="system">
+            <div class="notif-icon info">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
+            </div>
+            <div class="notif-body">
+              <p class="notif-title">به‌روزرسانی سیستم</p>
+              <p class="notif-desc">نسخه ۱.۰.۱ منتشر شد. شامل بهبود عملکرد و رفع اشکالات.</p>
+              <span class="notif-time">
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                ۲ روز پیش
+              </span>
+            </div>
+          </div>
+          <div class="notif-empty" id="notifEmpty">
+            <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M18 8a6 6 0 10-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/></svg>
+            <p>اعلانی در این دسته وجود ندارد</p>
+          </div>
+        </div>
+
+        <div class="pop-foot">
+          <button class="btn btn-ghost btn-sm">تنظیمات اعلان</button>
+          <button class="btn btn-dark btn-sm">مشاهده همه</button>
+        </div>
+      </div>
+
+      <!-- PROFILE BUTTON + POPOVER -->
+      <button class="icon-btn" id="profileBtn" title="پروفایل" aria-label="پروفایل">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 20c1.5-4 5-6 8-6s6.5 2 8 6"/></svg>
+      </button>
+
+      <div class="popover" id="profilePop">
+        <div class="prof-head">
+          <div class="avatar-lg">م.ط</div>
+          <div class="prof-info">
+            <h5>مهدی طاهری</h5>
+            <p>mahdi.taheri@dbspulse.ir</p>
+            <span class="role-tag">مدیر منابع انسانی</span>
+          </div>
+        </div>
+
+        <div class="prof-menu">
+          <div class="prof-item">
+            <div class="prof-ic">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 20c1.5-4 5-6 8-6s6.5 2 8 6"/></svg>
+            </div>
+            <span>پروفایل من</span>
+            <span class="kbd">P</span>
+          </div>
+          <div class="prof-item">
+            <div class="prof-ic">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+            </div>
+            <span>ارزیابی‌های من</span>
+          </div>
+          <div class="prof-item">
+            <div class="prof-ic">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+            </div>
+            <span>ویرایش اطلاعات</span>
+          </div>
+          <div class="prof-item">
+            <div class="prof-ic">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 01-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.6 15 1.65 1.65 0 003.09 14H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.6a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09A1.65 1.65 0 0015 4.6a1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09A1.65 1.65 0 0019.4 15z"/></svg>
+            </div>
+            <span>تنظیمات حساب</span>
+            <span class="kbd">S</span>
+          </div>
+          <div class="prof-item">
+            <div class="prof-ic">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a10 10 0 100 20 10 10 0 000-20z"/><path d="M9.09 9a3 3 0 015.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+            </div>
+            <span>راهنما و پشتیبانی</span>
+          </div>
+          <div class="prof-sep"></div>
+          <div class="prof-item">
+            <div class="prof-ic">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.2" y1="4.2" x2="5.6" y2="5.6"/><line x1="18.4" y1="18.4" x2="19.8" y2="19.8"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.2" y1="19.8" x2="5.6" y2="18.4"/><line x1="18.4" y1="5.6" x2="19.8" y2="4.2"/></svg>
+            </div>
+            <span>حالت روشن / تیره</span>
+            <label class="switch" style="margin-right:auto;" onclick="event.stopPropagation()">
+              <input type="checkbox">
+              <span class="slider"></span>
+            </label>
+          </div>
+          <div class="prof-sep"></div>
+          <div class="prof-item danger">
+            <div class="prof-ic">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 3h4a2 2 0 012 2v14a2 2 0 01-2 2h-4"/><polyline points="8 17 3 12 8 7"/><line x1="3" y1="12" x2="15" y2="12"/></svg>
+            </div>
+            <span>خروج از حساب</span>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </header>
+
+  <div class="intro">
+    <h1>کتابخانه اجزای رابط کاربری</h1>
+    <p>نمونه استایل هدر، دکمه‌ها، ورودی‌ها، منو، جدول، نمودار و نمودار عنکبوتی برای DbsPulse</p>
+  </div>
+
+  <!-- STAT PILLS -->
+  <div class="row" style="margin-bottom:6px;">
+    <div class="stat-pill">
+      <div class="ring" style="background:var(--primary);">۸۲٪</div>
+      <div class="lbl">میانگین<br>عملکرد</div>
+      <span class="trend up">▲ ۴٪</span>
+    </div>
+    <div class="stat-pill">
+      <div class="ring" style="background:var(--success);">۹۴٪</div>
+      <div class="lbl">تکمیل<br>ارزیابی</div>
+      <span class="trend up">▲ ۲٪</span>
+    </div>
+    <div class="stat-pill">
+      <div class="ring" style="background:var(--warning);">۱۲</div>
+      <div class="lbl">در انتظار<br>تأیید</div>
+      <span class="trend down">▼ ۱</span>
+    </div>
+    <div class="stat-pill">
+      <div class="ring" style="background:var(--surface-dark);">۵۶</div>
+      <div class="lbl">کل<br>پرسنل</div>
+      <span class="trend up">▲ ۳</span>
+    </div>
+  </div>
+
+  <!-- MAIN GRID: profile-style card / bar chart / radar chart -->
+  <div class="grid">
+    <div class="col-4 card dark">
+      <div class="card-head">
+        <h3 style="color:#fff;">امتیاز کلی</h3>
+        <button class="pill-btn">↗</button>
+      </div>
+      <div class="kpi-row"><span class="kpi-num">۸۷٪</span><span class="kpi-tag">عالی</span></div>
+      <p class="muted" style="margin:0 0 18px;">دوره ارزیابی — بهار ۱۴۰۴</p>
+      <div class="chart-box" style="height:140px;"><canvas id="miniDonut"></canvas></div>
+    </div>
+
+    <div class="col-4 card">
+      <div class="card-head"><h3>روند عملکرد</h3><button class="pill-btn" style="background:var(--grey-200);">↗</button></div>
+      <div class="chart-box"><canvas id="barChart"></canvas></div>
+    </div>
+
+    <div class="col-4 card">
+      <div class="card-head"><h3>نمودار عنکبوتی شایستگی‌ها</h3><button class="pill-btn" style="background:var(--grey-200);">↗</button></div>
+      <div class="chart-box"><canvas id="radarChart"></canvas></div>
+    </div>
+  </div>
+
+  <!-- FORM ELEMENTS -->
+  <div class="section-label">ورودی‌ها و منو</div>
+  <div class="grid">
+    <div class="col-6 card">
+      <div class="card-head"><h3>فرم نمونه</h3></div>
+      <div class="form-grid">
+        <div class="field">
+          <label>نام و نام خانوادگی</label>
+          <input type="text" placeholder="مثال: سارا احمدی">
+        </div>
+        <div class="field">
+          <label>واحد سازمانی</label>
+          <div class="menu-wrap" id="menu1">
+            <div class="menu-trigger" onclick="document.getElementById('menu1').classList.toggle('open')">
+              <span>منابع انسانی</span>
+              <svg class="chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+            </div>
+            <div class="menu-panel">
+              <div class="menu-item sel">منابع انسانی</div>
+              <div class="menu-item">فناوری اطلاعات</div>
+              <div class="menu-item">مالی</div>
+              <div class="menu-item">فروش</div>
+            </div>
+          </div>
+        </div>
+        <div class="field error">
+          <label>ایمیل</label>
+          <input type="text" value="sara@example">
+          <span class="hint">فرمت ایمیل معتبر نیست</span>
+        </div>
+        <div class="field">
+          <label>تاریخ دوره (شمسی)</label>
+          <input type="text" placeholder="۱۴۰۴/۰۴/۱۶">
+        </div>
+        <div class="field" style="grid-column:1/-1;">
+          <label>توضیحات ارزیابی</label>
+          <textarea placeholder="نکات و شواهد ارزیابی را اینجا بنویسید..."></textarea>
+        </div>
+
+        <!-- ============ امتیاز شایستگی (بازطراحی‌شده) ============ -->
+        <div class="field" style="grid-column:1/-1;">
+          <label>امتیاز شایستگی</label>
+          <div class="comp-rating">
+            <div class="comp-rating-head">
+              <span class="comp-rating-label" id="compLabel">
+                <span class="lvl-emoji" id="compEmoji">😊</span>
+                <span id="compText">خوب</span>
+              </span>
+              <span class="comp-rating-score">سطح <b id="compScore">۳</b> از ۵</span>
+            </div>
+
+            <div class="comp-slider" id="compSlider" tabindex="0"
+                 role="slider" aria-label="امتیاز شایستگی"
+                 aria-valuemin="1" aria-valuemax="5" aria-valuenow="3" aria-valuetext="خوب">
+              <div class="comp-slider-fill" id="compFill"></div>
+              <div class="comp-slider-thumb" id="compThumb"></div>
+            </div>
+
+            <div class="comp-ticks" id="compTicks">
+              <!-- ترتیب در RTL: راست = عالی ... چپ = نیازمند بهبود -->
+              <div class="comp-tick" data-v="5"><span class="dot"></span><span class="lbl">عالی</span></div>
+              <div class="comp-tick" data-v="4"><span class="dot"></span><span class="lbl">بسیار خوب</span></div>
+              <div class="comp-tick" data-v="3"><span class="dot"></span><span class="lbl">خوب</span></div>
+              <div class="comp-tick" data-v="2"><span class="dot"></span><span class="lbl">قابل قبول</span></div>
+              <div class="comp-tick" data-v="1"><span class="dot"></span><span class="lbl">نیازمند بهبود</span></div>
+            </div>
+          </div>
+        </div>
+        <!-- ============ پایان امتیاز شایستگی ============ -->
+
+      </div>
+    </div>
+
+    <div class="col-6 card">
+      <div class="card-head"><h3>دکمه‌ها و نشان‌ها</h3></div>
+      <p class="muted" style="margin:0 0 10px;">دکمه‌ها</p>
+      <div class="row" style="margin-bottom:20px;">
+        <button class="btn btn-primary">ثبت نهایی</button>
+        <button class="btn btn-dark">مشاهده جزئیات</button>
+        <button class="btn btn-outline">انصراف</button>
+        <button class="btn btn-ghost btn-sm">ویرایش</button>
+        <button class="btn btn-danger-o btn-sm">حذف</button>
+        <button class="btn btn-success-o btn-sm">تأیید</button>
+        <button class="btn btn-primary" disabled><span class="spin"></span> در حال ثبت...</button>
+      </div>
+      <p class="muted" style="margin:0 0 10px;">نشان‌های وضعیت</p>
+      <div class="row" style="margin-bottom:20px;">
+        <span class="badge success">نهایی‌شده</span>
+        <span class="badge warning">در انتظار تأیید</span>
+        <span class="badge danger">برگشت‌خورده</span>
+        <span class="badge info">در حال بررسی</span>
+        <span class="badge neutral">پیش‌نویس</span>
+      </div>
+      <p class="muted" style="margin:0 0 10px;">کلید تغییر وضعیت</p>
+      <div class="row">
+        <label class="switch"><input type="checkbox" checked><span class="slider"></span></label>
+        <span style="font-size:13px; color:var(--grey-700);">فعال بودن حساب</span>
+        <label class="switch" style="margin-right:16px;"><input type="checkbox"><span class="slider"></span></label>
+        <span style="font-size:13px; color:var(--grey-700);">اعلان ایمیلی</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- TABLE -->
+  <div class="section-label">جدول پرسنل</div>
+  <div class="card" style="padding-top:18px;">
+    <div class="table-toolbar">
+      <div class="table-search">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <input type="text" id="tableSearch" placeholder="جستجوی کارمند...">
+      </div>
+      <div class="filter-chips">
+        <div class="chip active" data-status="all">همه</div>
+        <div class="chip" data-status="final">نهایی‌شده</div>
+        <div class="chip" data-status="pending">در انتظار</div>
+        <div class="chip" data-status="returned">برگشتی</div>
+      </div>
+    </div>
+
+    <table class="data">
+      <thead>
+        <tr>
+          <th style="width:26%;">کارمند</th>
+          <th>واحد</th>
+          <th>امتیاز</th>
+          <th>وضعیت</th>
+          <th style="text-align:left; padding-left:16px;">عملیات</th>
+        </tr>
+      </thead>
+      <tbody id="tableBody">
+        <tr data-name="سارا احمدی طراح ux ui" data-status="final">
+          <td>
+            <div class="person">
+              <div class="avatar a1 online">س.ا</div>
+              <div><div class="name">سارا احمدی</div><div class="role">طراح UX/UI</div></div>
+            </div>
+          </td>
+          <td>منابع انسانی</td>
+          <td>
+            <div class="bar-cell">
+              <div class="bar-mini s-high"><span style="width:88%;"></span></div>
+              <span class="val">۸۸٪</span>
+            </div>
+          </td>
+          <td><span class="badge success">نهایی‌شده</span></td>
+          <td>
+            <div class="row-actions">
+              <button class="act-btn" title="مشاهده"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></button>
+              <button class="act-btn" title="ویرایش"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/></svg></button>
+              <button class="act-btn danger" title="حذف"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-2 14a2 2 0 01-2 2H9a2 2 0 01-2-2L5 6"/></svg></button>
+            </div>
+          </td>
+        </tr>
+        <tr data-name="محمد رضایی کارشناس فروش" data-status="pending">
+          <td>
+            <div class="person">
+              <div class="avatar a2 online">م.ر</div>
+              <div><div class="name">محمد رضایی</div><div class="role">کارشناس فروش</div></div>
+            </div>
+          </td>
+          <td>فروش</td>
+          <td>
+            <div class="bar-cell">
+              <div class="bar-mini s-mid"><span style="width:62%;"></span></div>
+              <span class="val">۶۲٪</span>
+            </div>
+          </td>
+          <td><span class="badge warning">در انتظار تأیید</span></td>
+          <td>
+            <div class="row-actions">
+              <button class="act-btn" title="مشاهده"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></button>
+              <button class="act-btn" title="ویرایش"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/></svg></button>
+              <button class="act-btn danger" title="حذف"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-2 14a2 2 0 01-2 2H9a2 2 0 01-2-2L5 6"/></svg></button>
+            </div>
+          </td>
+        </tr>
+        <tr data-name="نیلوفر کریمی مدیر پروژه" data-status="returned">
+          <td>
+            <div class="person">
+              <div class="avatar a3">ن.ک</div>
+              <div><div class="name">نیلوفر کریمی</div><div class="role">مدیر پروژه</div></div>
+            </div>
+          </td>
+          <td>فناوری اطلاعات</td>
+          <td>
+            <div class="bar-cell">
+              <div class="bar-mini s-low"><span style="width:41%;"></span></div>
+              <span class="val">۴۱٪</span>
+            </div>
+          </td>
+          <td><span class="badge danger">برگشت‌خورده</span></td>
+          <td>
+            <div class="row-actions">
+              <button class="act-btn" title="مشاهده"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></button>
+              <button class="act-btn" title="ویرایش"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/></svg></button>
+              <button class="act-btn danger" title="حذف"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-2 14a2 2 0 01-2 2H9a2 2 0 01-2-2L5 6"/></svg></button>
+            </div>
+          </td>
+        </tr>
+        <tr data-name="امیر محمدی حسابدار ارشد" data-status="pending">
+          <td>
+            <div class="person">
+              <div class="avatar a4 online">ا.م</div>
+              <div><div class="name">امیر محمدی</div><div class="role">حسابدار ارشد</div></div>
+            </div>
+          </td>
+          <td>مالی</td>
+          <td>
+            <div class="bar-cell">
+              <div class="bar-mini s-high"><span style="width:76%;"></span></div>
+              <span class="val">۷۶٪</span>
+            </div>
+          </td>
+          <td><span class="badge info">در حال بررسی</span></td>
+          <td>
+            <div class="row-actions">
+              <button class="act-btn" title="مشاهده"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></button>
+              <button class="act-btn" title="ویرایش"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/></svg></button>
+              <button class="act-btn danger" title="حذف"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-2 14a2 2 0 01-2 2H9a2 2 0 01-2-2L5 6"/></svg></button>
+            </div>
+          </td>
+        </tr>
+        <tr data-name="زهرا حسینی توسعه دهنده frontend" data-status="final">
+          <td>
+            <div class="person">
+              <div class="avatar a5">ز.ح</div>
+              <div><div class="name">زهرا حسینی</div><div class="role">توسعه‌دهنده Frontend</div></div>
+            </div>
+          </td>
+          <td>فناوری اطلاعات</td>
+          <td>
+            <div class="bar-cell">
+              <div class="bar-mini s-high"><span style="width:92%;"></span></div>
+              <span class="val">۹۲٪</span>
+            </div>
+          </td>
+          <td><span class="badge success">نهایی‌شده</span></td>
+          <td>
+            <div class="row-actions">
+              <button class="act-btn" title="مشاهده"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></button>
+              <button class="act-btn" title="ویرایش"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/></svg></button>
+              <button class="act-btn danger" title="حذف"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-2 14a2 2 0 01-2 2H9a2 2 0 01-2-2L5 6"/></svg></button>
+            </div>
+          </td>
+        </tr>
+        <tr class="table-empty-row" id="tableEmpty" style="display:none;">
+          <td colspan="5">نتیجه‌ای یافت نشد</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <footer class="appfooter">
+    <div class="fbrand"><span class="mark" style="width:16px;height:16px;"></span> DbsPulse <span class="muted">نسخه ۱.۰.۱</span></div>
+    <div class="fdev">
+      <span>Developed by</span>
+      <div class="devlogo">D</div>
+      <a href="https://dbsgraphic.ir" target="_blank" rel="noopener">dbs</a>
+    </div>
+  </footer>
+
+</div>
+
+<script>
+  // ========== POPOVERS (Notification + Profile) ==========
+  const notifBtn   = document.getElementById('notifBtn');
+  const notifPop   = document.getElementById('notifPop');
+  const profileBtn = document.getElementById('profileBtn');
+  const profilePop = document.getElementById('profilePop');
+  const backdrop   = document.getElementById('backdrop');
+
+  function closeAllPops(){
+    notifPop.classList.remove('open');
+    profilePop.classList.remove('open');
+    notifBtn.classList.remove('active');
+    profileBtn.classList.remove('active');
+    backdrop.classList.remove('open');
+  }
+
+  notifBtn.addEventListener('click', function(e){
+    e.stopPropagation();
+    const willOpen = !notifPop.classList.contains('open');
+    closeAllPops();
+    if(willOpen){
+      notifPop.classList.add('open');
+      notifBtn.classList.add('active');
+      backdrop.classList.add('open');
+    }
+  });
+
+  profileBtn.addEventListener('click', function(e){
+    e.stopPropagation();
+    const willOpen = !profilePop.classList.contains('open');
+    closeAllPops();
+    if(willOpen){
+      profilePop.classList.add('open');
+      profileBtn.classList.add('active');
+      backdrop.classList.add('open');
+    }
+  });
+
+  backdrop.addEventListener('click', closeAllPops);
+  document.addEventListener('keydown', function(e){ if(e.key==='Escape') closeAllPops(); });
+  notifPop.addEventListener('click', function(e){ e.stopPropagation(); });
+  profilePop.addEventListener('click', function(e){ e.stopPropagation(); });
+
+  // mark all notifications as read
+  function markAllRead(){
+    document.querySelectorAll('.notif-item.unread').forEach(function(el){ el.classList.remove('unread'); });
+    document.querySelector('#notifBtn .count').style.display = 'none';
+    const cnt = document.querySelector('#notifPop .cnt-badge');
+    if(cnt) cnt.textContent = 'همه خوانده شد';
+    document.querySelectorAll('.notif-tab .num').forEach(function(el){ el.textContent = '۰'; });
+  }
+
+  // notif tabs  ── فیلتر واقعی بر اساس دسته
+  const notifItems = document.querySelectorAll('.notif-item');
+  const notifEmpty = document.getElementById('notifEmpty');
+  function filterNotif(cat){
+    let visible = 0;
+    notifItems.forEach(function(item){
+      const show = (cat === 'all') || (item.dataset.cat === cat);
+      item.style.display = show ? 'flex' : 'none';
+      if(show) visible++;
+    });
+    notifEmpty.style.display = visible === 0 ? 'flex' : 'none';
+  }
+  document.querySelectorAll('.notif-tab').forEach(function(t){
+    t.addEventListener('click', function(){
+      document.querySelectorAll('.notif-tab').forEach(function(x){ x.classList.remove('active'); });
+      t.classList.add('active');
+      filterNotif(t.dataset.cat);
+    });
+  });
+
+  // ========== DROPDOWN (منابع انسانی) ==========
+  document.getElementById('menu1').addEventListener('click', function(e){ e.stopPropagation(); });
+  document.body.addEventListener('click', function(){ document.getElementById('menu1').classList.remove('open'); });
+  document.querySelectorAll('#menu1 .menu-item').forEach(function(item){
+    item.addEventListener('click', function(){
+      document.querySelectorAll('#menu1 .menu-item').forEach(function(i){ i.classList.remove('sel'); });
+      item.classList.add('sel');
+      document.querySelector('#menu1 .menu-trigger span').textContent = item.textContent;
+    });
+  });
+
+  // ========== امتیاز شایستگی — اسلایدر تعاملی ==========
+  (function(){
+    const slider = document.getElementById('compSlider');
+    const thumb  = document.getElementById('compThumb');
+    const fill   = document.getElementById('compFill');
+    const label  = document.getElementById('compLabel');
+    const textEl = document.getElementById('compText');
+    const emojiEl= document.getElementById('compEmoji');
+    const scoreEl= document.getElementById('compScore');
+    const ticks  = Array.from(document.querySelectorAll('#compTicks .comp-tick'));
+
+    // سطح ۱ (نیازمند بهبود) تا ۵ (عالی)
+    const LEVELS = {
+      1: { text:'نیازمند بهبود', emoji:'😟', color:'#C0392B' },
+      2: { text:'قابل قبول',     emoji:'😐', color:'#E0673C' },
+      3: { text:'خوب',           emoji:'🙂', color:'#B8791E' },
+      4: { text:'بسیار خوب',     emoji:'😊', color:'#7CB342' },
+      5: { text:'عالی',          emoji:'🌟', color:'#1E8E5A' }
+    };
+    const faDigit = n => String(n).replace(/\d/g, d => '۰۱۲۳۴۵۶۷۸۹'[d]);
+
+    let current = 3;
+
+    function render(v){
+      current = v;
+      const L = LEVELS[v];
+      // موقعیت افقی: ۱ در سمت چپ (۰٪ از راست) ... ۵ در سمت راست (۱۰۰٪ از راست)
+      const pct = ((v - 1) / 4) * 100;
+      thumb.style.right = pct + '%';
+      fill.style.width  = pct + '%';
+      // رنگ‌ها
+      label.style.background = L.color;
+      thumb.style.borderColor = L.color;
+      thumb.querySelector('::after');
+      thumb.style.setProperty('--c', L.color);
+      // چون ::after رنگش از border ارث نمی‌برد، مستقیم ست می‌کنیم
+      textEl.textContent  = L.text;
+      emojiEl.textContent = L.emoji;
+      scoreEl.textContent = faDigit(v);
+      // ticks
+      ticks.forEach(function(t){
+        t.classList.toggle('on', Number(t.dataset.v) === v);
+        t.querySelector('.dot').style.background =
+          (Number(t.dataset.v) === v) ? L.color : '';
+      });
+      // aria
+      slider.setAttribute('aria-valuenow', v);
+      slider.setAttribute('aria-valuetext', L.text);
+    }
+
+    // تبدیل موقعیت ماوس/لمس به سطح ۱..۵ (با در نظر گرفتن RTL)
+    function posToLevel(clientX){
+      const rect = slider.getBoundingClientRect();
+      // در RTL، سمت راست = مقدار بیشتر
+      let ratio = (rect.right - clientX) / rect.width;
+      ratio = Math.min(1, Math.max(0, ratio));
+      return Math.round(ratio * 4) + 1; // 1..5
+    }
+
+    let dragging = false;
+    function onMove(clientX){ render(posToLevel(clientX)); }
+
+    slider.addEventListener('mousedown', function(e){
+      dragging = true; onMove(e.clientX); e.preventDefault(); slider.focus();
+    });
+    window.addEventListener('mousemove', function(e){ if(dragging) onMove(e.clientX); });
+    window.addEventListener('mouseup', function(){ dragging = false; });
+
+    slider.addEventListener('touchstart', function(e){
+      dragging = true; onMove(e.touches[0].clientX);
+    }, {passive:true});
+    slider.addEventListener('touchmove', function(e){
+      if(dragging) onMove(e.touches[0].clientX);
+    }, {passive:true});
+    window.addEventListener('touchend', function(){ dragging = false; });
+
+    // کیبورد (دسترسی‌پذیری) — در RTL فلش راست = افزایش
+    slider.addEventListener('keydown', function(e){
+      let v = current;
+      if(e.key === 'ArrowRight' || e.key === 'ArrowUp'){ v = Math.min(5, current + 1); e.preventDefault(); }
+      else if(e.key === 'ArrowLeft' || e.key === 'ArrowDown'){ v = Math.max(1, current - 1); e.preventDefault(); }
+      else if(e.key === 'Home'){ v = 1; e.preventDefault(); }
+      else if(e.key === 'End'){ v = 5; e.preventDefault(); }
+      if(v !== current) render(v);
+    });
+
+    // کلیک روی برچسب‌های زیر اسلایدر
+    ticks.forEach(function(t){
+      t.addEventListener('click', function(){ render(Number(t.dataset.v)); });
+    });
+
+    render(3); // مقدار اولیه
+  })();
+
+  // ========== جدول: جستجو + فیلتر وضعیت ==========
+  (function(){
+    const rows      = Array.from(document.querySelectorAll('#tableBody tr[data-name]'));
+    const searchInp = document.getElementById('tableSearch');
+    const emptyRow  = document.getElementById('tableEmpty');
+    let activeStatus = 'all';
+    let query = '';
+
+    function apply(){
+      let visible = 0;
+      rows.forEach(function(r){
+        const matchStatus = (activeStatus === 'all') || (r.dataset.status === activeStatus);
+        const matchQuery  = r.dataset.name.includes(query);
+        const show = matchStatus && matchQuery;
+        r.style.display = show ? '' : 'none';
+        if(show) visible++;
+      });
+      emptyRow.style.display = visible === 0 ? '' : 'none';
+    }
+
+    searchInp.addEventListener('input', function(){
+      query = this.value.trim().toLowerCase();
+      apply();
+    });
+
+    document.querySelectorAll('.chip').forEach(function(c){
+      c.addEventListener('click', function(){
+        document.querySelectorAll('.chip').forEach(function(x){ x.classList.remove('active'); });
+        c.classList.add('active');
+        activeStatus = c.dataset.status;
+        apply();
+      });
+    });
+  })();
+
+  // ========== CHARTS ==========
+  const primary = '#B61615';
+  const dark = '#2A2D31';
+  const grey = '#D3D2CD';
+
+  new Chart(document.getElementById('miniDonut'), {
+    type: 'doughnut',
+    data: { labels:['تکمیل‌شده','باقیمانده'], datasets:[{ data:[87,13], backgroundColor:[primary,'rgba(255,255,255,.12)'], borderWidth:0 }] },
+    options: { cutout:'75%', plugins:{ legend:{ display:false }, tooltip:{ enabled:false } } }
+  });
+
+  new Chart(document.getElementById('barChart'), {
+    type: 'bar',
+    data: {
+      labels: ['فرو','اردیب','خرد','تیر','مرد','شهر'],
+      datasets: [{ data:[62,68,74,71,80,87], backgroundColor: primary, borderRadius:8, maxBarThickness:22 }]
+    },
+    options: {
+      plugins:{ legend:{ display:false } },
+      scales:{ y:{ display:false, min:0, max:100 }, x:{ grid:{ display:false }, ticks:{ color:'#86888D', font:{ family:'Vazirmatn' } } } }
+    }
+  });
+
+  new Chart(document.getElementById('radarChart'), {
+    type: 'radar',
+    data: {
+      labels: ['کیفیت کار','همکاری تیمی','نظم و انضباط','خلاقیت','مسئولیت‌پذیری','ارتباطات'],
+      datasets: [{
+        label:'عملکرد', data:[85,70,90,65,80,75],
+        backgroundColor:'rgba(182,22,21,.18)', borderColor: primary, pointBackgroundColor: primary, borderWidth:2
+      }]
+    },
+    options: {
+      plugins:{ legend:{ display:false } },
+      scales:{ r:{ min:0, max:100, ticks:{ display:false }, grid:{ color:'#E8E7E2' }, angleLines:{ color:'#E8E7E2' },
+        pointLabels:{ color:'#4B4D52', font:{ family:'Vazirmatn', size:11 } } } }
+    }
+  });
+</script>
+</body>
+</html>

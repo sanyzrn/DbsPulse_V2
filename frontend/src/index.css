@@ -8,10 +8,6 @@
   /* Font */
   --font-sans: "Vazirmatn", "Tahoma", "Segoe UI", sans-serif;
 
-  /* ── Brand Gradient Anchors ── */
-  --color-pulse-from: #b61615;
-  --color-pulse-to: #374151;
-
   /* ── Primary Accent Spectrum (50–950) — anchored on brand red #B61615 ── */
   --color-pulse-50: #fef3f3;
   --color-pulse-100: #fde5e5;
@@ -136,14 +132,6 @@ select:focus-visible,
   background-size: var(--shimmer-bg-size);
   animation: var(--animate-shimmer);
   border-radius: 8px;
-}
-
-/* Glass card */
-.glass {
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  background: rgba(255, 255, 255, 0.75);
-  border: 1px solid rgba(255, 255, 255, 0.3);
 }
 
 /* ═══════════════════════════════════════════════════════════════════════

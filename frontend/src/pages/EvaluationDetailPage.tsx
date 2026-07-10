@@ -53,6 +53,9 @@ export function EvaluationDetailPage() {
   async function load() {
     await queryClient.invalidateQueries({ queryKey: ["evaluation", evaluationId] });
     await queryClient.invalidateQueries({ queryKey: ["evaluations"] });
+    // هر اقدام گردش‌کار (تأیید/برگشت/کامنت) ممکن است اعلان جدیدی بسازد؛ زنگوله را
+    // فوراً به‌روز می‌کنیم تا کاربر منتظر poll بعدی نماند.
+    await queryClient.invalidateQueries({ queryKey: ["notifications"] });
   }
 
   const loadError = evaluationError != null ? extractErrorMessage(evaluationError) : null;

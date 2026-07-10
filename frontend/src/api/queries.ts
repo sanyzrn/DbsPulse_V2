@@ -178,8 +178,10 @@ export function useNotifications() {
     queryKey: ["notifications"],
     queryFn: async () =>
       (await apiClient.get<NotificationPage>("/notifications", { params: { limit: 15 } })).data,
-    // زنگوله باید بدون رفرش دستی به‌روز بماند
-    refetchInterval: 30_000,
+    // زنگوله باید بدون رفرش دستی به‌روز بماند. ۱۰ ثانیه: تعادل بین تازگی و بار سرور
+    // (درخواست کوچک است، فقط ۱۵ ردیف). علاوه بر این، پس از هر اقدام کاربر صف اعلان‌ها
+    // را فوراً invalidate می‌کنیم تا بدون انتظار برای poll بعدی به‌روز شود.
+    refetchInterval: 10_000,
     refetchOnWindowFocus: true,
   });
 }

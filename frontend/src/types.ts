@@ -125,6 +125,7 @@ export interface EvaluationCommentRow {
   id: number;
   commenter_user_id: number;
   commenter_username: string | null;
+  parent_comment_id: number | null;
   stage: CommentStage;
   comment_text: string;
   created_at: string;

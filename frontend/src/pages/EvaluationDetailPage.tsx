@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { AnimatePresence, motion } from "motion/react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { apiClient, extractErrorMessage } from "../api/client";
@@ -43,6 +44,8 @@ export function EvaluationDetailPage() {
 
   const [evaluatorComment, setEvaluatorComment] = useState("");
   const [newComment, setNewComment] = useState("");
+  const [replyingTo, setReplyingTo] = useState<number | null>(null);
+  const [replyText, setReplyText] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -123,6 +126,45 @@ export function EvaluationDetailPage() {
     (user.role === "hr" && evaluation.status === "submitted") ||
     (user.role === "deputy" && evaluation.status === "hr_approved" && evaluation.deputy_user_id === user.id) ||
     (user.role === "ceo" && evaluation.status === "deputy_approved" && evaluation.ceo_user_id === user.id);
+
+  // پاسخ threaded برای همهٔ نقش‌های زنجیرهٔ ارزیابی مجاز است (مثلاً پاسخ ارزیاب به
+  // دلیل برگشت پرونده)؛ کارمند فقط بیننده است و پاسخ نمی‌دهد.
+  const canReply = ["hr", "deputy", "ceo", "unit_supervisor"].includes(user.role);
+
+  const topLevelComments = evaluation.comments.filter((c) => c.parent_comment_id === null);
+  const repliesByParent = new Map<number, typeof evaluation.comments>();
+  for (const c of evaluation.comments) {
+    if (c.parent_comment_id !== null) {
+      const list = repliesByParent.get(c.parent_comment_id) ?? [];
+      list.push(c);
+      repliesByParent.set(c.parent_comment_id, list);
+    }
+  }
+
+  async function postComment(text: string, parentCommentId: number | null) {
+    setBusy(true);
+    setError(null);
+    try {
+      await apiClient.post(`/evaluations/${evaluation!.id}/comments`, {
+        comment_text: text,
+        ...(parentCommentId !== null ? { parent_comment_id: parentCommentId } : {}),
+      });
+      if (parentCommentId === null) {
+        setNewComment("");
+      } else {
+        setReplyText("");
+        setReplyingTo(null);
+      }
+      await load();
+      showSuccess(parentCommentId === null ? "کامنت ثبت شد" : "پاسخ ثبت شد");
+    } catch (err) {
+      const message = extractErrorMessage(err);
+      setError(message);
+      showError(message);
+    } finally {
+      setBusy(false);
+    }
+  }
 
   return (
     <div className="space-y-4">
@@ -215,21 +257,95 @@ export function EvaluationDetailPage() {
 
       <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-card">
         <h2 className="mb-3 text-base font-bold text-gray-900">کامنت‌ها</h2>
-        {evaluation.comments.length === 0 && <p className="text-sm text-gray-400">کامنتی ثبت نشده است.</p>}
+        {topLevelComments.length === 0 && <p className="text-sm text-gray-400">کامنتی ثبت نشده است.</p>}
         <ul className="space-y-2">
-          {evaluation.comments.map((c) => (
-            <li key={c.id} className="rounded-xl border border-gray-100 bg-gray-50/70 p-3 text-sm">
-              <p className="mb-1 flex items-center gap-2 text-xs text-gray-500">
-                <span className="inline-flex items-center rounded-md bg-pulse-50 px-1.5 py-0.5 font-medium text-pulse-700">
-                  {STAGE_LABELS[c.stage]}
-                </span>
-                <span>{c.commenter_username ?? `#${c.commenter_user_id}`}</span>
-                <span>·</span>
-                <span>{formatDateTime(c.created_at)}</span>
-              </p>
-              <p className="text-gray-700">{c.comment_text}</p>
-            </li>
-          ))}
+          <AnimatePresence initial={false}>
+            {topLevelComments.map((c) => {
+              const replies = repliesByParent.get(c.id) ?? [];
+              return (
+                <motion.li
+                  key={c.id}
+                  layout
+                  initial={{ opacity: 0, y: 6 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="rounded-xl border border-gray-100 bg-gray-50/70 p-3 text-sm"
+                >
+                  <p className="mb-1 flex items-center gap-2 text-xs text-gray-500">
+                    <span className="inline-flex items-center rounded-md bg-pulse-50 px-1.5 py-0.5 font-medium text-pulse-700">
+                      {STAGE_LABELS[c.stage]}
+                    </span>
+                    <span>{c.commenter_username ?? `#${c.commenter_user_id}`}</span>
+                    <span>·</span>
+                    <span>{formatDateTime(c.created_at)}</span>
+                  </p>
+                  <p className="text-gray-700">{c.comment_text}</p>
+
+                  {/* پاسخ‌های threaded (یک سطح تودرتو) */}
+                  {replies.length > 0 && (
+                    <ul className="mt-2 space-y-2 border-r-2 border-pulse-100 pr-3">
+                      {replies.map((r) => (
+                        <li key={r.id} className="rounded-lg bg-white/80 p-2.5">
+                          <p className="mb-1 flex items-center gap-2 text-xs text-gray-400">
+                            <span className="font-medium text-gray-600">
+                              {r.commenter_username ?? `#${r.commenter_user_id}`}
+                            </span>
+                            <span>·</span>
+                            <span>{formatDateTime(r.created_at)}</span>
+                          </p>
+                          <p className="text-gray-700">{r.comment_text}</p>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+
+                  {canReply && (
+                    <div className="mt-2">
+                      {replyingTo === c.id ? (
+                        <div>
+                          <textarea
+                            className="w-full resize-none rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm outline-none transition-colors duration-150 focus:border-pulse-500"
+                            rows={2}
+                            autoFocus
+                            value={replyText}
+                            onChange={(e) => setReplyText(e.target.value)}
+                            placeholder="پاسخ شما…"
+                          />
+                          <div className="mt-1.5 flex items-center gap-2">
+                            <button
+                              disabled={busy || !replyText.trim()}
+                              onClick={() => postComment(replyText, c.id)}
+                              className="cursor-pointer rounded-lg bg-gray-800 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-gray-900 disabled:cursor-not-allowed disabled:opacity-50"
+                            >
+                              ثبت پاسخ
+                            </button>
+                            <button
+                              onClick={() => {
+                                setReplyingTo(null);
+                                setReplyText("");
+                              }}
+                              className="cursor-pointer text-xs font-medium text-gray-500 hover:text-gray-700"
+                            >
+                              انصراف
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <button
+                          onClick={() => {
+                            setReplyingTo(c.id);
+                            setReplyText("");
+                          }}
+                          className="cursor-pointer text-xs font-medium text-pulse-600 hover:text-pulse-700"
+                        >
+                          پاسخ
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </motion.li>
+              );
+            })}
+          </AnimatePresence>
         </ul>
 
         {canComment && (
@@ -243,25 +359,8 @@ export function EvaluationDetailPage() {
             />
             <button
               disabled={busy || !newComment.trim()}
-              onClick={async () => {
-                setBusy(true);
-                setError(null);
-                try {
-                  await apiClient.post(`/evaluations/${evaluation.id}/comments`, {
-                    comment_text: newComment,
-                  });
-                  setNewComment("");
-                  await load();
-                  showSuccess("کامنت ثبت شد");
-                } catch (err) {
-                  const message = extractErrorMessage(err);
-                  setError(message);
-                  showError(message);
-                } finally {
-                  setBusy(false);
-                }
-              }}
-              className="mt-2 rounded-xl bg-gray-800 px-4 py-2 text-sm font-medium text-white shadow-md shadow-gray-500/20 transition-all duration-200 hover:bg-gray-900 hover:shadow-lg disabled:opacity-50"
+              onClick={() => postComment(newComment, null)}
+              className="mt-2 cursor-pointer rounded-xl bg-gray-800 px-4 py-2 text-sm font-medium text-white shadow-md shadow-gray-500/20 transition-all duration-200 hover:bg-gray-900 hover:shadow-lg disabled:cursor-not-allowed disabled:opacity-50"
             >
               ثبت کامنت
             </button>

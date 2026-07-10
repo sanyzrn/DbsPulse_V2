@@ -58,7 +58,9 @@ class EvaluationRecord(Base):
         back_populates="evaluation_record", cascade="all, delete-orphan"
     )
     comments: Mapped[list["EvaluationComment"]] = relationship(
-        back_populates="evaluation_record", cascade="all, delete-orphan"
+        back_populates="evaluation_record",
+        cascade="all, delete-orphan",
+        order_by="EvaluationComment.created_at",
     )
     # eager join تا فهرست‌ها بدون N+1 نام پرسنل را همراه داشته باشند
     subject: Mapped["Personnel"] = relationship(lazy="joined")
@@ -93,6 +95,10 @@ class EvaluationComment(Base):
         ForeignKey("evaluation_records.id"), nullable=False
     )
     commenter_user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False)
+    # پاسخ threaded: کامنتِ والد (فقط یک سطح عمق). null یعنی کامنت سطح‌بالا.
+    parent_comment_id: Mapped[int | None] = mapped_column(
+        ForeignKey("evaluation_comments.id", ondelete="CASCADE"), nullable=True
+    )
     stage: Mapped[CommentStage] = mapped_column(
         Enum(CommentStage, name="comment_stage", values_callable=lambda e: [m.value for m in e]),
         nullable=False,

@@ -5,6 +5,7 @@ import { useEvaluations, usePersonnelList } from "../../api/queries";
 import { EmployeeProfileModal } from "../../components/EmployeeProfileModal";
 import { EvaluationActionButton } from "../../components/EvaluationActionButton";
 import { EvaluationList } from "../../components/EvaluationList";
+import { RoleOverviewCards } from "../../components/RoleOverviewCards";
 import { PageHeader } from "../../ui/Card";
 import { Table } from "../../ui/Table";
 import type { Personnel } from "../../types";
@@ -56,6 +57,7 @@ export function DeputyHomePage() {
   return (
     <div className="space-y-4">
       <PageHeader title="پرونده‌های در انتظار بررسی" subtitle="بررسی ارزیابی‌های تأییدشده توسط منابع انسانی و نمره‌دهی پرسنل مدیریتی" />
+      <RoleOverviewCards />
       {loadError != null && (
         <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">{extractErrorMessage(loadError)}</p>
       )}

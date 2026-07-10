@@ -26,6 +26,7 @@ import {
   type Personnel,
   type PipelineStat,
   type RadarPoint,
+  type RoleOverview,
   type TrendPoint,
   type UserRole,
 } from "../types";
@@ -171,6 +172,14 @@ export function usePersonTrend(personnelId: number | null) {
     queryFn: async () =>
       (await apiClient.get<TrendPoint[]>(`/dashboard/personnel/${personnelId}/trend`)).data,
     enabled: personnelId !== null,
+  });
+}
+
+export function useRoleOverview() {
+  return useQuery({
+    queryKey: ["dashboard", "role-overview"],
+    queryFn: async () => (await apiClient.get<RoleOverview>("/dashboard/role-overview")).data,
+    staleTime: 30_000,
   });
 }
 

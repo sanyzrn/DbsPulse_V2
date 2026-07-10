@@ -23,6 +23,8 @@ from app.schemas.dashboard import (
     PersonStat,
     PipelineStat,
     RadarPoint,
+    RoleOverview,
+    RoleOverviewCard,
     TrendPoint,
     UnitStat,
 )
@@ -291,3 +293,177 @@ def personnel_in_progress(
         was_returned=was_returned,
         created_at=record.created_at,
     )
+
+
+def _count_records(db: Session, *conditions) -> int:
+    return (
+        db.scalar(
+            select(func.count()).select_from(EvaluationRecord).where(*conditions)
+        )
+        or 0
+    )
+
+
+@router.get("/role-overview", response_model=RoleOverview)
+def role_overview(
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(get_current_user),
+) -> RoleOverview:
+    """کاشی‌های خلاصهٔ داشبورد، متناسب با نقشِ کاربرِ واردشده — تا هر نقش در صفحهٔ
+    اصلی خود یک نمای سریع از کارهای در انتظار و وضعیت پرونده‌هایش داشته باشد."""
+    uid = current_user.id
+    role = current_user.role
+    cards: list[RoleOverviewCard] = []
+
+    if role == UserRole.unit_supervisor:
+        subordinates = (
+            db.scalar(
+                select(func.count())
+                .select_from(EvaluationAccess)
+                .where(EvaluationAccess.unit_supervisor_user_id == uid)
+            )
+            or 0
+        )
+        mine = EvaluationRecord.unit_supervisor_user_id == uid
+        cards = [
+            RoleOverviewCard(key="subordinates", label="افراد زیرمجموعه", value=subordinates, tone="neutral"),
+            RoleOverviewCard(
+                key="drafts",
+                label="پیش‌نویس باز",
+                value=_count_records(db, mine, EvaluationRecord.status == EvaluationStatus.draft),
+                tone="amber",
+            ),
+            RoleOverviewCard(
+                key="in_review",
+                label="در جریان تأیید",
+                value=_count_records(
+                    db,
+                    mine,
+                    EvaluationRecord.status.in_(
+                        [
+                            EvaluationStatus.submitted,
+                            EvaluationStatus.hr_approved,
+                            EvaluationStatus.deputy_approved,
+                        ]
+                    ),
+                ),
+                tone="pulse",
+            ),
+            RoleOverviewCard(
+                key="finalized",
+                label="نهایی‌شده",
+                value=_count_records(db, mine, _FINALIZED),
+                tone="green",
+            ),
+        ]
+    elif role == UserRole.deputy:
+        mine = EvaluationRecord.deputy_user_id == uid
+        cards = [
+            RoleOverviewCard(
+                key="awaiting_me",
+                label="در انتظار تأیید من",
+                value=_count_records(
+                    db,
+                    mine,
+                    EvaluationRecord.status == EvaluationStatus.hr_approved,
+                    EvaluationRecord.unit_supervisor_user_id.is_not(None),
+                ),
+                tone="amber",
+            ),
+            RoleOverviewCard(
+                key="manager_scoring",
+                label="امتیازدهی مدیر (با من)",
+                value=_count_records(
+                    db,
+                    mine,
+                    EvaluationRecord.status == EvaluationStatus.hr_approved,
+                    EvaluationRecord.unit_supervisor_user_id.is_(None),
+                ),
+                tone="pulse",
+            ),
+            RoleOverviewCard(
+                key="finalized",
+                label="نهایی‌شده (حوزهٔ من)",
+                value=_count_records(db, mine, _FINALIZED),
+                tone="green",
+            ),
+        ]
+    elif role == UserRole.ceo:
+        mine = EvaluationRecord.ceo_user_id == uid
+        cards = [
+            RoleOverviewCard(
+                key="awaiting_me",
+                label="در انتظار تأیید نهایی",
+                value=_count_records(
+                    db, mine, EvaluationRecord.status == EvaluationStatus.deputy_approved
+                ),
+                tone="amber",
+            ),
+            RoleOverviewCard(
+                key="finalized",
+                label="نهایی‌شده (حوزهٔ من)",
+                value=_count_records(db, mine, _FINALIZED),
+                tone="green",
+            ),
+            RoleOverviewCard(
+                key="total",
+                label="کل پرونده‌های من",
+                value=_count_records(db, mine),
+                tone="neutral",
+            ),
+        ]
+    elif role == UserRole.hr:
+        personnel_count = (
+            db.scalar(select(func.count()).select_from(Personnel)) or 0
+        )
+        cards = [
+            RoleOverviewCard(
+                key="awaiting_hr",
+                label="در انتظار بررسی منابع انسانی",
+                value=_count_records(db, EvaluationRecord.status == EvaluationStatus.submitted),
+                tone="amber",
+            ),
+            RoleOverviewCard(
+                key="open",
+                label="پرونده‌های باز",
+                value=_count_records(db, EvaluationRecord.status != EvaluationStatus.finalized),
+                tone="pulse",
+            ),
+            RoleOverviewCard(
+                key="finalized",
+                label="نهایی‌شده",
+                value=_count_records(db, _FINALIZED),
+                tone="green",
+            ),
+            RoleOverviewCard(key="personnel", label="کل پرسنل", value=personnel_count, tone="neutral"),
+        ]
+    elif role == UserRole.employee and current_user.personnel_id is not None:
+        pid = current_user.personnel_id
+        mine = EvaluationRecord.subject_personnel_id == pid
+        avg = db.scalar(
+            select(func.avg(EvaluationRecord.final_weighted_pct)).where(mine, _FINALIZED)
+        )
+        cards = [
+            RoleOverviewCard(
+                key="finalized",
+                label="ارزیابی‌های نهایی‌شده",
+                value=_count_records(db, mine, _FINALIZED),
+                tone="neutral",
+            ),
+            RoleOverviewCard(
+                key="avg",
+                label="میانگین امتیاز نهایی (٪)",
+                value=round(float(avg), 1) if avg is not None else 0,
+                tone="green",
+            ),
+            RoleOverviewCard(
+                key="pending_ack",
+                label="در انتظار رؤیت شما",
+                value=_count_records(
+                    db, mine, _FINALIZED, EvaluationRecord.acknowledged_at.is_(None)
+                ),
+                tone="amber",
+            ),
+        ]
+
+    return RoleOverview(role=role.value, cards=cards)

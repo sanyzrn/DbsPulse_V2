@@ -4,6 +4,7 @@ import { motion } from "motion/react";
 import { apiClient, extractErrorMessage } from "../../api/client";
 import { useMyEvaluations, useMyImprovementPlans } from "../../api/queries";
 import { useConfirm } from "../../components/ConfirmDialog";
+import { RoleOverviewCards } from "../../components/RoleOverviewCards";
 import { useToast } from "../../components/Toast";
 import { Button } from "../../ui/Button";
 import { Card, EmptyState, PageHeader } from "../../ui/Card";
@@ -150,6 +151,7 @@ export function MyEvaluationsPage() {
         title="کارنامه من"
         subtitle="نتایج نهایی‌شده ارزیابی عملکرد شما. با دکمه «رؤیت شد» ابلاغ رسمی نتیجه ثبت می‌شود."
       />
+      <RoleOverviewCards />
 
       {plans.map((plan, i) => (
         <MyPlanCard key={plan.id} plan={plan} index={i} />

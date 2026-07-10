@@ -315,6 +315,21 @@ export interface NotStartedPersonnel {
   org_unit: string;
 }
 
+export type RoleOverviewTone = "neutral" | "amber" | "pulse" | "green";
+
+export interface RoleOverviewCard {
+  key: string;
+  label: string;
+  value: number;
+  tone: RoleOverviewTone;
+  hint: string | null;
+}
+
+export interface RoleOverview {
+  role: UserRole;
+  cards: RoleOverviewCard[];
+}
+
 export interface InProgressEvaluation {
   evaluation_id: number;
   evaluation_code: string;

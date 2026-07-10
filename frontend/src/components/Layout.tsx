@@ -1,5 +1,5 @@
 import { Navigate, NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
-import { motion } from "motion/react";
+import { AnimatePresence, motion } from "motion/react";
 import { useAuth } from "../auth/AuthContext";
 import { APP_NAME, APP_NAME_FA, FEATURE_PERIODS_ENABLED } from "../appInfo";
 import { BrandMark } from "./Brand";
@@ -7,6 +7,7 @@ import { ErrorBoundary } from "./ErrorBoundary";
 import { Footer } from "./Footer";
 import { NotificationBell } from "./NotificationBell";
 import { ProfileMenu } from "./ProfileMenu";
+import { EASE_SOFT } from "../ui/motion";
 
 const NAV_BY_ROLE: Record<string, { to: string; label: string }[]> = {
   hr: [
@@ -100,14 +101,19 @@ export function Layout() {
           {/* ErrorBoundary با key مسیر دوباره mount می‌شود تا خطای یک صفحه با رفتن به
               صفحهٔ دیگر خودبه‌خود پاک شود، نه اینکه کاربر برای همیشه در حالت خطا بماند */}
           <ErrorBoundary key={location.pathname} title="مشکلی در نمایش این صفحه پیش آمد">
-            {/* انیمیشن انتقال صفحه — fade + slide-up با key مسیر */}
-            <motion.div
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.3, ease: "easeOut" }}
-            >
-              <Outlet />
-            </motion.div>
+            {/* انتقال صفحه — cross-fade نرم با خروجِ صفحهٔ قبل (mode="wait") تا تعویض
+                مسیرها به‌جای پرشِ ناگهانی، یکنواخت و آرام دیده شود */}
+            <AnimatePresence mode="wait">
+              <motion.div
+                key={location.pathname}
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -6 }}
+                transition={{ duration: 0.24, ease: EASE_SOFT }}
+              >
+                <Outlet />
+              </motion.div>
+            </AnimatePresence>
           </ErrorBoundary>
         </main>
 

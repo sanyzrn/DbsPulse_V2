@@ -1,5 +1,6 @@
 import { motion } from "motion/react";
 import { useRoleOverview } from "../api/queries";
+import { EASE_SOFT } from "../ui/motion";
 import type { RoleOverviewTone } from "../types";
 
 const TONE_CLASS: Record<RoleOverviewTone, string> = {
@@ -41,7 +42,7 @@ export function RoleOverviewCards() {
           key={card.key}
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.25, delay: i * 0.05, ease: [0.22, 1, 0.36, 1] }}
+          transition={{ duration: 0.25, delay: i * 0.05, ease: EASE_SOFT }}
           className={`rounded-2xl border p-4 shadow-card ${TONE_CLASS[card.tone]}`}
         >
           <div className="flex items-center gap-1.5">

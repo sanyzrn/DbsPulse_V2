@@ -178,3 +178,19 @@ button:disabled,
 ::-webkit-scrollbar-thumb:hover {
   background: rgba(182, 22, 21, 0.4);
 }
+
+/* ═══════════════════════════════════════════════════════════════════════
+   احترام به تنظیمِ «کاهش حرکت» سیستم‌عامل — برای کاربرانی که به انیمیشن حساس‌اند
+   (سرگیجه/حواس‌پرتی) همهٔ انیمیشن‌ها و ترنزیشن‌ها به حداقل می‌رسند. Framer Motion
+   هم این تنظیم را از طریق همین media query در سطح CSS محترم می‌شمارد.
+   ═══════════════════════════════════════════════════════════════════════ */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

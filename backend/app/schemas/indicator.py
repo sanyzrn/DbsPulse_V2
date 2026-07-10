@@ -23,6 +23,14 @@ class IndicatorUpdate(BaseModel):
     is_active: bool | None = None
 
 
+class IndicatorReorder(BaseModel):
+    """ترتیب جدید شاخص‌های یک بخش؛ ordered_ids باید دقیقاً همان مجموعهٔ شناسه‌های
+    آن بخش باشد، به ترتیب دلخواه کاربر (drag-and-drop)."""
+
+    section: IndicatorSection
+    ordered_ids: list[int] = Field(min_length=1)
+
+
 class IndicatorRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

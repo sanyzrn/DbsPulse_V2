@@ -35,8 +35,9 @@ def test_config_endpoint_returns_business_rules(client, db_session):
     r = client.get("/api/config", headers=auth_header(user))
     assert r.status_code == 200
     body = r.json()
-    assert body["evidence_min_words"] == 15
-    assert body["evidence_exempt_score"] == 3
+    assert body["evidence_min_words"] == 3
+    assert body["evidence_max_words"] == 40
+    assert body["evidence_required_scores"] == [1, 5]
     assert body["general_section_weight"] == 0.6
     assert body["specialized_section_weight"] == 0.4
 
@@ -194,6 +195,55 @@ def test_reviewers_see_profile_only_for_personnel_in_their_scope(client, db_sess
         ).status_code
         == 403
     )
+
+
+def test_personnel_in_progress_reflects_open_evaluation_stage(client, db_session):
+    """پروفایل باید پروندهٔ باز فرد و مرحلهٔ فعلی آن را نشان دهد؛ پس از نهایی‌شدن
+    دیگر پروندهٔ بازی نیست و null برمی‌گردد."""
+    hr = make_user(db_session, "hr")
+    sup = make_user(db_session, "unit_supervisor")
+    dep = make_user(db_session, "deputy")
+    ceo = make_user(db_session, "ceo")
+    personnel = make_personnel(db_session)
+    make_access(db_session, personnel, sup, dep, ceo)
+    db_session.commit()
+
+    # هنوز پرونده‌ای شروع نشده
+    r = client.get(
+        f"/api/dashboard/personnel/{personnel.id}/in-progress", headers=auth_header(hr)
+    )
+    assert r.status_code == 200 and r.json() is None
+
+    indicators = active_indicators(db_session)
+    eid = client.post(
+        "/api/evaluations", json={"subject_personnel_id": personnel.id}, headers=auth_header(sup)
+    ).json()["id"]
+    client.put(
+        f"/api/evaluations/{eid}/scores",
+        json={"scores": full_valid_scores(indicators)},
+        headers=auth_header(sup),
+    )
+    client.post(f"/api/evaluations/{eid}/submit", headers=auth_header(sup))
+
+    # اکنون در انتظار تأیید منابع انسانی است
+    r = client.get(
+        f"/api/dashboard/personnel/{personnel.id}/in-progress", headers=auth_header(hr)
+    )
+    assert r.status_code == 200
+    body = r.json()
+    assert body is not None
+    assert body["evaluation_id"] == eid
+    assert body["status"] == "submitted"
+    assert body["was_returned"] is False
+
+    # پس از نهایی‌شدن، دیگر پروندهٔ بازی نیست
+    client.post(f"/api/evaluations/{eid}/hr-approve", headers=auth_header(hr))
+    client.post(f"/api/evaluations/{eid}/deputy-approve", headers=auth_header(dep))
+    client.post(f"/api/evaluations/{eid}/ceo-finalize", headers=auth_header(ceo))
+    r = client.get(
+        f"/api/dashboard/personnel/{personnel.id}/in-progress", headers=auth_header(hr)
+    )
+    assert r.status_code == 200 and r.json() is None
 
 
 def test_pipeline_counts_by_status(client, db_session):

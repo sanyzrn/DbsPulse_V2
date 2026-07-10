@@ -123,6 +123,32 @@ select:focus-visible,
 }
 
 /* ═══════════════════════════════════════════════════════════════════════
+   Interactive Cursors — هر عنصر تعاملی باید نشانگر ماوس مناسب داشته باشد
+   ═══════════════════════════════════════════════════════════════════════ */
+
+button:not(:disabled),
+[role="button"]:not([aria-disabled="true"]),
+[role="tab"]:not([aria-disabled="true"]),
+[role="slider"],
+label.switch,
+summary {
+  cursor: pointer;
+}
+
+button:disabled,
+[aria-disabled="true"],
+[role="tab"][aria-disabled="true"] {
+  cursor: not-allowed;
+}
+
+.grip-handle {
+  cursor: grab;
+}
+.grip-handle:active {
+  cursor: grabbing;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
    Reusable Utility Classes
    ═══════════════════════════════════════════════════════════════════════ */
 
@@ -132,68 +158,6 @@ select:focus-visible,
   background-size: var(--shimmer-bg-size);
   animation: var(--animate-shimmer);
   border-radius: 8px;
-}
-
-/* ═══════════════════════════════════════════════════════════════════════
-   Score Slider — input[type=range] بومی برای امتیازدهی ۱ تا ۵
-   ═══════════════════════════════════════════════════════════════════════ */
-
-.score-slider {
-  -webkit-appearance: none;
-  appearance: none;
-  height: 20px;
-  background: transparent;
-  cursor: pointer;
-}
-
-.score-slider:focus-visible {
-  outline: none;
-}
-
-/* Track */
-.score-slider::-webkit-slider-runnable-track {
-  height: 8px;
-  border-radius: 999px;
-  background: linear-gradient(to left, #ef4444, #f97316, #f59e0b, #84cc16, #10b981);
-}
-
-.score-slider::-moz-range-track {
-  height: 8px;
-  border-radius: 999px;
-  background: linear-gradient(to left, #ef4444, #f97316, #f59e0b, #84cc16, #10b981);
-}
-
-/* Thumb */
-.score-slider::-webkit-slider-thumb {
-  -webkit-appearance: none;
-  height: 20px;
-  width: 20px;
-  margin-top: -6px;
-  border-radius: 50%;
-  background: #fff;
-  border: 3px solid var(--score-color, var(--color-pulse-600));
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.18);
-  transition: transform 0.15s ease;
-}
-
-.score-slider::-moz-range-thumb {
-  height: 20px;
-  width: 20px;
-  border-radius: 50%;
-  background: #fff;
-  border: 3px solid var(--score-color, var(--color-pulse-600));
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.18);
-  transition: transform 0.15s ease;
-}
-
-.score-slider:active::-webkit-slider-thumb,
-.score-slider:focus-visible::-webkit-slider-thumb {
-  transform: scale(1.15);
-}
-
-.score-slider:active::-moz-range-thumb,
-.score-slider:focus-visible::-moz-range-thumb {
-  transform: scale(1.15);
 }
 
 /* Modern scrollbar */
@@ -213,4 +177,20 @@ select:focus-visible,
 
 ::-webkit-scrollbar-thumb:hover {
   background: rgba(182, 22, 21, 0.4);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   احترام به تنظیمِ «کاهش حرکت» سیستم‌عامل — برای کاربرانی که به انیمیشن حساس‌اند
+   (سرگیجه/حواس‌پرتی) همهٔ انیمیشن‌ها و ترنزیشن‌ها به حداقل می‌رسند. Framer Motion
+   هم این تنظیم را از طریق همین media query در سطح CSS محترم می‌شمارد.
+   ═══════════════════════════════════════════════════════════════════════ */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }

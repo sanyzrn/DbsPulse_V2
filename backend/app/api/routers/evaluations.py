@@ -31,6 +31,8 @@ from app.services.audit import log_event
 from app.services.documents import archive_final_pdf
 from app.services.evaluation import next_evaluation_code
 from app.services.excel import build_evaluations_workbook
+from app.services.notifications import notify
+from app.services.pdf import weasyprint_available
 from app.services.snapshot import build_final_snapshot
 from app.services.workflow import (
     active_indicators_by_id,
@@ -508,9 +510,28 @@ def evaluation_summary_pdf(
 ) -> Response:
     record = _get_record_or_404(db, evaluation_id)
     _ensure_can_view(record, current_user)
+    # خروجی PDF فقط برای منابع انسانی — سایر نقش‌ها حتی اگر پرونده را ببینند، اجازهٔ
+    # چاپ/دانلود سند رسمی را ندارند.
+    if current_user.role != UserRole.hr:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="خروجی PDF فقط برای منابع انسانی در دسترس است",
+        )
     if record.status != EvaluationStatus.finalized or record.final_snapshot is None:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST, detail="ارزیابی هنوز نهایی نشده است"
+        )
+
+    # اگر کتابخانه‌های بومی WeasyPrint روی این سرور نصب نباشند، به‌جای خطای مبهم
+    # (AttributeError روی سند None) یک پیام واضح ۵۰۰ برمی‌گردانیم.
+    if not weasyprint_available():
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=(
+                "تولید PDF روی این سرور در دسترس نیست: کتابخانه‌های سیستمی WeasyPrint "
+                "(Pango/Cairo/GDK-PixBuf) نصب نشده‌اند. برای فعال‌سازی چاپ، این کتابخانه‌ها "
+                "را روی سرور نصب کنید (راهنما: بخش «چاپ PDF» در README)."
+            ),
         )
 
     log_event(
@@ -523,6 +544,11 @@ def evaluation_summary_pdf(
     # سند آرشیوشده را سرو می‌کنیم؛ برای رکوردهای قدیمی (پیش از قابلیت آرشیو) در همین
     # لحظه تولید و ذخیره می‌شود تا از این پس پایدار بماند.
     document = archive_final_pdf(db, record)
+    if document is None:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="تولید PDF با خطا مواجه شد؛ لطفاً بعداً دوباره تلاش کنید یا با پشتیبانی تماس بگیرید.",
+        )
     db.commit()
 
     return Response(
@@ -542,6 +568,12 @@ def add_comment(
     current_user: CurrentUser = Depends(get_current_user),
 ) -> EvaluationComment:
     record = _get_record_or_404(db, evaluation_id)
+
+    # مسیر «پاسخ threaded»: پاسخ به یک کامنت سطح‌بالای موجود (مثلاً دلیل برگشت پرونده).
+    # برخلاف کامنت سطح‌بالا که به مرحلهٔ بازبینی گره خورده، پاسخ را هر مشارکت‌کنندهٔ
+    # مجاز به دیدن پرونده می‌تواند ثبت کند تا گفت‌وگوی رفت‌وبرگشتی روی برگشت ممکن شود.
+    if payload.parent_comment_id is not None:
+        return _add_reply(db, record, payload, current_user)
 
     stage_by_role = {
         UserRole.hr: (CommentStage.hr_review, EvaluationStatus.submitted, None),
@@ -577,3 +609,55 @@ def add_comment(
     db.commit()
     db.refresh(comment)
     return comment
+
+
+def _add_reply(
+    db: Session,
+    record: EvaluationRecord,
+    payload: CommentCreate,
+    current_user: CurrentUser,
+) -> EvaluationComment:
+    """ثبت یک پاسخ threaded (عمق ۱). فقط کاربرِ مجاز به دیدن پرونده می‌تواند پاسخ دهد؛
+    پاسخ به پاسخ مجاز نیست و کامنتِ والد باید به همین پرونده تعلق داشته باشد."""
+    _ensure_can_view(record, current_user)
+
+    parent = db.get(EvaluationComment, payload.parent_comment_id)
+    if parent is None or parent.evaluation_record_id != record.id:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="کامنتِ والد یافت نشد"
+        )
+    if parent.parent_comment_id is not None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="پاسخ‌ها فقط یک سطح عمق دارند؛ نمی‌توان به یک پاسخ، پاسخ داد",
+        )
+
+    reply = EvaluationComment(
+        evaluation_record_id=record.id,
+        commenter_user_id=current_user.id,
+        parent_comment_id=parent.id,
+        stage=parent.stage,  # پاسخ در همان نخِ مرحلهٔ کامنتِ والد باقی می‌ماند
+        comment_text=payload.comment_text,
+    )
+    db.add(reply)
+    log_event(
+        db,
+        actor_user_id=current_user.id,
+        event_type="comment_reply_added",
+        evaluation_record_id=record.id,
+        new_value={"parent_comment_id": parent.id, "stage": parent.stage.value},
+    )
+    # نویسندهٔ کامنتِ والد را از پاسخ باخبر می‌کنیم (اگر خودش پاسخ نداده باشد) تا
+    # تأخیر اطلاع‌رسانی گفت‌وگوی برگشت کم شود.
+    if parent.commenter_user_id != current_user.id:
+        notify(
+            db,
+            [parent.commenter_user_id],
+            type_="comment_reply_added",
+            message=f"پاسخی به کامنت شما در پروندهٔ {record.evaluation_code} ثبت شد",
+            evaluation_record_id=record.id,
+            link=f"/evaluations/{record.id}",
+        )
+    db.commit()
+    db.refresh(reply)
+    return reply

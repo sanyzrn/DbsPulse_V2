@@ -1,6 +1,75 @@
 import pytest
 
-from app.services.pdf import _TEMPLATES_DIR, _env, _local_templates_only_url_fetcher
+from app.services.pdf import (
+    _TEMPLATES_DIR,
+    _env,
+    _local_templates_only_url_fetcher,
+    weasyprint_available,
+)
+from tests.helpers import (
+    active_indicators,
+    auth_header,
+    full_valid_scores,
+    make_access,
+    make_personnel,
+    make_user,
+)
+
+
+def _finalize_evaluation(client, db_session):
+    """یک ارزیابی را از ابتدا تا مرحلهٔ نهایی پیش می‌برد و tuple نقش‌ها + شناسه را برمی‌گرداند."""
+    hr = make_user(db_session, "hr")
+    sup = make_user(db_session, "unit_supervisor")
+    dep = make_user(db_session, "deputy")
+    ceo = make_user(db_session, "ceo")
+    personnel = make_personnel(db_session, job_title="کارشناس")
+    make_access(db_session, personnel, sup, dep, ceo)
+    db_session.commit()
+
+    indicators = active_indicators(db_session)
+    r = client.post(
+        "/api/evaluations", json={"subject_personnel_id": personnel.id}, headers=auth_header(sup)
+    )
+    eid = r.json()["id"]
+    client.put(
+        f"/api/evaluations/{eid}/scores",
+        json={"scores": full_valid_scores(indicators)},
+        headers=auth_header(sup),
+    )
+    client.post(f"/api/evaluations/{eid}/submit", headers=auth_header(sup))
+    client.post(f"/api/evaluations/{eid}/hr-approve", headers=auth_header(hr))
+    client.post(f"/api/evaluations/{eid}/deputy-approve", headers=auth_header(dep))
+    client.post(f"/api/evaluations/{eid}/ceo-finalize", headers=auth_header(ceo))
+    return eid, hr, sup, dep, ceo
+
+
+def test_pdf_export_is_forbidden_for_non_hr(client, db_session):
+    """خروجی PDF فقط برای منابع انسانی — CEO/معاونت/مسئول واحد حتی روی پروندهٔ نهایی ۴۰۳ می‌گیرند."""
+    eid, hr, sup, dep, ceo = _finalize_evaluation(client, db_session)
+    for role_user in (sup, dep, ceo):
+        r = client.get(f"/api/evaluations/{eid}/summary.pdf", headers=auth_header(role_user))
+        assert r.status_code == 403, r.text
+        assert "منابع انسانی" in r.json()["detail"]
+
+
+@pytest.mark.skipif(not weasyprint_available(), reason="weasyprint native libs not installed")
+def test_pdf_export_returns_valid_pdf_for_hr(client, db_session):
+    eid, hr, *_ = _finalize_evaluation(client, db_session)
+    r = client.get(f"/api/evaluations/{eid}/summary.pdf", headers=auth_header(hr))
+    assert r.status_code == 200, r.text
+    assert r.headers["content-type"] == "application/pdf"
+    assert r.content[:5] == b"%PDF-"
+    assert len(r.content) > 1024
+
+
+def test_pdf_export_fails_clearly_when_weasyprint_unavailable(client, db_session, monkeypatch):
+    """اگر کتابخانه‌های بومی نبودند، به‌جای AttributeError مبهم، ۵۰۰ با پیام واضح فارسی می‌آید."""
+    eid, hr, *_ = _finalize_evaluation(client, db_session)
+    monkeypatch.setattr("app.api.routers.evaluations.weasyprint_available", lambda: False)
+    r = client.get(f"/api/evaluations/{eid}/summary.pdf", headers=auth_header(hr))
+    assert r.status_code == 500
+    assert "WeasyPrint" in r.json()["detail"]
+    assert "README" in r.json()["detail"]
 
 
 def _snapshot_with(evidence_text: str) -> dict:

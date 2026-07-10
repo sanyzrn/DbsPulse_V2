@@ -18,6 +18,7 @@ import {
   type ImprovementPlanDetail,
   type ImprovementPlanStatus,
   type Indicator,
+  type InProgressEvaluation,
   type MyEvaluation,
   type NotificationPage,
   type Page,
@@ -25,6 +26,7 @@ import {
   type Personnel,
   type PipelineStat,
   type RadarPoint,
+  type RoleOverview,
   type TrendPoint,
   type UserRole,
 } from "../types";
@@ -173,13 +175,36 @@ export function usePersonTrend(personnelId: number | null) {
   });
 }
 
+export function useRoleOverview() {
+  return useQuery({
+    queryKey: ["dashboard", "role-overview"],
+    queryFn: async () => (await apiClient.get<RoleOverview>("/dashboard/role-overview")).data,
+    staleTime: 30_000,
+  });
+}
+
+export function usePersonInProgress(personnelId: number | null) {
+  return useQuery({
+    queryKey: ["dashboard", "in-progress", personnelId],
+    queryFn: async () =>
+      (
+        await apiClient.get<InProgressEvaluation | null>(
+          `/dashboard/personnel/${personnelId}/in-progress`
+        )
+      ).data,
+    enabled: personnelId !== null,
+  });
+}
+
 export function useNotifications() {
   return useQuery({
     queryKey: ["notifications"],
     queryFn: async () =>
       (await apiClient.get<NotificationPage>("/notifications", { params: { limit: 15 } })).data,
-    // زنگوله باید بدون رفرش دستی به‌روز بماند
-    refetchInterval: 30_000,
+    // زنگوله باید بدون رفرش دستی به‌روز بماند. ۱۰ ثانیه: تعادل بین تازگی و بار سرور
+    // (درخواست کوچک است، فقط ۱۵ ردیف). علاوه بر این، پس از هر اقدام کاربر صف اعلان‌ها
+    // را فوراً invalidate می‌کنیم تا بدون انتظار برای poll بعدی به‌روز شود.
+    refetchInterval: 10_000,
     refetchOnWindowFocus: true,
   });
 }

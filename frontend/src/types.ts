@@ -125,6 +125,7 @@ export interface EvaluationCommentRow {
   id: number;
   commenter_user_id: number;
   commenter_username: string | null;
+  parent_comment_id: number | null;
   stage: CommentStage;
   comment_text: string;
   created_at: string;
@@ -250,14 +251,17 @@ export interface Page<T> {
 
 export interface AppConfig {
   evidence_min_words: number;
-  evidence_exempt_score: number;
+  evidence_max_words: number;
+  /** امتیازهایی که شواهد عینی برایشان اجباری است (پیش‌فرض [۱، ۵]). */
+  evidence_required_scores: number[];
   general_section_weight: number;
   specialized_section_weight: number;
 }
 
 export const DEFAULT_APP_CONFIG: AppConfig = {
-  evidence_min_words: 15,
-  evidence_exempt_score: 3,
+  evidence_min_words: 3,
+  evidence_max_words: 40,
+  evidence_required_scores: [1, 5],
   general_section_weight: 0.6,
   specialized_section_weight: 0.4,
 };
@@ -309,6 +313,29 @@ export interface NotStartedPersonnel {
   personnel_id: number;
   full_name: string;
   org_unit: string;
+}
+
+export type RoleOverviewTone = "neutral" | "amber" | "pulse" | "green";
+
+export interface RoleOverviewCard {
+  key: string;
+  label: string;
+  value: number;
+  tone: RoleOverviewTone;
+  hint: string | null;
+}
+
+export interface RoleOverview {
+  role: UserRole;
+  cards: RoleOverviewCard[];
+}
+
+export interface InProgressEvaluation {
+  evaluation_id: number;
+  evaluation_code: string;
+  status: EvaluationStatus;
+  was_returned: boolean;
+  created_at: string;
 }
 
 export type ImprovementPlanStatus = "open" | "completed" | "cancelled";

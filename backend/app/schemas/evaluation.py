@@ -41,6 +41,8 @@ class CommentCreate(BaseModel):
     model_config = ConfigDict(str_strip_whitespace=True)
 
     comment_text: str = Field(min_length=1)
+    # اگر مقدار داشته باشد، این یک پاسخ threaded به یک کامنتِ سطح‌بالاست (فقط یک سطح عمق).
+    parent_comment_id: int | None = None
 
 
 class CommentRead(BaseModel):
@@ -49,6 +51,7 @@ class CommentRead(BaseModel):
     id: int
     commenter_user_id: int
     commenter_username: str | None = None
+    parent_comment_id: int | None = None
     stage: CommentStage
     comment_text: str
     created_at: datetime

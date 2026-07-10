@@ -1,8 +1,11 @@
 GENERAL_SECTION_WEIGHT = 0.6
 SPECIALIZED_SECTION_WEIGHT = 0.4
 
-EVIDENCE_REQUIRED_MIN_WORDS = 15
-EVIDENCE_EXEMPT_SCORE = 3
+# شواهد عینی فقط برای دو سرِ طیف اجباری است: امتیاز ۱ (بسیار ضعیف) و ۵ (عالی)؛
+# برای ۲/۳/۴ اختیاری است. حداقل ۳ و حداکثر ۴۰ کلمه (سقف نرم برای جلوگیری از متن طولانی).
+EVIDENCE_REQUIRED_SCORES = (1, 5)
+EVIDENCE_REQUIRED_MIN_WORDS = 3
+EVIDENCE_MAX_WORDS = 40
 
 # هر ردیف: (سقف بازه — exclusive، برچسب). بازه‌ها نیم‌باز هستند تا کل [0, 100] را
 # بدون شکاف پوشش دهند (امتیازهایی مثل ۵۹٫۵ نباید بدون نتیجه بمانند).

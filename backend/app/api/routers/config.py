@@ -2,8 +2,9 @@ from fastapi import APIRouter, Depends
 
 from app.api.deps import get_current_user
 from app.core.constants import (
-    EVIDENCE_EXEMPT_SCORE,
+    EVIDENCE_MAX_WORDS,
     EVIDENCE_REQUIRED_MIN_WORDS,
+    EVIDENCE_REQUIRED_SCORES,
     GENERAL_SECTION_WEIGHT,
     SPECIALIZED_SECTION_WEIGHT,
 )
@@ -17,7 +18,8 @@ router = APIRouter(prefix="/api/config", tags=["config"])
 def get_config(current_user: CurrentUser = Depends(get_current_user)) -> AppConfig:
     return AppConfig(
         evidence_min_words=EVIDENCE_REQUIRED_MIN_WORDS,
-        evidence_exempt_score=EVIDENCE_EXEMPT_SCORE,
+        evidence_max_words=EVIDENCE_MAX_WORDS,
+        evidence_required_scores=list(EVIDENCE_REQUIRED_SCORES),
         general_section_weight=GENERAL_SECTION_WEIGHT,
         specialized_section_weight=SPECIALIZED_SECTION_WEIGHT,
     )

@@ -5,6 +5,7 @@ import { useEvaluations, usePersonnelList } from "../../api/queries";
 import { EmployeeProfileModal } from "../../components/EmployeeProfileModal";
 import { EvaluationActionButton } from "../../components/EvaluationActionButton";
 import { EvaluationList } from "../../components/EvaluationList";
+import { RoleOverviewCards } from "../../components/RoleOverviewCards";
 import { PageHeader } from "../../ui/Card";
 import { Table } from "../../ui/Table";
 import type { Personnel } from "../../types";
@@ -58,6 +59,7 @@ export function SupervisorHomePage() {
   return (
     <div className="space-y-4">
       <PageHeader title="افراد زیرمجموعه" subtitle="شروع ارزیابی جدید برای افراد زیرمجموعه شما" />
+      <RoleOverviewCards />
       <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-card">
         <h2 className="mb-4 text-base font-bold text-gray-900">فهرست افراد</h2>
         {loadError != null && (

@@ -58,3 +58,28 @@ class PipelineStat(BaseModel):
     status: EvaluationStatus
     count: int
     oldest_created_at: datetime | None
+
+
+class RoleOverviewCard(BaseModel):
+    """یک کاشیِ خلاصهٔ داشبورد نقش؛ tone برای رنگ‌بندی سمت فرانت است."""
+
+    key: str
+    label: str
+    value: float
+    tone: str  # neutral | amber | pulse | green
+    hint: str | None = None
+
+
+class RoleOverview(BaseModel):
+    role: str
+    cards: list[RoleOverviewCard]
+
+
+class InProgressEvaluation(BaseModel):
+    """ارزیابی باز (نهایی‌نشدهٔ) جاری یک پرسنل، برای نمایش «مرحلهٔ فعلی» در پروفایل او."""
+
+    evaluation_id: int
+    evaluation_code: str
+    status: EvaluationStatus
+    was_returned: bool
+    created_at: datetime

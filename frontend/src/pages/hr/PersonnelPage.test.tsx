@@ -12,7 +12,7 @@ vi.mock("../../api/client", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../../api/client")>();
   return {
     ...actual,
-    apiClient: { ...actual.apiClient, get: vi.fn(), patch: vi.fn(), post: vi.fn() },
+    apiClient: { ...actual.apiClient, get: vi.fn(), patch: vi.fn(), post: vi.fn(), put: vi.fn() },
   };
 });
 
@@ -49,6 +49,7 @@ describe("PersonnelPage edit modal", () => {
   it("opens the edit modal and submits an updated job title + status", async () => {
     const getMock = vi.mocked(apiClient.get);
     const patchMock = vi.mocked(apiClient.patch);
+    const putMock = vi.mocked(apiClient.put);
     getMock.mockImplementation(async (url: string) => {
       if (url === "/personnel") {
         return { data: { total: 1, items: [SAMPLE_PERSONNEL] } };
@@ -56,14 +57,21 @@ describe("PersonnelPage edit modal", () => {
       if (url === "/users") {
         return { data: { total: 0, items: [] } };
       }
+      // دسترسی موجود پرسنل که مودال ویرایش هنگام باز شدن بارگذاری می‌کند
+      if (url === "/personnel/1/access") {
+        return {
+          data: { unit_supervisor_user_id: null, deputy_user_id: 2, ceo_user_id: 3 },
+        };
+      }
       throw new Error(`unexpected GET ${url}`);
     });
     patchMock.mockResolvedValue({ data: {} });
+    putMock.mockResolvedValue({ data: {} });
 
     renderPage();
 
     await screen.findByText("کارمند تست");
-    await userEvent.click(screen.getByRole("button", { name: "ویرایش" }));
+    await userEvent.click(screen.getByRole("button", { name: "ویرایش و دسترسی" }));
 
     const dialog = await screen.findByRole("dialog");
     expect(within(dialog).getByText("ویرایش پرسنل: کارمند تست")).toBeInTheDocument();

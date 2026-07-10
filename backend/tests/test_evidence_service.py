@@ -23,25 +23,27 @@ def _indicator(id_: int, section: str) -> Indicator:
     return ind
 
 
-def test_score_of_three_never_requires_evidence():
+@pytest.mark.parametrize("score", [2, 3, 4])
+def test_middle_scores_never_require_evidence(score):
+    """فقط ۱ و ۵ شواهد می‌خواهند؛ ۲/۳/۴ حتی بدون متن هم معتبرند."""
     indicators = {1: _indicator(1, IndicatorSection.general)}
-    scores = [{"indicator_id": 1, "score": 3, "evidence_text": None}]
+    scores = [{"indicator_id": 1, "score": score, "evidence_text": None}]
     validate_evidence(scores, indicators)  # should not raise
 
 
-@pytest.mark.parametrize("score", [1, 2, 4, 5])
-def test_non_three_score_requires_15_words(score):
+@pytest.mark.parametrize("score", [1, 5])
+def test_extreme_scores_require_min_3_words(score):
     indicators = {1: _indicator(1, IndicatorSection.general)}
-    short_evidence = " ".join(["کلمه"] * 14)
+    short_evidence = " ".join(["کلمه"] * 2)
     scores = [{"indicator_id": 1, "score": score, "evidence_text": short_evidence}]
-    with pytest.raises(ValueError, match="حداقل ۱۵ کلمه"):
+    with pytest.raises(ValueError, match="حداقل ۳ کلمه"):
         validate_evidence(scores, indicators)
 
 
-@pytest.mark.parametrize("score", [1, 2, 4, 5])
-def test_non_three_score_passes_with_exactly_15_words(score):
+@pytest.mark.parametrize("score", [1, 5])
+def test_extreme_scores_pass_with_exactly_3_words(score):
     indicators = {1: _indicator(1, IndicatorSection.general)}
-    evidence = " ".join(["کلمه"] * 15)
+    evidence = " ".join(["کلمه"] * 3)
     scores = [{"indicator_id": 1, "score": score, "evidence_text": evidence}]
     validate_evidence(scores, indicators)  # should not raise
 

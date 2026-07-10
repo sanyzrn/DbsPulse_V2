@@ -6,6 +6,8 @@ class AppConfig(BaseModel):
     می‌شوند تا نسخه‌های کپی‌شده در UI با سرور واگرا نشوند."""
 
     evidence_min_words: int
-    evidence_exempt_score: int
+    evidence_max_words: int
+    # امتیازهایی که شواهد عینی برایشان اجباری است (پیش‌فرض [۱، ۵]).
+    evidence_required_scores: list[int]
     general_section_weight: float
     specialized_section_weight: float

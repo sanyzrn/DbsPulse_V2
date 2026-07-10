@@ -16,6 +16,27 @@ vi.mock("../../api/client", async (importOriginal) => {
   };
 });
 
+// صفحه برای محافظ «قفل‌نشدن حساب خود» به کاربر فعلی نیاز دارد
+vi.mock("../../auth/AuthContext", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../../auth/AuthContext")>();
+  return {
+    ...actual,
+    useAuth: () => ({
+      user: {
+        id: 999,
+        username: "hr-admin",
+        role: "hr",
+        personnel_id: null,
+        must_change_password: false,
+      },
+      loading: false,
+      login: vi.fn(),
+      logout: vi.fn(),
+      refreshUser: vi.fn(),
+    }),
+  };
+});
+
 function renderPage() {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(

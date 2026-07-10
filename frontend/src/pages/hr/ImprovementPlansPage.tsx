@@ -8,6 +8,7 @@ import {
   useImprovementPlans,
 } from "../../api/queries";
 import { EmployeeProfileModal } from "../../components/EmployeeProfileModal";
+import { ExcelExportButton } from "../../components/ExcelExportButton";
 import { PaginationControls } from "../../components/PaginationControls";
 import { useToast } from "../../components/Toast";
 import { Button } from "../../ui/Button";
@@ -199,7 +200,13 @@ export function ImprovementPlansPage() {
       <Card
         title="فهرست برنامه‌ها"
         actions={
-          <div className="relative">
+          <div className="flex flex-wrap items-center gap-2">
+            <ExcelExportButton
+              url="/improvement-plans/export.xlsx"
+              filename="improvement-plans.xlsx"
+              params={{ status: statusFilter || undefined }}
+            />
+            <div className="relative">
             <select
               className="appearance-none rounded-xl border border-gray-200 bg-gray-100 py-1.5 pr-3 pl-8 text-sm text-gray-700 outline-none transition-colors duration-150 focus:border-pulse-500 focus:bg-white"
               value={statusFilter}
@@ -218,6 +225,7 @@ export function ImprovementPlansPage() {
             <svg viewBox="0 0 20 20" className="pointer-events-none absolute left-2 top-1/2 h-3 w-3 -translate-y-1/2 text-gray-400" fill="none" stroke="currentColor" strokeWidth="2">
               <path d="M6 8l4 4 4-4" />
             </svg>
+            </div>
           </div>
         }
       >

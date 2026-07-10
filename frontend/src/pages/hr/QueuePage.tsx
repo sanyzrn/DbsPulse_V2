@@ -4,6 +4,8 @@ export function QueuePage() {
   return (
     <EvaluationList
       title="پرونده‌های ارزیابی"
+      enableAdvancedFilters
+      enableExcelExport
       tabs={[
         { key: "submitted", label: "در انتظار بررسی منابع انسانی", status: "submitted" },
         { key: "draft", label: "پیش‌نویس", status: "draft" },

@@ -83,6 +83,20 @@ def update_user(
 
     old_value = {"role": user.role.value, "is_active": user.is_active, "personnel_id": user.personnel_id}
     updates = payload.model_dump(exclude_unset=True, exclude={"password"})
+
+    # محافظ قفل‌شدن: HR نمی‌تواند حساب خودش را غیرفعال کند یا نقش HR خودش را بگیرد؛
+    # وگرنه ممکن است هیچ HR فعالی باقی نماند و مدیریت سامانه قفل شود.
+    if user.id == current_user.id:
+        if updates.get("is_active") is False:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="نمی‌توانید حساب کاربری خودتان را غیرفعال کنید",
+            )
+        if "role" in updates and updates["role"] != UserRole.hr:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="نمی‌توانید نقش «منابع انسانی» را از حساب خودتان بگیرید",
+            )
     if "personnel_id" in updates and updates["personnel_id"] is not None:
         if db.get(Personnel, updates["personnel_id"]) is None:
             raise HTTPException(

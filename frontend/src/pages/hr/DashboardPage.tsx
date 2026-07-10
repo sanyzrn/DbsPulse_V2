@@ -27,6 +27,7 @@ import {
   usePersonTrend,
   usePersonnelList,
 } from "../../api/queries";
+import { ExcelExportButton } from "../../components/ExcelExportButton";
 import { StatusBadge } from "../../components/StatusBadge";
 import { useToast } from "../../components/Toast";
 import { CountUp, PctBadge, ScoreRing } from "../../ui/Meters";
@@ -76,7 +77,7 @@ export function DashboardPage() {
           <p className="mt-1 text-sm text-gray-500">نمای کلی از وضعیت ارزیابی‌های عملکرد سازمان</p>
           <div className="mt-3 h-0.5 w-16 rounded-full bg-pulse-500" />
         </div>
-        <ExcelExportButton />
+        <ExcelExportButton url="/evaluations/export.xlsx" filename="evaluations.xlsx" />
       </div>
 
       {/* ── کارت‌های خلاصه بالایی ── */}
@@ -475,38 +476,6 @@ function ExpiringContractsCard() {
         </div>
       )}
     </div>
-  );
-}
-
-function ExcelExportButton() {
-  const [downloading, setDownloading] = useState(false);
-
-  async function download() {
-    setDownloading(true);
-    try {
-      const { data } = await apiClient.get("/evaluations/export.xlsx", { responseType: "blob" });
-      const url = URL.createObjectURL(data as Blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = "evaluations.xlsx";
-      a.click();
-      setTimeout(() => URL.revokeObjectURL(url), 10_000);
-    } finally {
-      setDownloading(false);
-    }
-  }
-
-  return (
-    <button
-      onClick={download}
-      disabled={downloading}
-      className="flex items-center gap-2 whitespace-nowrap rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm transition-all duration-200 hover:bg-gray-50 hover:shadow-md disabled:opacity-50"
-    >
-      <svg viewBox="0 0 20 20" className="h-4 w-4 text-green-600" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M10 3v10m0 0l-3.5-3.5M10 13l3.5-3.5M4 15v1a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1v-1" />
-      </svg>
-      {downloading ? "در حال آماده‌سازی…" : "خروجی Excel"}
-    </button>
   );
 }
 

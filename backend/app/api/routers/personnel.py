@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi.responses import Response as FastAPIResponse
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
@@ -11,6 +12,7 @@ from app.models.personnel import Personnel
 from app.schemas.auth import CurrentUser
 from app.schemas.personnel import PersonnelCreate, PersonnelPage, PersonnelRead, PersonnelUpdate
 from app.services.audit import log_event
+from app.services.excel import build_personnel_workbook
 
 router = APIRouter(prefix="/api/personnel", tags=["personnel"])
 
@@ -75,6 +77,45 @@ def list_personnel(
     total = db.scalar(select(func.count()).select_from(query.subquery())) or 0
     items = list(db.scalars(query.order_by(Personnel.full_name).limit(limit).offset(offset)))
     return PersonnelPage(total=total, items=[PersonnelRead.model_validate(p) for p in items])
+
+
+# توجه: این دو مسیر ثابت باید پیش از "/{personnel_id}" تعریف شوند وگرنه FastAPI
+# رشتهٔ "org-units" یا "export.xlsx" را به‌عنوان شناسهٔ عددی تفسیر می‌کند (۴۲۲).
+@router.get("/org-units", response_model=list[str])
+def list_org_units(
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(require_roles(UserRole.hr)),
+) -> list[str]:
+    """واحدهای سازمانی متمایز — منبع گزینه‌های فیلتر «واحد» در فهرست‌های HR."""
+    return list(
+        db.scalars(select(Personnel.org_unit).distinct().order_by(Personnel.org_unit))
+    )
+
+
+@router.get("/export.xlsx")
+def export_personnel_excel(
+    q: str | None = None,
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(require_roles(UserRole.hr)),
+) -> FastAPIResponse:
+    """خروجی Excel از فهرست پرسنل (فقط HR)؛ q همان جست‌وجوی فهرست را اعمال می‌کند."""
+    query = select(Personnel)
+    if q:
+        pattern = f"%{q.strip()}%"
+        query = query.where(
+            Personnel.full_name.ilike(pattern)
+            | Personnel.personnel_code.ilike(pattern)
+            | Personnel.job_title.ilike(pattern)
+            | Personnel.org_unit.ilike(pattern)
+        )
+    rows = list(db.scalars(query.order_by(Personnel.full_name)))
+    log_event(db, actor_user_id=current_user.id, event_type="personnel_excel_exported")
+    db.commit()
+    return FastAPIResponse(
+        content=build_personnel_workbook(rows),
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": 'attachment; filename="personnel.xlsx"'},
+    )
 
 
 @router.post("", response_model=PersonnelRead, status_code=status.HTTP_201_CREATED)

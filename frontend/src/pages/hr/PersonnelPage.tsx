@@ -14,7 +14,7 @@ import { PageHeader } from "../../ui/Card";
 import { Modal } from "../../ui/Modal";
 import { Table } from "../../ui/Table";
 import { JalaliDatePicker } from "../../ui/JalaliDatePicker";
-import type { AppUser, EvaluationAccess, Personnel } from "../../types";
+import type { AppUser, Personnel } from "../../types";
 
 const PAGE_SIZE = 10;
 
@@ -28,16 +28,125 @@ const emptyForm = {
   contract_end_date: "",
 };
 
+/** حالت دسترسی زنجیره ارزیابی که همراه فرم پرسنل نگه داشته می‌شود. */
+type AccessDraft = {
+  unit_supervisor_user_id: number | null;
+  deputy_user_id: number | null;
+  ceo_user_id: number | null;
+};
+
+const emptyAccess: AccessDraft = {
+  unit_supervisor_user_id: null,
+  deputy_user_id: null,
+  ceo_user_id: null,
+};
+
 /** کلاس استاندارد فیلد ورودی مدرن. */
 const inputClass =
   "w-full rounded-xl border border-gray-200 bg-gray-100 px-3 py-2 text-sm text-gray-900 outline-none transition-colors duration-150 focus:border-pulse-500 focus:bg-white";
+
+/** فیلدهای دسترسی زنجیره ارزیابی (مسئول واحد/معاونت/مدیرعامل) که هم در فرم افزودن
+ * و هم در مودال ویرایش پرسنل استفاده می‌شوند؛ دسترسی جزئی از ثبت پرسنل است نه یک
+ * مرحلهٔ جدا. برای فرد «مدیر»، مسئول واحد غیرفعال می‌شود (ارزیابی مستقیم توسط معاونت). */
+function AccessFields({
+  users,
+  isManager,
+  access,
+  setAccess,
+}: {
+  users: AppUser[];
+  isManager: boolean;
+  access: AccessDraft;
+  setAccess: (next: AccessDraft) => void;
+}) {
+  const supervisors = users.filter((u) => u.role === "unit_supervisor");
+  const deputies = users.filter((u) => u.role === "deputy");
+  const ceos = users.filter((u) => u.role === "ceo");
+
+  return (
+    <div className="grid grid-cols-1 gap-3 text-sm sm:grid-cols-2">
+      <label className="flex flex-col gap-1 text-xs font-medium text-gray-600 sm:col-span-2">
+        دسترسی ارزیابی — مسئول واحد
+        <select
+          disabled={isManager}
+          className={`${inputClass} disabled:cursor-not-allowed disabled:bg-gray-50 disabled:text-gray-400`}
+          value={access.unit_supervisor_user_id ?? ""}
+          onChange={(e) =>
+            setAccess({
+              ...access,
+              unit_supervisor_user_id: e.target.value ? Number(e.target.value) : null,
+            })
+          }
+        >
+          <option value="">— انتخاب کنید —</option>
+          {supervisors.map((u) => (
+            <option key={u.id} value={u.id}>
+              {u.username}
+            </option>
+          ))}
+        </select>
+      </label>
+      {isManager && (
+        <p className="-mt-1 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-700 sm:col-span-2">
+          چون این فرد به‌عنوان «مدیر» علامت خورده است، دسترسی مسئول واحد غیرفعال است؛ این فرد مستقیماً
+          توسط معاونت ارزیابی می‌شود.
+        </p>
+      )}
+      <label className="flex flex-col gap-1 text-xs font-medium text-gray-600">
+        معاونت
+        <select
+          required
+          className={inputClass}
+          value={access.deputy_user_id ?? ""}
+          onChange={(e) =>
+            setAccess({ ...access, deputy_user_id: e.target.value ? Number(e.target.value) : null })
+          }
+        >
+          <option value="">— انتخاب کنید —</option>
+          {deputies.map((u) => (
+            <option key={u.id} value={u.id}>
+              {u.username}
+            </option>
+          ))}
+        </select>
+      </label>
+      <label className="flex flex-col gap-1 text-xs font-medium text-gray-600">
+        مدیرعامل
+        <select
+          required
+          className={inputClass}
+          value={access.ceo_user_id ?? ""}
+          onChange={(e) =>
+            setAccess({ ...access, ceo_user_id: e.target.value ? Number(e.target.value) : null })
+          }
+        >
+          <option value="">— انتخاب کنید —</option>
+          {ceos.map((u) => (
+            <option key={u.id} value={u.id}>
+              {u.username}
+            </option>
+          ))}
+        </select>
+      </label>
+    </div>
+  );
+}
+
+/** payload دسترسی را از draft می‌سازد؛ برای فرد «مدیر» مسئول واحد همیشه null است. */
+function accessPayload(access: AccessDraft, isManager: boolean) {
+  return {
+    unit_supervisor_user_id: isManager ? null : access.unit_supervisor_user_id,
+    deputy_user_id: access.deputy_user_id,
+    ceo_user_id: access.ceo_user_id,
+  };
+}
 
 export function PersonnelPage() {
   const { showSuccess, showError } = useToast();
   const queryClient = useQueryClient();
   const [form, setForm] = useState(emptyForm);
+  const [access, setAccess] = useState<AccessDraft>(emptyAccess);
   const [error, setError] = useState<string | null>(null);
-  const [selected, setSelected] = useState<Personnel | null>(null);
   const [profilePerson, setProfilePerson] = useState<Personnel | null>(null);
   const [editingPersonnel, setEditingPersonnel] = useState<Personnel | null>(null);
   const [search, setSearch] = useState("");
@@ -57,9 +166,18 @@ export function PersonnelPage() {
 
   async function createPersonnel() {
     setError(null);
+    if (access.deputy_user_id == null || access.ceo_user_id == null) {
+      const message = "برای ثبت پرسنل، معاونت و مدیرعامل زنجیره ارزیابی را انتخاب کنید";
+      setError(message);
+      showError(message);
+      return;
+    }
     try {
-      await apiClient.post("/personnel", form);
+      // ثبت پرسنل و سپس تنظیم دسترسی در همان جریان؛ دسترسی بخشی از ایجاد پرسنل است.
+      const { data: created } = await apiClient.post<Personnel>("/personnel", form);
+      await apiClient.put(`/personnel/${created.id}/access`, accessPayload(access, form.is_manager));
       setForm(emptyForm);
+      setAccess(emptyAccess);
       await queryClient.invalidateQueries({ queryKey: ["personnel"] });
       showSuccess("پرسنل با موفقیت افزوده شد");
     } catch (err) {
@@ -141,11 +259,23 @@ export function PersonnelPage() {
                   type="checkbox"
                   checked={form.is_manager}
                   onChange={(e) => setForm({ ...form, is_manager: e.target.checked })}
-                  className="h-4 w-4 rounded border-gray-300 text-pulse-500 focus:ring-gray-400"
+                  className="h-4 w-4 cursor-pointer rounded border-gray-300 text-pulse-500 focus:ring-gray-400"
                 />
                 پرسنل مدیریتی (ارزیابی مستقیم توسط معاونت، بدون مسئول واحد)
               </label>
             </div>
+
+            {/* دسترسی زنجیره ارزیابی — بخشی از همان فرم ثبت پرسنل */}
+            <div className="mt-4 border-t border-gray-100 pt-4">
+              <h3 className="mb-3 text-sm font-semibold text-gray-800">دسترسی زنجیره ارزیابی</h3>
+              <AccessFields
+                users={users}
+                isManager={form.is_manager}
+                access={access}
+                setAccess={setAccess}
+              />
+            </div>
+
             {error && <p className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p>}
             <Button type="submit" className="mt-4">
               افزودن
@@ -214,19 +344,13 @@ export function PersonnelPage() {
                 <div key="actions" className="flex items-center gap-3">
                   <button
                     onClick={() => setEditingPersonnel(p)}
-                    className="text-sm font-medium text-gray-600 hover:text-gray-800"
-                  >
-                    ویرایش
-                  </button>
-                  <button
-                    onClick={() => setSelected(p)}
                     className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-sm font-medium text-pulse-600 transition-colors hover:bg-pulse-50"
                   >
                     <svg viewBox="0 0 20 20" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M10 12a2 2 0 1 0 0-4 2 2 0 0 0 0 4z" />
-                      <path d="M2 10s3-5 8-5 8 5 8 5-3 5-8 5-8-5-8-5z" />
+                      <path d="M4 13.5V16h2.5l7.4-7.4-2.5-2.5L4 13.5z" />
+                      <path d="M12.5 5.5l2 2" />
                     </svg>
-                    تنظیم دسترسی
+                    ویرایش و دسترسی
                   </button>
                 </div>,
               ])}
@@ -242,15 +366,6 @@ export function PersonnelPage() {
         </div>
       </div>
 
-      {/* ویرایش دسترسی داخل مودال مرکزی باز می‌شود، نه ستون کناری صفحه */}
-      {selected && (
-        <AccessEditor
-          personnel={selected}
-          users={users}
-          onClose={() => setSelected(null)}
-        />
-      )}
-
       {/* پروفایل پرسنل با کلیک روی نام از همین فهرست همیشه در دسترس است؛ به هیچ
           مرحله‌ای از گردش‌کار ارزیابی (مثل بازکردن یک پرونده خاص) گره نخورده است. */}
       {profilePerson && (
@@ -262,13 +377,25 @@ export function PersonnelPage() {
       )}
 
       {editingPersonnel && (
-        <EditPersonnelModal personnel={editingPersonnel} onClose={() => setEditingPersonnel(null)} />
+        <EditPersonnelModal
+          personnel={editingPersonnel}
+          users={users}
+          onClose={() => setEditingPersonnel(null)}
+        />
       )}
     </div>
   );
 }
 
-function EditPersonnelModal({ personnel, onClose }: { personnel: Personnel; onClose: () => void }) {
+function EditPersonnelModal({
+  personnel,
+  users,
+  onClose,
+}: {
+  personnel: Personnel;
+  users: AppUser[];
+  onClose: () => void;
+}) {
   const { showSuccess, showError } = useToast();
   const queryClient = useQueryClient();
   const [form, setForm] = useState({
@@ -281,16 +408,45 @@ function EditPersonnelModal({ personnel, onClose }: { personnel: Personnel; onCl
     contract_end_date: personnel.contract_end_date,
     status: personnel.status,
   });
+  const [access, setAccess] = useState<AccessDraft>(emptyAccess);
+  const [accessLoaded, setAccessLoaded] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
+  useEffect(() => {
+    setAccessLoaded(false);
+    apiClient
+      .get(`/personnel/${personnel.id}/access`)
+      .then(({ data }) => {
+        if (data) {
+          setAccess({
+            unit_supervisor_user_id: data.unit_supervisor_user_id ?? null,
+            deputy_user_id: data.deputy_user_id ?? null,
+            ceo_user_id: data.ceo_user_id ?? null,
+          });
+        }
+      })
+      .catch((err) => setError(extractErrorMessage(err)))
+      .finally(() => setAccessLoaded(true));
+  }, [personnel.id]);
+
   async function save() {
     setError(null);
+    if (access.deputy_user_id == null || access.ceo_user_id == null) {
+      const message = "معاونت و مدیرعامل زنجیره ارزیابی الزامی هستند";
+      setError(message);
+      showError(message);
+      return;
+    }
     setSaving(true);
     try {
       await apiClient.patch(`/personnel/${personnel.id}`, form);
+      await apiClient.put(
+        `/personnel/${personnel.id}/access`,
+        accessPayload(access, form.is_manager)
+      );
       await queryClient.invalidateQueries({ queryKey: ["personnel"] });
-      showSuccess("پرسنل به‌روزرسانی شد");
+      showSuccess("پرسنل و دسترسی به‌روزرسانی شد");
       onClose();
     } catch (err) {
       const message = extractErrorMessage(err);
@@ -304,13 +460,14 @@ function EditPersonnelModal({ personnel, onClose }: { personnel: Personnel; onCl
   return (
     <Modal
       title={`ویرایش پرسنل: ${personnel.full_name}`}
+      size="lg"
       onClose={onClose}
       footer={
         <>
           <Button variant="secondary" onClick={onClose}>
             انصراف
           </Button>
-          <Button onClick={save} disabled={saving}>
+          <Button onClick={save} disabled={saving || !accessLoaded}>
             ذخیره
           </Button>
         </>
@@ -387,147 +544,31 @@ function EditPersonnelModal({ personnel, onClose }: { personnel: Personnel; onCl
             type="checkbox"
             checked={form.is_manager}
             onChange={(e) => setForm({ ...form, is_manager: e.target.checked })}
-            className="h-4 w-4 rounded border-gray-300 text-pulse-500 focus:ring-gray-400"
+            className="h-4 w-4 cursor-pointer rounded border-gray-300 text-pulse-500 focus:ring-gray-400"
           />
           پرسنل مدیریتی
         </label>
       </div>
-      {error && <p className="mt-2 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p>}
-    </Modal>
-  );
-}
 
-function AccessEditor({
-  personnel,
-  users,
-  onClose,
-}: {
-  personnel: Personnel;
-  users: AppUser[];
-  onClose: () => void;
-}) {
-  const { showSuccess, showError } = useToast();
-  const isManager = personnel.is_manager;
-  const [access, setAccess] = useState<Partial<EvaluationAccess>>({});
-  const [error, setError] = useState<string | null>(null);
-  const [loaded, setLoaded] = useState(false);
-
-  useEffect(() => {
-    setLoaded(false);
-    setError(null);
-    apiClient
-      .get(`/personnel/${personnel.id}/access`)
-      .then(({ data }) => {
-        setAccess(data ?? {});
-      })
-      .catch((err) => setError(extractErrorMessage(err)))
-      .finally(() => setLoaded(true));
-  }, [personnel.id]);
-
-  const supervisors = users.filter((u) => u.role === "unit_supervisor");
-  const deputies = users.filter((u) => u.role === "deputy");
-  const ceos = users.filter((u) => u.role === "ceo");
-
-  async function save() {
-    setError(null);
-    try {
-      await apiClient.put(`/personnel/${personnel.id}/access`, {
-        unit_supervisor_user_id: isManager ? null : access.unit_supervisor_user_id || null,
-        deputy_user_id: access.deputy_user_id,
-        ceo_user_id: access.ceo_user_id,
-      });
-      showSuccess("دسترسی ارزیابی ذخیره شد");
-      onClose();
-    } catch (err) {
-      const message = extractErrorMessage(err);
-      setError(message);
-      showError(message);
-    }
-  }
-
-  return (
-    <Modal
-      title={`دسترسی ارزیابی: ${personnel.full_name}`}
-      onClose={onClose}
-      footer={
-        loaded && (
-          <>
-            <Button variant="secondary" onClick={onClose}>
-              انصراف
-            </Button>
-            <Button onClick={save}>ذخیره</Button>
-          </>
-        )
-      }
-    >
-      {!loaded ? (
-        <div className="space-y-3 py-4">
-          <div className="skeleton h-10" />
-          <div className="skeleton h-10" />
-          <div className="skeleton h-10" />
-        </div>
-      ) : (
-        <div className="space-y-4 py-2">
-          <div>
-            <label className="mb-1.5 block text-sm font-medium text-gray-700">مسئول واحد</label>
-            <select
-              disabled={isManager}
-              className={`${inputClass} disabled:bg-gray-50 disabled:text-gray-400`}
-              value={access.unit_supervisor_user_id ?? ""}
-              onChange={(e) =>
-                setAccess({ ...access, unit_supervisor_user_id: e.target.value ? Number(e.target.value) : null })
-              }
-            >
-              <option value="">— انتخاب کنید —</option>
-              {supervisors.map((u) => (
-                <option key={u.id} value={u.id}>
-                  {u.username}
-                </option>
-              ))}
-            </select>
-            {isManager && (
-              <p className="mt-2 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-700">
-                چون این فرد به‌عنوان «مدیر» علامت خورده است، دسترسی مسئول واحد غیرفعال است؛ این فرد مستقیماً
-                توسط معاونت ارزیابی می‌شود.
-              </p>
-            )}
+      {/* دسترسی زنجیره ارزیابی — در همان مودال ویرایش پرسنل */}
+      <div className="mt-3 border-t border-gray-100 pt-4">
+        <h3 className="mb-3 text-sm font-semibold text-gray-800">دسترسی زنجیره ارزیابی</h3>
+        {!accessLoaded ? (
+          <div className="space-y-3">
+            <div className="skeleton h-10" />
+            <div className="skeleton h-10" />
           </div>
+        ) : (
+          <AccessFields
+            users={users}
+            isManager={form.is_manager}
+            access={access}
+            setAccess={setAccess}
+          />
+        )}
+      </div>
 
-          <div>
-            <label className="mb-1.5 block text-sm font-medium text-gray-700">معاونت</label>
-            <select
-              className={inputClass}
-              value={access.deputy_user_id ?? ""}
-              onChange={(e) => setAccess({ ...access, deputy_user_id: Number(e.target.value) })}
-            >
-              <option value="">— انتخاب کنید —</option>
-              {deputies.map((u) => (
-                <option key={u.id} value={u.id}>
-                  {u.username}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div>
-            <label className="mb-1.5 block text-sm font-medium text-gray-700">مدیرعامل</label>
-            <select
-              className={inputClass}
-              value={access.ceo_user_id ?? ""}
-              onChange={(e) => setAccess({ ...access, ceo_user_id: Number(e.target.value) })}
-            >
-              <option value="">— انتخاب کنید —</option>
-              {ceos.map((u) => (
-                <option key={u.id} value={u.id}>
-                  {u.username}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {error && <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p>}
-        </div>
-      )}
+      {error && <p className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p>}
     </Modal>
   );
 }

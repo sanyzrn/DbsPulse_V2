@@ -7,9 +7,10 @@
 from datetime import UTC, datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi.responses import Response
 from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 
 from app.api.deps import require_roles
 from app.core.constants import CONDITIONAL_RENEWAL_RECOMMENDATION
@@ -32,6 +33,7 @@ from app.schemas.improvement_plan import (
     ImprovementPlanUpdate,
 )
 from app.services.audit import log_event
+from app.services.excel import build_improvement_plans_workbook
 from app.services.notifications import notify
 
 router = APIRouter(prefix="/api/improvement-plans", tags=["improvement-plans"])
@@ -179,6 +181,54 @@ def create_plan(
     db.commit()
     db.refresh(plan)
     return plan
+
+
+# مسیر ثابت پیش از "/{plan_id}" تا "export.xlsx" شناسهٔ عددی تفسیر نشود
+@router.get("/export.xlsx")
+def export_plans_excel(
+    status_filter: ImprovementPlanStatus | None = Query(default=None, alias="status"),
+    q: str | None = None,
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(require_roles(UserRole.hr)),
+) -> Response:
+    """خروجی Excel از برنامه‌های بهبود (فقط HR) با همان فیلترهای فهرست."""
+    query = select(ImprovementPlan).options(selectinload(ImprovementPlan.goals))
+    if status_filter is not None:
+        query = query.where(ImprovementPlan.status == status_filter)
+    if q:
+        pattern = f"%{q.strip()}%"
+        query = query.join(Personnel, Personnel.id == ImprovementPlan.personnel_id).where(
+            Personnel.full_name.ilike(pattern) | ImprovementPlan.title.ilike(pattern)
+        )
+    plans = list(db.scalars(query.order_by(ImprovementPlan.review_date)))
+
+    # دو کوئری دسته‌ای به‌جای N+1: کد ارزیابی و نام مسئول پیگیری هر برنامه
+    evaluation_ids = {p.evaluation_record_id for p in plans}
+    evaluation_codes = (
+        dict(
+            db.execute(
+                select(EvaluationRecord.id, EvaluationRecord.evaluation_code).where(
+                    EvaluationRecord.id.in_(evaluation_ids)
+                )
+            ).all()
+        )
+        if evaluation_ids
+        else {}
+    )
+    owner_ids = {p.owner_user_id for p in plans if p.owner_user_id is not None}
+    owner_usernames = (
+        dict(db.execute(select(User.id, User.username).where(User.id.in_(owner_ids))).all())
+        if owner_ids
+        else {}
+    )
+
+    log_event(db, actor_user_id=current_user.id, event_type="improvement_plans_excel_exported")
+    db.commit()
+    return Response(
+        content=build_improvement_plans_workbook(plans, evaluation_codes, owner_usernames),
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": 'attachment; filename="improvement-plans.xlsx"'},
+    )
 
 
 @router.get("/{plan_id}", response_model=ImprovementPlanDetail)

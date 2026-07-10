@@ -45,8 +45,9 @@ describe("EvaluationList tabs", () => {
 
     await userEvent.click(screen.getByRole("tab", { name: "همهٔ پرونده‌های من" }));
 
+    // تب «همه» = بدون فیلتر وضعیت؛ پارامترهای خالی از query string حذف می‌شوند
     await waitFor(() =>
-      expect(getMock.mock.calls.at(-1)?.[1]?.params).toMatchObject({ status: undefined })
+      expect(getMock.mock.calls.at(-1)?.[1]?.params).not.toHaveProperty("status")
     );
   });
 

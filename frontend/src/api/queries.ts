@@ -54,8 +54,21 @@ export function useAppConfig(): AppConfig {
 export interface EvaluationListParams {
   q?: string;
   status?: EvaluationStatus;
+  /** فیلترهای پیشرفتهٔ HR — همگی اختیاری و ترکیب‌پذیر */
+  org_unit?: string;
+  created_from?: string;
+  created_to?: string;
+  min_final_pct?: number;
+  max_final_pct?: number;
   limit: number;
   offset: number;
+}
+
+/** مقادیر خالی/undefined را حذف می‌کند تا query string تمیز بماند. */
+function compactParams(params: object): Record<string, unknown> {
+  return Object.fromEntries(
+    Object.entries(params).filter(([, v]) => v !== undefined && v !== null && v !== "")
+  );
 }
 
 export function useEvaluations(params: EvaluationListParams) {
@@ -64,10 +77,20 @@ export function useEvaluations(params: EvaluationListParams) {
     queryFn: async () =>
       (
         await apiClient.get<Page<EvaluationRecord>>("/evaluations", {
-          params: { ...params, q: params.q || undefined },
+          params: compactParams(params),
         })
       ).data,
     placeholderData: keepPreviousData,
+  });
+}
+
+/** واحدهای سازمانی متمایز (فقط HR) — گزینه‌های فیلتر «واحد». */
+export function useOrgUnits(enabled: boolean) {
+  return useQuery({
+    queryKey: ["personnel", "org-units"],
+    queryFn: async () => (await apiClient.get<string[]>("/personnel/org-units")).data,
+    enabled,
+    staleTime: 300_000,
   });
 }
 

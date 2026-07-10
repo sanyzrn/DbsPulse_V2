@@ -1,5 +1,5 @@
 import secrets
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi.responses import Response
@@ -212,10 +212,56 @@ def create_evaluation(
     return record
 
 
+def _apply_evaluation_filters(
+    query,
+    *,
+    q: str | None,
+    status_filter: EvaluationStatus | None,
+    org_unit: str | None,
+    created_from: date | None,
+    created_to: date | None,
+    min_final_pct: float | None,
+    max_final_pct: float | None,
+):
+    """فیلترهای ترکیب‌پذیر فهرست/خروجی ارزیابی‌ها — یک‌جا تا list و export.xlsx
+    همیشه رفتار یکسان داشته باشند (خروجی همان چیزی است که HR فیلتر کرده)."""
+    needs_personnel_join = bool(q) or bool(org_unit)
+    if needs_personnel_join:
+        query = query.join(Personnel, Personnel.id == EvaluationRecord.subject_personnel_id)
+
+    if status_filter is not None:
+        query = query.where(EvaluationRecord.status == status_filter)
+    if q:
+        pattern = f"%{q.strip()}%"
+        query = query.where(
+            EvaluationRecord.evaluation_code.ilike(pattern)
+            | Personnel.full_name.ilike(pattern)
+        )
+    if org_unit:
+        query = query.where(Personnel.org_unit == org_unit)
+    if created_from is not None:
+        query = query.where(EvaluationRecord.created_at >= created_from)
+    if created_to is not None:
+        # بازه شامل خودِ روز پایان است (created_at از نوع timestamp است)
+        query = query.where(
+            EvaluationRecord.created_at < created_to + timedelta(days=1)
+        )
+    if min_final_pct is not None:
+        query = query.where(EvaluationRecord.final_weighted_pct >= min_final_pct)
+    if max_final_pct is not None:
+        query = query.where(EvaluationRecord.final_weighted_pct <= max_final_pct)
+    return query
+
+
 @router.get("", response_model=EvaluationPage)
 def list_evaluations(
     q: str | None = None,
     status_filter: EvaluationStatus | None = Query(default=None, alias="status"),
+    org_unit: str | None = None,
+    created_from: date | None = None,
+    created_to: date | None = None,
+    min_final_pct: float | None = Query(default=None, ge=0, le=100),
+    max_final_pct: float | None = Query(default=None, ge=0, le=100),
     limit: int = Query(default=50, ge=1, le=200),
     offset: int = Query(default=0, ge=0),
     db: Session = Depends(get_db),
@@ -239,16 +285,16 @@ def list_evaluations(
         )
     # hr می‌بیند همه را
 
-    if status_filter is not None:
-        query = query.where(EvaluationRecord.status == status_filter)
-    if q:
-        pattern = f"%{q.strip()}%"
-        query = query.join(
-            Personnel, Personnel.id == EvaluationRecord.subject_personnel_id
-        ).where(
-            EvaluationRecord.evaluation_code.ilike(pattern)
-            | Personnel.full_name.ilike(pattern)
-        )
+    query = _apply_evaluation_filters(
+        query,
+        q=q,
+        status_filter=status_filter,
+        org_unit=org_unit,
+        created_from=created_from,
+        created_to=created_to,
+        min_final_pct=min_final_pct,
+        max_final_pct=max_final_pct,
+    )
 
     total = db.scalar(select(func.count()).select_from(query.subquery())) or 0
     items = list(
@@ -283,13 +329,29 @@ def list_evaluations(
 
 @router.get("/export.xlsx")
 def export_evaluations_excel(
+    q: str | None = None,
+    status_filter: EvaluationStatus | None = Query(default=None, alias="status"),
+    org_unit: str | None = None,
+    created_from: date | None = None,
+    created_to: date | None = None,
+    min_final_pct: float | None = Query(default=None, ge=0, le=100),
+    max_final_pct: float | None = Query(default=None, ge=0, le=100),
     db: Session = Depends(get_db),
     current_user: CurrentUser = Depends(require_roles(UserRole.hr)),
 ) -> Response:
-    """خروجی Excel از کل ارزیابی‌ها (فقط HR) برای گزارش‌گیری بیرون از سامانه."""
-    records = db.scalars(
-        select(EvaluationRecord).order_by(EvaluationRecord.created_at.desc())
-    ).all()
+    """خروجی Excel از ارزیابی‌ها (فقط HR) — همان فیلترهای فهرست را می‌پذیرد تا HR
+    دقیقاً همان چیزی را که روی صفحه فیلتر کرده است دریافت کند."""
+    query = _apply_evaluation_filters(
+        select(EvaluationRecord),
+        q=q,
+        status_filter=status_filter,
+        org_unit=org_unit,
+        created_from=created_from,
+        created_to=created_to,
+        min_final_pct=min_final_pct,
+        max_final_pct=max_final_pct,
+    )
+    records = db.scalars(query.order_by(EvaluationRecord.created_at.desc())).all()
     log_event(db, actor_user_id=current_user.id, event_type="excel_exported")
     db.commit()
     return Response(

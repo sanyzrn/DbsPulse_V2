@@ -7,6 +7,7 @@ import {
   useUsersList,
 } from "../../api/queries";
 import { EmployeeProfileModal } from "../../components/EmployeeProfileModal";
+import { ExcelExportButton } from "../../components/ExcelExportButton";
 import { PaginationControls } from "../../components/PaginationControls";
 import { useToast } from "../../components/Toast";
 import { Button } from "../../ui/Button";
@@ -286,20 +287,27 @@ export function PersonnelPage() {
         <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-card">
           <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
             <h2 className="text-base font-bold text-gray-900">فهرست پرسنل</h2>
-            <div className="relative">
-              <svg viewBox="0 0 20 20" className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
-                <circle cx="9" cy="9" r="6" />
-                <path d="M14 14l3 3" />
-              </svg>
-              <input
-                className="w-full rounded-xl border border-gray-200 bg-gray-100 py-1.5 pr-9 pl-3 text-sm text-gray-700 outline-none transition-colors duration-150 focus:border-pulse-500 focus:bg-white sm:w-80"
-                placeholder="جست‌وجو (نام، کد پرسنلی، عنوان شغلی، واحد)…"
-                value={search}
-                onChange={(e) => {
-                  setSearch(e.target.value);
-                  setPage(0);
-                }}
+            <div className="flex flex-wrap items-center gap-2">
+              <ExcelExportButton
+                url="/personnel/export.xlsx"
+                filename="personnel.xlsx"
+                params={{ q: debouncedSearch || undefined }}
               />
+              <div className="relative">
+                <svg viewBox="0 0 20 20" className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
+                  <circle cx="9" cy="9" r="6" />
+                  <path d="M14 14l3 3" />
+                </svg>
+                <input
+                  className="w-full rounded-xl border border-gray-200 bg-gray-100 py-1.5 pr-9 pl-3 text-sm text-gray-700 outline-none transition-colors duration-150 focus:border-pulse-500 focus:bg-white sm:w-80"
+                  placeholder="جست‌وجو (نام، کد پرسنلی، عنوان شغلی، واحد)…"
+                  value={search}
+                  onChange={(e) => {
+                    setSearch(e.target.value);
+                    setPage(0);
+                  }}
+                />
+              </div>
             </div>
           </div>
           {loadError != null && (

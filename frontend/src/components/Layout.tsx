@@ -1,7 +1,7 @@
 import { Navigate, NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { motion } from "motion/react";
 import { useAuth } from "../auth/AuthContext";
-import { APP_NAME, APP_NAME_FA } from "../appInfo";
+import { APP_NAME, APP_NAME_FA, FEATURE_PERIODS_ENABLED } from "../appInfo";
 import { BrandMark } from "./Brand";
 import { ErrorBoundary } from "./ErrorBoundary";
 import { Footer } from "./Footer";
@@ -14,7 +14,10 @@ const NAV_BY_ROLE: Record<string, { to: string; label: string }[]> = {
     { to: "/hr/users", label: "کاربران" },
     { to: "/hr/indicators", label: "شاخص‌ها" },
     { to: "/hr/queue", label: "صف بررسی" },
-    { to: "/hr/periods", label: "دوره‌های ارزیابی" },
+    // «دوره‌های ارزیابی» پشت پرچم ویژگی — فعلاً غیرفعال (رجوع به appInfo.ts)
+    ...(FEATURE_PERIODS_ENABLED
+      ? [{ to: "/hr/periods", label: "دوره‌های ارزیابی" }]
+      : []),
     { to: "/hr/improvement-plans", label: "برنامه‌های بهبود" },
     { to: "/hr/dashboard", label: "داشبورد تحلیلی" },
     { to: "/hr/audit-log", label: "گزارش رویدادها" },

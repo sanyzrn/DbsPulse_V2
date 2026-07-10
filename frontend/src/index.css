@@ -123,6 +123,32 @@ select:focus-visible,
 }
 
 /* ═══════════════════════════════════════════════════════════════════════
+   Interactive Cursors — هر عنصر تعاملی باید نشانگر ماوس مناسب داشته باشد
+   ═══════════════════════════════════════════════════════════════════════ */
+
+button:not(:disabled),
+[role="button"]:not([aria-disabled="true"]),
+[role="tab"]:not([aria-disabled="true"]),
+[role="slider"],
+label.switch,
+summary {
+  cursor: pointer;
+}
+
+button:disabled,
+[aria-disabled="true"],
+[role="tab"][aria-disabled="true"] {
+  cursor: not-allowed;
+}
+
+.grip-handle {
+  cursor: grab;
+}
+.grip-handle:active {
+  cursor: grabbing;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
    Reusable Utility Classes
    ═══════════════════════════════════════════════════════════════════════ */
 

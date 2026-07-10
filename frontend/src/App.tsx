@@ -1,4 +1,5 @@
 import { Navigate, Route, Routes } from "react-router-dom";
+import { FEATURE_PERIODS_ENABLED } from "./appInfo";
 import { useAuth } from "./auth/AuthContext";
 import { ProtectedRoute } from "./auth/ProtectedRoute";
 import { Layout } from "./components/Layout";
@@ -19,6 +20,22 @@ import { SupervisorHomePage } from "./pages/supervisor/SupervisorHomePage";
 import { DeputyHomePage } from "./pages/deputy/DeputyHomePage";
 import { CeoHomePage } from "./pages/ceo/CeoHomePage";
 import { MyEvaluationsPage } from "./pages/employee/MyEvaluationsPage";
+
+/** جای‌گزین بخش‌های موقتاً غیرفعال — به‌جای ۴۰۴ یک پیام دوستانه نشان می‌دهد. */
+function DisabledFeature({ title }: { title: string }) {
+  return (
+    <div className="rounded-2xl border border-gray-100 bg-white p-10 text-center shadow-card">
+      <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-gray-100 text-gray-400">
+        <svg viewBox="0 0 24 24" className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+          <circle cx="12" cy="12" r="9" />
+          <path d="M8 12h8" />
+        </svg>
+      </div>
+      <h1 className="text-lg font-bold text-gray-900">{title}</h1>
+      <p className="mt-1 text-sm text-gray-500">این بخش فعلاً غیرفعال است.</p>
+    </div>
+  );
+}
 
 function HomeRedirect() {
   const { user } = useAuth();
@@ -53,7 +70,12 @@ function App() {
             <Route path="/hr/users" element={<UsersPage />} />
             <Route path="/hr/indicators" element={<IndicatorsPage />} />
             <Route path="/hr/queue" element={<QueuePage />} />
-            <Route path="/hr/periods" element={<PeriodsPage />} />
+            <Route
+              path="/hr/periods"
+              element={
+                FEATURE_PERIODS_ENABLED ? <PeriodsPage /> : <DisabledFeature title="دوره‌های ارزیابی" />
+              }
+            />
             <Route path="/hr/improvement-plans" element={<ImprovementPlansPage />} />
             <Route path="/hr/improvement-plans/:id" element={<ImprovementPlanDetailPage />} />
             <Route path="/hr/dashboard" element={<DashboardPage />} />

@@ -232,7 +232,7 @@ export function EvaluationDetailPage() {
         {canComment && (
           <div className="mt-3">
             <textarea
-              className="w-full rounded-xl border border-gray-200 bg-gray-100 px-3 py-2 outline-none transition-colors duration-150 focus:border-pulse-500 focus:bg-white text-sm"
+              className="w-full resize-none rounded-xl border border-gray-200 bg-gray-100 px-3 py-2 outline-none transition-colors duration-150 focus:border-pulse-500 focus:bg-white text-sm"
               rows={2}
               value={newComment}
               onChange={(e) => setNewComment(e.target.value)}
@@ -352,7 +352,7 @@ export function EvaluationDetailPage() {
             }}
           />
         )}
-        {evaluation.status === "finalized" && (
+        {user.role === "hr" && evaluation.status === "finalized" && (
           <button
             onClick={async () => {
               // پنجره باید هم‌زمان با کلیک کاربر (sync) باز شود، وگرنه مرورگر (به‌خصوص
@@ -490,6 +490,7 @@ function EditableScoring({
 }) {
   const { showSuccess, showError } = useToast();
   const confirm = useConfirm();
+  const navigate = useNavigate();
   const { drafts, setScore, setEvidence, violations, isValid } = useScoreForm(
     indicators,
     existing,
@@ -570,6 +571,9 @@ function EditableScoring({
       await apiClient.post(`/evaluations/${evaluationId}/${nextAction === "submit" ? "submit" : "deputy-approve"}`);
       showSuccess("ارزیابی با موفقیت ثبت شد");
       onSubmitted();
+      // پس از ثبت نهایی، ارزیاب به صفحهٔ اصلی نقش خود بازمی‌گردد (مسیر «/» توسط
+      // App.tsx بر اساس نقش هدایت می‌شود). کمی تأخیر تا توست موفقیت دیده شود.
+      setTimeout(() => navigate("/"), 400);
     } catch (err) {
       const message = extractErrorMessage(err);
       setError(message);
@@ -748,7 +752,7 @@ function ReturnBox({ evaluationId, onReturned }: { evaluationId: number; onRetur
           </label>
           <textarea
             id="return-reason"
-            className="w-full rounded-xl border border-amber-300 bg-white px-3 py-2 text-sm outline-none transition-all"
+            className="w-full resize-none rounded-xl border border-amber-300 bg-white px-3 py-2 text-sm outline-none transition-all"
             rows={2}
             value={reason}
             onChange={(e) => setReason(e.target.value)}

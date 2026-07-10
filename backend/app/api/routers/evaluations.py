@@ -508,6 +508,13 @@ def evaluation_summary_pdf(
 ) -> Response:
     record = _get_record_or_404(db, evaluation_id)
     _ensure_can_view(record, current_user)
+    # خروجی PDF فقط برای منابع انسانی — سایر نقش‌ها حتی اگر پرونده را ببینند، اجازهٔ
+    # چاپ/دانلود سند رسمی را ندارند.
+    if current_user.role != UserRole.hr:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="خروجی PDF فقط برای منابع انسانی در دسترس است",
+        )
     if record.status != EvaluationStatus.finalized or record.final_snapshot is None:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST, detail="ارزیابی هنوز نهایی نشده است"

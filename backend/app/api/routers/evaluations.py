@@ -31,6 +31,7 @@ from app.services.audit import log_event
 from app.services.documents import archive_final_pdf
 from app.services.evaluation import next_evaluation_code
 from app.services.excel import build_evaluations_workbook
+from app.services.pdf import weasyprint_available
 from app.services.snapshot import build_final_snapshot
 from app.services.workflow import (
     active_indicators_by_id,
@@ -520,6 +521,18 @@ def evaluation_summary_pdf(
             status_code=status.HTTP_400_BAD_REQUEST, detail="ارزیابی هنوز نهایی نشده است"
         )
 
+    # اگر کتابخانه‌های بومی WeasyPrint روی این سرور نصب نباشند، به‌جای خطای مبهم
+    # (AttributeError روی سند None) یک پیام واضح ۵۰۰ برمی‌گردانیم.
+    if not weasyprint_available():
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=(
+                "تولید PDF روی این سرور در دسترس نیست: کتابخانه‌های سیستمی WeasyPrint "
+                "(Pango/Cairo/GDK-PixBuf) نصب نشده‌اند. برای فعال‌سازی چاپ، این کتابخانه‌ها "
+                "را روی سرور نصب کنید (راهنما: بخش «چاپ PDF» در README)."
+            ),
+        )
+
     log_event(
         db,
         actor_user_id=current_user.id,
@@ -530,6 +543,11 @@ def evaluation_summary_pdf(
     # سند آرشیوشده را سرو می‌کنیم؛ برای رکوردهای قدیمی (پیش از قابلیت آرشیو) در همین
     # لحظه تولید و ذخیره می‌شود تا از این پس پایدار بماند.
     document = archive_final_pdf(db, record)
+    if document is None:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="تولید PDF با خطا مواجه شد؛ لطفاً بعداً دوباره تلاش کنید یا با پشتیبانی تماس بگیرید.",
+        )
     db.commit()
 
     return Response(

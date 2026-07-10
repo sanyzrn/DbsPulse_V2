@@ -62,6 +62,16 @@ def test_pdf_export_returns_valid_pdf_for_hr(client, db_session):
     assert len(r.content) > 1024
 
 
+def test_pdf_export_fails_clearly_when_weasyprint_unavailable(client, db_session, monkeypatch):
+    """اگر کتابخانه‌های بومی نبودند، به‌جای AttributeError مبهم، ۵۰۰ با پیام واضح فارسی می‌آید."""
+    eid, hr, *_ = _finalize_evaluation(client, db_session)
+    monkeypatch.setattr("app.api.routers.evaluations.weasyprint_available", lambda: False)
+    r = client.get(f"/api/evaluations/{eid}/summary.pdf", headers=auth_header(hr))
+    assert r.status_code == 500
+    assert "WeasyPrint" in r.json()["detail"]
+    assert "README" in r.json()["detail"]
+
+
 def _snapshot_with(evidence_text: str) -> dict:
     return {
         "evaluation_code": "EVL-0001",

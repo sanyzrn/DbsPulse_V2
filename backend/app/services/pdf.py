@@ -15,15 +15,18 @@ _TEMPLATES_DIR = Path(__file__).resolve().parent.parent / "templates"
 _PERSIAN_DIGITS = str.maketrans("0123456789", "۰۱۲۳۴۵۶۷۸۹")
 
 
-def to_jalali(value: str | None) -> str:
-    """تاریخ ISO میلادی → تاریخ شمسی با ارقام فارسی برای سند رسمی؛ مقدار نامعتبر
-    دست‌نخورده برمی‌گردد تا snapshot های قدیمی هم رندر شوند."""
+def to_jalali(value: str | datetime | None) -> str:
+    """تاریخ ISO میلادی یا شیء datetime → تاریخ شمسی با ارقام فارسی برای سند رسمی؛
+    مقدار نامعتبر دست‌نخورده برمی‌گردد تا snapshot های قدیمی هم رندر شوند."""
     if not value:
         return "—"
-    try:
-        dt = datetime.fromisoformat(value)
-    except ValueError:
-        return value
+    if isinstance(value, datetime):
+        dt = value
+    else:
+        try:
+            dt = datetime.fromisoformat(value)
+        except (ValueError, TypeError):
+            return str(value)
     jalali = jdatetime.datetime.fromgregorian(datetime=dt)
     return jalali.strftime("%Y/%m/%d ساعت %H:%M").translate(_PERSIAN_DIGITS)
 
@@ -59,9 +62,12 @@ try:
 
     _default_url_fetcher = default_url_fetcher
     _weasyprint_available = True
-except OSError:
+except (OSError, ImportError):
+    # OSError: پکیج نصب است ولی کتابخانه‌های بومی (Pango/Cairo/GDK-PixBuf) نیستند.
+    # ImportError: خود پکیج نصب نشده. در هر دو حالت اپ سالم بالا می‌آید و فقط چاپ PDF
+    # غیرفعال می‌شود؛ endpoint خروجی PDF با پیام واضح ۵۰۰ می‌دهد (نه خطای مبهم).
     logger.warning(
-        "WeasyPrint native libraries (GTK/GObject/Pango) not found. "
+        "WeasyPrint native libraries (Pango/Cairo/GDK-PixBuf) not found. "
         "PDF generation will be unavailable until those are installed. "
         "All other features work normally."
     )

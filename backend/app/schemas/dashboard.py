@@ -58,3 +58,13 @@ class PipelineStat(BaseModel):
     status: EvaluationStatus
     count: int
     oldest_created_at: datetime | None
+
+
+class InProgressEvaluation(BaseModel):
+    """ارزیابی باز (نهایی‌نشدهٔ) جاری یک پرسنل، برای نمایش «مرحلهٔ فعلی» در پروفایل او."""
+
+    evaluation_id: int
+    evaluation_code: str
+    status: EvaluationStatus
+    was_returned: bool
+    created_at: datetime

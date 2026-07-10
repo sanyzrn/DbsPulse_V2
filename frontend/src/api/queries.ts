@@ -18,6 +18,7 @@ import {
   type ImprovementPlanDetail,
   type ImprovementPlanStatus,
   type Indicator,
+  type InProgressEvaluation,
   type MyEvaluation,
   type NotificationPage,
   type Page,
@@ -169,6 +170,19 @@ export function usePersonTrend(personnelId: number | null) {
     queryKey: ["dashboard", "trend", personnelId],
     queryFn: async () =>
       (await apiClient.get<TrendPoint[]>(`/dashboard/personnel/${personnelId}/trend`)).data,
+    enabled: personnelId !== null,
+  });
+}
+
+export function usePersonInProgress(personnelId: number | null) {
+  return useQuery({
+    queryKey: ["dashboard", "in-progress", personnelId],
+    queryFn: async () =>
+      (
+        await apiClient.get<InProgressEvaluation | null>(
+          `/dashboard/personnel/${personnelId}/in-progress`
+        )
+      ).data,
     enabled: personnelId !== null,
   });
 }

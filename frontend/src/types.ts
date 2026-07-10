@@ -314,6 +314,14 @@ export interface NotStartedPersonnel {
   org_unit: string;
 }
 
+export interface InProgressEvaluation {
+  evaluation_id: number;
+  evaluation_code: string;
+  status: EvaluationStatus;
+  was_returned: boolean;
+  created_at: string;
+}
+
 export type ImprovementPlanStatus = "open" | "completed" | "cancelled";
 
 export const IMPROVEMENT_PLAN_STATUS_LABELS: Record<ImprovementPlanStatus, string> = {

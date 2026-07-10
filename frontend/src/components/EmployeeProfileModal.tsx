@@ -13,10 +13,26 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from "recharts";
-import { usePersonRadar, usePersonTrend, usePersonnelDetail } from "../api/queries";
+import {
+  usePersonInProgress,
+  usePersonRadar,
+  usePersonTrend,
+  usePersonnelDetail,
+} from "../api/queries";
 import { Button } from "../ui/Button";
 import { Modal } from "../ui/Modal";
 import { formatDate } from "../utils/dates";
+import type { EvaluationStatus } from "../types";
+
+/** توضیح فارسی «مرحلهٔ فعلی» یک پروندهٔ باز بر اساس وضعیت گردش‌کار — اینکه اکنون
+ * منتظر اقدام چه کسی است. */
+const IN_PROGRESS_STAGE_LABEL: Record<EvaluationStatus, string> = {
+  draft: "در حال نمره‌دهی توسط ارزیاب",
+  submitted: "در انتظار تأیید منابع انسانی",
+  hr_approved: "در انتظار تأیید معاونت",
+  deputy_approved: "در انتظار تأیید نهایی مدیرعامل",
+  finalized: "نهایی‌شده",
+};
 
 // یک رنگ واحد برای هر دو نمودار (تک‌سری‌اند: امتیاز یک نفر) — قبلاً یک گرادیانت
 // دو‌رنگه قرمز به طوسی تیره بود که باعث می‌شد پرشدگی رادار/ناحیه کدر و شلوغ به‌نظر
@@ -66,6 +82,7 @@ export function EmployeeProfileModal({
   const { data: personnel } = usePersonnelDetail(personnelId);
   const { data: radar = [] } = usePersonRadar(personnelId);
   const { data: trend = [] } = usePersonTrend(personnelId);
+  const { data: inProgress } = usePersonInProgress(personnelId);
 
   if (!personnel) {
     return (
@@ -116,6 +133,27 @@ export function EmployeeProfileModal({
             </div>
           )}
         </div>
+
+        {/* ارزیابی در جریان: مرحلهٔ فعلی گردش‌کار را همین‌جا نشان می‌دهد تا کاربر
+            بی‌نیاز از باز کردن صف/فهرست، وضعیت پروندهٔ باز فرد را ببیند. */}
+        {inProgress && (
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 rounded-2xl border border-amber-100 bg-amber-50/60 px-4 py-3">
+            <span aria-hidden className="relative flex h-2.5 w-2.5">
+              <span className="absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-60" style={{ animation: "var(--animate-pulse-slow)" }} />
+              <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-amber-500" />
+            </span>
+            <span className="text-sm font-semibold text-amber-900">ارزیابی در جریان</span>
+            <span className="text-xs text-amber-700">{inProgress.evaluation_code}</span>
+            <span className="mr-auto rounded-full bg-white/70 px-2.5 py-0.5 text-xs font-medium text-amber-800">
+              {IN_PROGRESS_STAGE_LABEL[inProgress.status]}
+            </span>
+            {inProgress.was_returned && (
+              <span className="rounded-full bg-red-50 px-2.5 py-0.5 text-xs font-medium text-red-700">
+                برگشت‌خورده
+              </span>
+            )}
+          </div>
+        )}
 
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
           <div>

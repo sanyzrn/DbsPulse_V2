@@ -8,6 +8,7 @@ from app.api.deps import get_current_user, require_roles
 from app.api.routers.personnel import _can_view_personnel
 from app.db.session import get_db
 from app.models.enums import EvaluationStatus, PersonnelStatus, UserRole
+from app.models.audit_log import AuditLog
 from app.models.evaluation import EvaluationRecord, EvaluationScore
 from app.models.evaluation_access import EvaluationAccess
 from app.models.indicator import Indicator
@@ -17,6 +18,7 @@ from app.schemas.auth import CurrentUser
 from app.schemas.dashboard import (
     DashboardOverview,
     EvaluatorStat,
+    InProgressEvaluation,
     IndicatorStat,
     PersonStat,
     PipelineStat,
@@ -245,3 +247,47 @@ def personnel_trend(
         )
         for r in records
     ]
+
+
+@router.get(
+    "/personnel/{personnel_id}/in-progress",
+    response_model=InProgressEvaluation | None,
+)
+def personnel_in_progress(
+    personnel_id: int,
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(get_current_user),
+) -> InProgressEvaluation | None:
+    """ارزیابی باز (نهایی‌نشدهٔ) جاری این پرسنل را برمی‌گرداند تا در پروفایل، «مرحلهٔ
+    فعلی» نمایش داده شود؛ اگر پرونده‌ای در جریان نباشد null برمی‌گردد. دسترسی مثل
+    رادار/روند محدود است (HR همه، ارزیاب فقط حوزهٔ خودش)."""
+    if not _can_view_personnel(db, personnel_id, current_user):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="دسترسی مجاز نیست")
+    record = db.scalar(
+        select(EvaluationRecord)
+        .where(
+            EvaluationRecord.subject_personnel_id == personnel_id,
+            EvaluationRecord.status != EvaluationStatus.finalized,
+        )
+        .order_by(EvaluationRecord.created_at.desc())
+    )
+    if record is None:
+        return None
+    was_returned = (
+        db.scalar(
+            select(AuditLog.id)
+            .where(
+                AuditLog.event_type == "evaluation_returned",
+                AuditLog.evaluation_record_id == record.id,
+            )
+            .limit(1)
+        )
+        is not None
+    )
+    return InProgressEvaluation(
+        evaluation_id=record.id,
+        evaluation_code=record.evaluation_code,
+        status=record.status,
+        was_returned=was_returned,
+        created_at=record.created_at,
+    )

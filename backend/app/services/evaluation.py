@@ -2,8 +2,8 @@ from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from app.core.constants import (
-    EVIDENCE_EXEMPT_SCORE,
     EVIDENCE_REQUIRED_MIN_WORDS,
+    EVIDENCE_REQUIRED_SCORES,
     FINAL_RESULT_THRESHOLDS,
     GENERAL_SECTION_WEIGHT,
     SPECIALIZED_SECTION_WEIGHT,
@@ -31,16 +31,17 @@ def recommendation_for(final_pct: float) -> str:
 
 
 def validate_evidence(scores: list[dict], indicators_by_id: dict[int, Indicator]) -> None:
-    """هر ردیف با score != 3 باید حداقل ۱۵ کلمه شواهد داشته باشد؛ هرگز به فرانت‌اند تنها اعتماد نمی‌شود."""
+    """فقط امتیازهای ۱ و ۵ به شواهد عینی (حداقل ۳ کلمه) نیاز دارند؛ برای ۲/۳/۴
+    اختیاری است. هرگز به اعتبارسنجی فرانت‌اند تنها اعتماد نمی‌شود."""
     violations = []
     for row in scores:
-        if row["score"] == EVIDENCE_EXEMPT_SCORE:
+        if row["score"] not in EVIDENCE_REQUIRED_SCORES:
             continue
         count = word_count(row.get("evidence_text"))
         if count < EVIDENCE_REQUIRED_MIN_WORDS:
             indicator = indicators_by_id.get(row["indicator_id"])
             label = indicator.category if indicator else f"شاخص #{row['indicator_id']}"
-            violations.append(f'«{label}» (حداقل ۱۵ کلمه لازم است، در حال حاضر: {count} کلمه)')
+            violations.append(f'«{label}» (حداقل ۳ کلمه لازم است، در حال حاضر: {count} کلمه)')
 
     if violations:
         raise ValueError(

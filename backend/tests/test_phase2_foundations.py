@@ -35,8 +35,9 @@ def test_config_endpoint_returns_business_rules(client, db_session):
     r = client.get("/api/config", headers=auth_header(user))
     assert r.status_code == 200
     body = r.json()
-    assert body["evidence_min_words"] == 15
-    assert body["evidence_exempt_score"] == 3
+    assert body["evidence_min_words"] == 3
+    assert body["evidence_max_words"] == 40
+    assert body["evidence_required_scores"] == [1, 5]
     assert body["general_section_weight"] == 0.6
     assert body["specialized_section_weight"] == 0.4
 

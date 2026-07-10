@@ -160,14 +160,14 @@ def test_submit_rejects_incomplete_evidence(client, db_session):
 
     indicators = active_indicators(db_session)
     scores = full_valid_scores(indicators)
-    # give the first indicator a non-3 score with insufficient evidence
+    # امتیاز ۵ شواهد اجباری دارد؛ ۲ کلمه کمتر از حداقل ۳ است → رد می‌شود
     scores[0]["score"] = 5
     scores[0]["evidence_text"] = "کلمه کلمه"
 
     client.put(f"/api/evaluations/{evaluation_id}/scores", json={"scores": scores}, headers=auth_header(sup))
     r = client.post(f"/api/evaluations/{evaluation_id}/submit", headers=auth_header(sup))
     assert r.status_code == 400
-    assert "حداقل ۱۵ کلمه" in r.json()["detail"]
+    assert "حداقل ۳ کلمه" in r.json()["detail"]
 
 
 def test_submit_rejects_incomplete_indicator_coverage(client, db_session):

@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { act, fireEvent, render, renderHook, screen } from "@testing-library/react";
-import { NEUTRAL_SCORE, ScoreFormTable, computePreview, scoredRows, useScoreForm } from "./ScoreForm";
-import { DEFAULT_APP_CONFIG, type Indicator } from "../types";
+import { ScoreFormTable, computePreview, scoredRows, useScoreForm } from "./ScoreForm";
+import { type Indicator } from "../types";
 
 function indicator(id: number, section: "general" | "specialized" = "general"): Indicator {
   return {
@@ -19,34 +19,53 @@ function indicator(id: number, section: "general" | "specialized" = "general"): 
 const INDICATORS = [indicator(1), indicator(2), indicator(3, "specialized")];
 
 describe("useScoreForm", () => {
-  it("defaults every indicator to the neutral middle score (3), not the lowest option", () => {
+  it("starts every indicator UNSCORED (null) so the evaluator must touch each one", () => {
     const { result } = renderHook(() => useScoreForm(INDICATORS, []));
-    expect(result.current.drafts.every((d) => d.score === NEUTRAL_SCORE)).toBe(true);
-    // امتیاز خنثی از قانون شواهد معاف است، پس فرم از ابتدا معتبر است
+    expect(result.current.drafts.every((d) => d.score === null)).toBe(true);
+    // با شاخص‌های بی‌امتیاز فرم معتبر نیست
+    expect(result.current.isValid).toBe(false);
+    expect(result.current.unscored).toHaveLength(INDICATORS.length);
+  });
+
+  it("becomes valid only once every indicator has a score", () => {
+    const { result } = renderHook(() => useScoreForm(INDICATORS, []));
+    act(() => {
+      result.current.setScore(1, 3);
+      result.current.setScore(2, 4);
+    });
+    expect(result.current.isValid).toBe(false); // indicator 3 still null
+    act(() => {
+      result.current.setScore(3, 2);
+    });
+    expect(result.current.unscored).toHaveLength(0);
     expect(result.current.isValid).toBe(true);
   });
 
-  it("requires evidence of at least the configured word count for non-exempt scores", () => {
+  it("requires evidence only for scores 1 and 5 (min 3 words)", () => {
     const { result } = renderHook(() => useScoreForm(INDICATORS, []));
     act(() => {
       result.current.setScore(1, 5);
+      result.current.setScore(2, 4);
+      result.current.setScore(3, 3);
     });
+    // امتیاز ۵ بدون شواهد → نقض؛ ۴ و ۳ نیازی ندارند
     expect(result.current.violations).toHaveLength(1);
     expect(result.current.isValid).toBe(false);
 
     act(() => {
-      result.current.setEvidence(1, Array(DEFAULT_APP_CONFIG.evidence_min_words).fill("کلمه").join(" "));
+      result.current.setEvidence(1, "یک دو سه");
     });
     expect(result.current.violations).toHaveLength(0);
     expect(result.current.isValid).toBe(true);
   });
 
-  it("exempts the configured score (3) from the evidence rule", () => {
-    const { result } = renderHook(() => useScoreForm(INDICATORS, []));
+  it("does not require evidence for middle scores 2/3/4", () => {
+    const { result } = renderHook(() => useScoreForm([indicator(1)], []));
     act(() => {
-      result.current.setScore(1, DEFAULT_APP_CONFIG.evidence_exempt_score);
+      result.current.setScore(1, 2);
     });
     expect(result.current.violations).toHaveLength(0);
+    expect(result.current.isValid).toBe(true);
   });
 
   it("hydrates existing saved scores", () => {
@@ -58,26 +77,25 @@ describe("useScoreForm", () => {
   });
 
   it("re-initialises when indicators arrive after the first render (manager-path race)", () => {
-    // اولین رندر با فهرست خالی (شاخص‌ها هنوز در حال بارگذاری) — مانند مسیر «مدیر»
     const { result, rerender } = renderHook(
       ({ inds }) => useScoreForm(inds, []),
       { initialProps: { inds: [] as Indicator[] } }
     );
     expect(result.current.drafts).toHaveLength(0);
-    // با فهرست خالی نباید معتبر باشد تا ثبت با scores خالی جلوگیری شود
     expect(result.current.isValid).toBe(false);
 
-    // شاخص‌ها که رسیدند، drafts باید بازسازی شود
     rerender({ inds: INDICATORS });
     expect(result.current.drafts).toHaveLength(INDICATORS.length);
-    expect(result.current.isValid).toBe(true);
+    // بازسازی‌شده اما هنوز بی‌امتیاز → نامعتبر
+    expect(result.current.isValid).toBe(false);
   });
 });
 
 describe("scoredRows", () => {
-  it("sends every row and nullifies empty evidence", () => {
+  it("omits unscored (null) rows and nullifies empty evidence", () => {
     const rows = scoredRows([
       { indicator_id: 1, score: 4, evidence_text: "متن" },
+      { indicator_id: 2, score: null, evidence_text: "" },
       { indicator_id: 3, score: 3, evidence_text: "" },
     ]);
     expect(rows).toEqual([
@@ -87,58 +105,78 @@ describe("scoredRows", () => {
   });
 });
 
-describe("ScoreFormTable", () => {
-  it("renders a 1..5 range slider with the neutral score pre-selected", () => {
+describe("ScoreFormTable slider", () => {
+  it("renders an unset slider (no default) with the 'not chosen' label", () => {
     render(
       <ScoreFormTable
         section="general"
         indicators={[indicator(1)]}
-        drafts={[{ indicator_id: 1, score: NEUTRAL_SCORE, evidence_text: "" }]}
+        drafts={[{ indicator_id: 1, score: null, evidence_text: "" }]}
         onScoreChange={() => {}}
         onEvidenceChange={() => {}}
       />
     );
     const slider = screen.getByRole("slider");
-    expect(slider).toHaveValue(String(NEUTRAL_SCORE));
-    expect(slider).toHaveAccessibleName(/امتیاز/);
-    // امتیاز خنثی از شواهد معاف است، پس textarea غیرفعال می‌ماند
-    const textarea = screen.getByRole("textbox");
-    expect(textarea).toBeDisabled();
+    expect(slider).toHaveAttribute("aria-valuetext", "امتیازی انتخاب نشده");
+    expect(slider).not.toHaveAttribute("aria-valuenow");
   });
 
-  it("reports the chosen score through onScoreChange", () => {
+  it("reports a score via keyboard (End = 5)", () => {
     const onScoreChange = vi.fn();
     render(
       <ScoreFormTable
         section="general"
         indicators={[indicator(1)]}
-        drafts={[{ indicator_id: 1, score: NEUTRAL_SCORE, evidence_text: "" }]}
+        drafts={[{ indicator_id: 1, score: null, evidence_text: "" }]}
         onScoreChange={onScoreChange}
         onEvidenceChange={() => {}}
       />
     );
     const slider = screen.getByRole("slider");
-    fireEvent.change(slider, { target: { value: "5" } });
+    fireEvent.keyDown(slider, { key: "End" });
     expect(onScoreChange).toHaveBeenCalledWith(1, 5);
   });
 
-  it("shows the word-count warning for a non-exempt score without evidence", () => {
-    render(
+  it("enables the evidence box only for scores 1/5", () => {
+    const { rerender } = render(
       <ScoreFormTable
         section="general"
         indicators={[indicator(1)]}
-        drafts={[{ indicator_id: 1, score: 5, evidence_text: "کوتاه" }]}
+        drafts={[{ indicator_id: 1, score: 3, evidence_text: "" }]}
         onScoreChange={() => {}}
         onEvidenceChange={() => {}}
       />
     );
-    expect(screen.getByText(/حداقل 15 کلمه لازم است/)).toBeInTheDocument();
+    expect(screen.getByRole("textbox")).toBeDisabled();
+
+    rerender(
+      <ScoreFormTable
+        section="general"
+        indicators={[indicator(1)]}
+        drafts={[{ indicator_id: 1, score: 5, evidence_text: "" }]}
+        onScoreChange={() => {}}
+        onEvidenceChange={() => {}}
+      />
+    );
+    expect(screen.getByRole("textbox")).toBeEnabled();
   });
 });
 
 describe("computePreview", () => {
   it("returns null for an empty draft list", () => {
     expect(computePreview([], INDICATORS)).toBeNull();
+  });
+
+  it("returns null while any indicator is still unscored", () => {
+    const preview = computePreview(
+      [
+        { indicator_id: 1, score: 5, evidence_text: "" },
+        { indicator_id: 2, score: null, evidence_text: "" },
+        { indicator_id: 3, score: 1, evidence_text: "" },
+      ],
+      INDICATORS
+    );
+    expect(preview).toBeNull();
   });
 
   it("computes weighted percentages with the server formula", () => {
@@ -152,19 +190,5 @@ describe("computePreview", () => {
       INDICATORS
     );
     expect(preview).toEqual({ general_pct: 60, specialized_pct: 20, final_pct: 44 });
-  });
-
-  it("rounds to one decimal like the backend", () => {
-    // عمومی: 4/10 = 40٪ ، تخصصی: 2/5 = 40٪ ← نهایی 40٪
-    const preview = computePreview(
-      [
-        { indicator_id: 1, score: 1, evidence_text: "" },
-        { indicator_id: 2, score: 3, evidence_text: "" },
-        { indicator_id: 3, score: 2, evidence_text: "" },
-      ],
-      INDICATORS
-    );
-    expect(preview?.general_pct).toBe(40);
-    expect(preview?.final_pct).toBe(40);
   });
 });

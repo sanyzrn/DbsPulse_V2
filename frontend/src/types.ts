@@ -250,14 +250,17 @@ export interface Page<T> {
 
 export interface AppConfig {
   evidence_min_words: number;
-  evidence_exempt_score: number;
+  evidence_max_words: number;
+  /** امتیازهایی که شواهد عینی برایشان اجباری است (پیش‌فرض [۱، ۵]). */
+  evidence_required_scores: number[];
   general_section_weight: number;
   specialized_section_weight: number;
 }
 
 export const DEFAULT_APP_CONFIG: AppConfig = {
-  evidence_min_words: 15,
-  evidence_exempt_score: 3,
+  evidence_min_words: 3,
+  evidence_max_words: 40,
+  evidence_required_scores: [1, 5],
   general_section_weight: 0.6,
   specialized_section_weight: 0.4,
 };

@@ -491,7 +491,7 @@ function EditableScoring({
   const { showSuccess, showError } = useToast();
   const confirm = useConfirm();
   const navigate = useNavigate();
-  const { drafts, setScore, setEvidence, violations, isValid } = useScoreForm(
+  const { drafts, setScore, setEvidence, violations, unscored, isValid } = useScoreForm(
     indicators,
     existing,
     config
@@ -591,7 +591,7 @@ function EditableScoring({
             <circle cx="10" cy="10" r="8" />
             <path d="M10 6v4l2 2" />
           </svg>
-          همه شاخص‌ها روی امتیاز خنثی (۳) شروع می‌شوند؛ امتیاز هر شاخص را متناسب با عملکرد تنظیم کنید.
+          برای هر شاخص باید امتیازی انتخاب کنید؛ تا وقتی حتی یک شاخص بی‌امتیاز باشد، ثبت نهایی فعال نمی‌شود.
         </p>
         <p className={`flex items-center gap-1.5 text-xs font-medium ${dirty ? "text-amber-600" : "text-pulse-600"}`}>
           {saving ? (
@@ -690,14 +690,19 @@ function EditableScoring({
         <Button
           onClick={submit}
           disabled={saving || !isValid}
-          title={!isValid ? "برخی شاخص‌ها هنوز شواهد کافی ندارند" : undefined}
+          title={!isValid ? "همهٔ شاخص‌ها باید امتیاز داشته باشند و شواهد امتیازهای ۱ و ۵ کامل باشد" : undefined}
         >
           ثبت ارزیابی
         </Button>
       </div>
-      {violations.length > 0 && (
+      {unscored.length > 0 && (
         <p className="text-left text-xs text-red-600">
-          {violations.length.toLocaleString("fa-IR")} شاخص هنوز شواهد کافی ندارد.
+          هنوز {unscored.length.toLocaleString("fa-IR")} شاخص امتیازی ندارد.
+        </p>
+      )}
+      {unscored.length === 0 && violations.length > 0 && (
+        <p className="text-left text-xs text-red-600">
+          {violations.length.toLocaleString("fa-IR")} شاخص (امتیاز ۱ یا ۵) هنوز شواهد کافی ندارد.
         </p>
       )}
     </div>

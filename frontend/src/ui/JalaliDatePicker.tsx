@@ -280,7 +280,7 @@ export function JalaliDatePicker({
                       </svg>
                     </button>
                     <span className="text-xs font-medium text-gray-500">
-                      {toPersianDigits(years[0])} – {toPersianDigits(years[years.length - 1])}
+                      {toPersianDigits(yearWindowStart)} – {toPersianDigits(yearWindowStart + 11)}
                     </span>
                     <button
                       type="button"

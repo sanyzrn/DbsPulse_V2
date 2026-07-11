@@ -326,7 +326,9 @@ export function ReportsSection() {
         subtitle="امتیاز نهایی وزنی (٪) — با فیلترهای فعال"
         filename="avg-by-unit.png"
       >
-        {unitChartData.length === 0 ? (
+        {summaryPending ? (
+          <TableSkeleton rows={4} />
+        ) : unitChartData.length === 0 ? (
           <EmptyState>برای فیلترهای فعلی داده‌ای وجود ندارد.</EmptyState>
         ) : (
           <div style={{ height: Math.max(280, unitChartData.length * 54) }}>
@@ -351,7 +353,9 @@ export function ReportsSection() {
         subtitle="میانگین امتیاز هر شاخص در همهٔ پرسنل منطبق با فیلتر"
         filename="avg-by-indicator.png"
       >
-        {indicatorChartData.length === 0 ? (
+        {summaryPending ? (
+          <TableSkeleton rows={5} />
+        ) : indicatorChartData.length === 0 ? (
           <EmptyState>برای فیلترهای فعلی داده‌ای وجود ندارد.</EmptyState>
         ) : (
           <div style={{ height: Math.max(320, indicatorChartData.length * 34) }}>

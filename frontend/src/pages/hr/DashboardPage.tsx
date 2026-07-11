@@ -27,10 +27,11 @@ import {
   usePersonTrend,
   usePersonnelList,
 } from "../../api/queries";
-import { ExcelExportButton } from "../../components/ExcelExportButton";
+import { RoleOverviewCards } from "../../components/RoleOverviewCards";
 import { StatusBadge } from "../../components/StatusBadge";
 import { useToast } from "../../components/Toast";
 import { ReportsSection } from "./ReportsSection";
+import { PageHeader } from "../../ui/Card";
 import { CountUp, PctBadge, ScoreRing } from "../../ui/Meters";
 import { Table } from "../../ui/Table";
 import { formatDate } from "../../utils/dates";
@@ -56,8 +57,14 @@ const TOOLTIP_STYLE = {
   backdropFilter: "blur(8px)",
 };
 
+const DASHBOARD_TABS = [
+  { key: "overview" as const, label: "نمای کلی" },
+  { key: "analysis" as const, label: "تحلیل و گزارش‌ها" },
+];
+
 export function DashboardPage() {
   const [selectedPersonId, setSelectedPersonId] = useState<number | null>(null);
+  const [tab, setTab] = useState<"overview" | "analysis">("overview");
 
   const { data: overview, error: overviewError } = useDashboardOverview();
   const { data: personnelPage } = usePersonnelList({ limit: 1000, offset: 0 });
@@ -72,15 +79,34 @@ export function DashboardPage() {
 
   return (
     <div className="space-y-5">
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-extrabold text-gray-900">داشبورد تحلیلی</h1>
-          <p className="mt-1 text-sm text-gray-500">نمای کلی از وضعیت ارزیابی‌های عملکرد سازمان</p>
-          <div className="mt-3 h-0.5 w-16 rounded-full bg-pulse-500" />
-        </div>
-        <ExcelExportButton url="/evaluations/export.xlsx" filename="evaluations.xlsx" />
+      <PageHeader
+        title="داشبورد منابع انسانی"
+        subtitle="خلاصهٔ وضعیت ارزیابی‌ها و گزارش‌های تحلیلی سازمان"
+      />
+
+      {/* خلاصهٔ سریع نقش — همیشه بالای صفحه دیده می‌شود */}
+      <RoleOverviewCards />
+
+      {/* تب‌ها: نمای کلی (خلاصه) و تحلیل/گزارش‌ها — تا صفحه به‌جای یک اسکرول طولانی و
+          شلوغ، به دو بخش تمیز تقسیم شود. */}
+      <div role="tablist" className="inline-flex flex-wrap gap-1 rounded-2xl border border-gray-100 bg-white p-1 shadow-sm">
+        {DASHBOARD_TABS.map((t) => (
+          <button
+            key={t.key}
+            role="tab"
+            aria-selected={tab === t.key}
+            onClick={() => setTab(t.key)}
+            className={`rounded-xl px-4 py-1.5 text-sm font-medium transition-colors ${
+              tab === t.key ? "bg-charcoal-900 text-white" : "text-gray-600 hover:text-gray-900"
+            }`}
+          >
+            {t.label}
+          </button>
+        ))}
       </div>
 
+      {tab === "overview" && (
+      <div className="space-y-5">
       {/* ── کارت‌های خلاصه بالایی ── */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {/* کل ارزیابی‌ها */}
@@ -142,10 +168,14 @@ export function DashboardPage() {
 
       <PipelineCard />
 
+      <ExpiringContractsCard />
+      </div>
+      )}
+
+      {tab === "analysis" && (
+      <div className="space-y-5">
       {/* ── نمودار میله‌ای میانگین به تفکیک واحد ── */}
       <BarByOrgUnitCard data={overview.by_org_unit} />
-
-      <ExpiringContractsCard />
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <Table
@@ -284,8 +314,10 @@ export function DashboardPage() {
         )}
       </div>
 
-      {/* ── گزارش‌های تحلیلی فیلترشونده (بخش جدید) ── */}
+      {/* ── گزارش‌های تحلیلی فیلترشونده ── */}
       <ReportsSection />
+      </div>
+      )}
     </div>
   );
 }

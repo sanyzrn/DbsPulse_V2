@@ -317,7 +317,7 @@ export function EvaluationList({
               >
                 مشاهده
                 <svg viewBox="0 0 20 20" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M7 5l5 5-5 5" />
+                  <path d="M13 5l-5 5 5 5" />
                 </svg>
               </button>,
             ])}

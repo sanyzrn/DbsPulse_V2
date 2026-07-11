@@ -11,6 +11,8 @@ import { EASE_SOFT } from "../ui/motion";
 
 const NAV_BY_ROLE: Record<string, { to: string; label: string }[]> = {
   hr: [
+    // داشبورد صفحهٔ فرودِ HR است (خلاصهٔ وضعیت)، پس اول فهرست می‌آید.
+    { to: "/hr/dashboard", label: "داشبورد" },
     { to: "/hr/personnel", label: "پرسنل" },
     { to: "/hr/users", label: "کاربران" },
     { to: "/hr/indicators", label: "شاخص‌ها" },
@@ -20,7 +22,6 @@ const NAV_BY_ROLE: Record<string, { to: string; label: string }[]> = {
       ? [{ to: "/hr/periods", label: "دوره‌های ارزیابی" }]
       : []),
     { to: "/hr/improvement-plans", label: "برنامه‌های بهبود" },
-    { to: "/hr/dashboard", label: "داشبورد تحلیلی" },
     { to: "/hr/audit-log", label: "گزارش رویدادها" },
   ],
   unit_supervisor: [{ to: "/supervisor", label: "افراد زیرمجموعه" }],

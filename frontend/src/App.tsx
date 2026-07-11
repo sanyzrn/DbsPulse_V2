@@ -84,7 +84,7 @@ function HomeRedirect() {
   const { user } = useAuth();
   if (!user) return <Navigate to="/login" replace />;
   const targetByRole: Record<string, string> = {
-    hr: "/hr/personnel",
+    hr: "/hr/dashboard",
     unit_supervisor: "/supervisor",
     deputy: "/deputy",
     ceo: "/ceo",

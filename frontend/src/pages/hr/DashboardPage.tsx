@@ -33,6 +33,7 @@ import { useToast } from "../../components/Toast";
 import { ReportsSection } from "./ReportsSection";
 import { PageHeader } from "../../ui/Card";
 import { CountUp, PctBadge, ScoreRing } from "../../ui/Meters";
+import { TAB_TRANSITION } from "../../ui/motion";
 import { Table } from "../../ui/Table";
 import { formatDate } from "../../utils/dates";
 import type { EvaluationStatus } from "../../types";
@@ -114,7 +115,7 @@ export function DashboardPage() {
       </div>
 
       {tab === "overview" && (
-      <div className="space-y-5">
+      <motion.div key="overview-tab" {...TAB_TRANSITION} className="space-y-5">
       {/* ── کارت‌های خلاصه بالایی ── */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {/* کل ارزیابی‌ها */}
@@ -177,11 +178,11 @@ export function DashboardPage() {
       <PipelineCard />
 
       <ExpiringContractsCard />
-      </div>
+      </motion.div>
       )}
 
       {tab === "analysis" && (
-      <div className="space-y-5">
+      <motion.div key="analysis-tab" {...TAB_TRANSITION} className="space-y-5">
       {/* زیرتب‌های تحلیل — سبک‌تر از تب‌های اصلی تا سلسله‌مراتب مشخص باشد */}
       <div role="tablist" className="inline-flex flex-wrap gap-1 rounded-xl border border-gray-100 bg-gray-50 p-1">
         {ANALYSIS_SUBTABS.map((t) => (
@@ -190,7 +191,7 @@ export function DashboardPage() {
             role="tab"
             aria-selected={analysisTab === t.key}
             onClick={() => setAnalysisTab(t.key)}
-            className={`rounded-lg px-3.5 py-1.5 text-sm font-medium transition-colors ${
+            className={`rounded-lg px-3.5 py-1.5 text-sm font-medium transition-all duration-300 ${
               analysisTab === t.key ? "bg-white text-pulse-700 shadow-sm" : "text-gray-500 hover:text-gray-800"
             }`}
           >
@@ -198,6 +199,9 @@ export function DashboardPage() {
           </button>
         ))}
       </div>
+
+      {/* محتوای زیرتب‌ها با تعویض نرم (fade) هنگام جابه‌جایی */}
+      <motion.div key={analysisTab} {...TAB_TRANSITION} className="space-y-5">
 
       {analysisTab === "org" && (
       <div className="space-y-5">
@@ -347,7 +351,8 @@ export function DashboardPage() {
 
       {/* ── گزارش‌های تحلیلی فیلترشونده ── */}
       {analysisTab === "reports" && <ReportsSection />}
-      </div>
+      </motion.div>
+      </motion.div>
       )}
     </div>
   );

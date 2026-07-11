@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { animate, motion, useMotionValue } from "motion/react";
 import { DEFAULT_APP_CONFIG, type AppConfig, type Indicator, type EvaluationScoreRow } from "../types";
 
 function wordCount(text: string): number {
@@ -152,12 +151,10 @@ export function scoredRows(drafts: ScoreDraft[]) {
     }));
 }
 
-const THUMB = 22;
-
-/** اسلایدر امتیازدهی ۱ تا ۵ — کاملاً کنترل‌شده با pointer/keyboard و انیمیشن نرم فنری
- * (motion). در RTL امتیاز ۱ سمت راست و ۵ سمت چپ است؛ فلش چپ امتیاز را زیاد و فلش راست
- * کم می‌کند (thumb همان‌طور که فلش نشان می‌دهد حرکت می‌کند). حالت null (بی‌امتیاز) با
- * thumb خاکستریِ کم‌رنگ در وسط نشان داده می‌شود. */
+/** اسلایدر امتیازدهی ۱ تا ۵ — کنترل‌شده با pointer/keyboard. در RTL امتیاز ۵ سمت چپ
+ * (۰٪) و امتیاز ۱ سمت راست (۱۰۰٪) است. موقعیت thumb در هر رندر به‌صورت درصدی از عرضِ
+ * فعلیِ track محاسبه می‌شود (نه پیکسلِ اندازه‌گیری‌شده)، تا با تغییر عرض ستون‌های جدول
+ * هرگز از روی track بیرون نزند. حالت null (بی‌امتیاز) با thumb خاکستری در وسط. */
 export function SegmentedScore({
   value,
   onChange,
@@ -168,33 +165,10 @@ export function SegmentedScore({
   label?: string;
 }) {
   const trackRef = useRef<HTMLDivElement>(null);
-  const [innerTravel, setInnerTravel] = useState(0);
-  const x = useMotionValue(0);
-  const draggingRef = useRef(false);
+  const [dragging, setDragging] = useState(false);
 
-  // موقعیت افقی (px از لبهٔ چپ) برای هر امتیاز: ۵ سمت چپ (x=0)، ۱ سمت راست.
-  const xForValue = (v: number) => ((5 - v) / 4) * innerTravel;
-
-  // اندازه‌گیری عرض track و به‌روزرسانی با تغییر اندازهٔ پنجره
-  useEffect(() => {
-    function measure() {
-      if (trackRef.current) {
-        setInnerTravel(Math.max(0, trackRef.current.offsetWidth - THUMB));
-      }
-    }
-    measure();
-    window.addEventListener("resize", measure);
-    return () => window.removeEventListener("resize", measure);
-  }, []);
-
-  // با تغییر value (یا اندازه)، thumb با فنر نرم به موقعیت جدید سُر می‌خورد
-  useEffect(() => {
-    if (draggingRef.current) return;
-    const target = xForValue(value ?? 3);
-    const controls = animate(x, target, { type: "spring", stiffness: 320, damping: 34, mass: 0.6 });
-    return controls.stop;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [value, innerTravel]);
+  // درصد موقعیت thumb از لبهٔ چپ: امتیاز ۵ → ۰٪، امتیاز ۱ → ۱۰۰٪.
+  const pct = ((5 - (value ?? 3)) / 4) * 100;
 
   function valueFromClientX(clientX: number): number {
     const rect = trackRef.current!.getBoundingClientRect();
@@ -202,15 +176,22 @@ export function SegmentedScore({
     return Math.min(5, Math.max(1, Math.round(5 - frac * 4)));
   }
 
-  function onTrackPointerDown(e: React.PointerEvent) {
-    // کلیک روی خودِ track (نه درگ thumb) → پرش به نزدیک‌ترین پله
-    if ((e.target as HTMLElement).dataset.thumb) return;
+  function onPointerDown(e: React.PointerEvent) {
+    e.currentTarget.setPointerCapture?.(e.pointerId);
+    setDragging(true);
     onChange(valueFromClientX(e.clientX));
+  }
+  function onPointerMove(e: React.PointerEvent) {
+    if (!dragging) return;
+    onChange(valueFromClientX(e.clientX));
+  }
+  function endDrag(e: React.PointerEvent) {
+    setDragging(false);
+    e.currentTarget.releasePointerCapture?.(e.pointerId);
   }
 
   function onKeyDown(e: React.KeyboardEvent) {
-    // فقط وقتی خودِ اسلایدر فوکوس دارد این هندلر اجرا می‌شود؛ پس فلش‌ها داخل textareaِ
-    // مجاور، مکان‌نما را جابه‌جا می‌کنند نه امتیاز را. preventDefault جلوی اسکرول صفحه را می‌گیرد.
+    // فلش چپ/بالا امتیاز را زیاد و فلش راست/پایین کم می‌کند (هم‌راستا با جهت RTL track).
     const eff = value ?? 3;
     if (e.key === "ArrowLeft" || e.key === "ArrowUp") {
       e.preventDefault();
@@ -243,14 +224,16 @@ export function SegmentedScore({
         aria-valuetext={valueText}
         onKeyDown={onKeyDown}
         title={valueText}
-        className="group relative rounded-lg py-2 outline-none focus-visible:ring-2 focus-visible:ring-pulse-300"
-        style={{ touchAction: "pan-y" }}
+        className="group relative rounded-lg py-2.5 outline-none focus-visible:ring-2 focus-visible:ring-pulse-300"
       >
         {/* track با گرادیانت قرمز→سبز (RTL: قرمز راست، سبز چپ) */}
         <div
           ref={trackRef}
-          onPointerDown={onTrackPointerDown}
-          className="relative h-2 w-full rounded-full"
+          onPointerDown={onPointerDown}
+          onPointerMove={onPointerMove}
+          onPointerUp={endDrag}
+          onPointerCancel={endDrag}
+          className="relative h-2 w-full cursor-pointer touch-none rounded-full"
           style={{
             background: "linear-gradient(to left, #ef4444, #f97316, #f59e0b, #84cc16, #10b981)",
             opacity: isSet ? 1 : 0.5,
@@ -261,32 +244,25 @@ export function SegmentedScore({
             <span
               key={n}
               aria-hidden
-              className="absolute top-1/2 h-1 w-1 -translate-y-1/2 rounded-full bg-white/70"
-              style={{ left: `calc(${((5 - n) / 4) * 100}% )`, transform: "translate(-50%, -50%)" }}
+              className="absolute top-1/2 h-1 w-1 rounded-full bg-white/70"
+              style={{ left: `${((5 - n) / 4) * 100}%`, transform: "translate(-50%, -50%)" }}
             />
           ))}
-          {/* thumb */}
-          <motion.div
-            data-thumb="1"
-            drag="x"
-            dragConstraints={{ left: 0, right: innerTravel }}
-            dragElastic={0}
-            dragMomentum={false}
-            onDragStart={() => {
-              draggingRef.current = true;
+          {/* thumb — موقعیت درصدی، همیشه روی track */}
+          <div
+            aria-hidden
+            className={`absolute top-1/2 flex h-[22px] w-[22px] items-center justify-center rounded-full border-[3px] bg-white shadow-md ${
+              dragging ? "cursor-grabbing" : "cursor-grab"
+            } ${isSet ? "" : "opacity-70"}`}
+            style={{
+              left: `${pct}%`,
+              transform: "translate(-50%, -50%)",
+              borderColor: color,
+              transition: dragging ? "none" : "left 0.18s ease-out",
             }}
-            onDragEnd={() => {
-              draggingRef.current = false;
-              const frac = innerTravel ? x.get() / innerTravel : 0;
-              onChange(Math.min(5, Math.max(1, Math.round(5 - frac * 4))));
-            }}
-            style={{ x, background: "#fff", borderColor: color }}
-            className={`absolute top-1/2 flex h-[22px] w-[22px] -translate-y-1/2 cursor-grab items-center justify-center rounded-full border-[3px] shadow-md active:cursor-grabbing ${
-              isSet ? "" : "opacity-70"
-            }`}
           >
             <span className="h-2 w-2 rounded-full" style={{ background: color }} />
-          </motion.div>
+          </div>
         </div>
       </div>
       <div className="mt-1 flex items-center justify-between text-[10px] text-gray-400">

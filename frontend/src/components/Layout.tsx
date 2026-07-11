@@ -11,6 +11,8 @@ import { EASE_SOFT } from "../ui/motion";
 
 const NAV_BY_ROLE: Record<string, { to: string; label: string }[]> = {
   hr: [
+    // داشبورد صفحهٔ فرودِ HR است (خلاصهٔ وضعیت)، پس اول فهرست می‌آید.
+    { to: "/hr/dashboard", label: "داشبورد" },
     { to: "/hr/personnel", label: "پرسنل" },
     { to: "/hr/users", label: "کاربران" },
     { to: "/hr/indicators", label: "شاخص‌ها" },
@@ -20,7 +22,6 @@ const NAV_BY_ROLE: Record<string, { to: string; label: string }[]> = {
       ? [{ to: "/hr/periods", label: "دوره‌های ارزیابی" }]
       : []),
     { to: "/hr/improvement-plans", label: "برنامه‌های بهبود" },
-    { to: "/hr/dashboard", label: "داشبورد تحلیلی" },
     { to: "/hr/audit-log", label: "گزارش رویدادها" },
   ],
   unit_supervisor: [{ to: "/supervisor", label: "افراد زیرمجموعه" }],
@@ -83,9 +84,11 @@ export function Layout() {
             </div>
           </div>
 
-          {/* ناوبری — در عرض‌های کم به‌صورت افقی اسکرول می‌خورد */}
+          {/* ناوبری — در عرض‌های کم آیتم‌ها به خط بعد می‌شکنند (wrap) به‌جای اسکرول
+              افقی؛ اسکرول افقی یک اسکرول‌بار ۶ پیکسلیِ قرمز پایین منو می‌ساخت که هم
+              ارتفاع کم منو را می‌بلعید و هم زشت بود. */}
           <nav className="border-t border-gray-100 px-3 py-2 sm:px-4" aria-label="منوی اصلی">
-            <ul className="flex gap-1 overflow-x-auto">
+            <ul className="flex flex-wrap gap-1">
               {links.map((link) => (
                 <li key={link.to}>
                   <NavLink to={link.to} className={navLinkClass}>

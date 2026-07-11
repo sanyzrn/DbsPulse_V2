@@ -172,8 +172,9 @@ export function EvaluationDetailPage() {
   return (
     <div className="space-y-4">
       <button onClick={() => navigate(-1)} className="inline-flex items-center gap-1 text-sm font-medium text-gray-500 transition-colors hover:text-gray-700">
+        {/* RTL: فلش «بازگشت» به سمت راست است */}
         <svg viewBox="0 0 20 20" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M13 5l-5 5 5 5" />
+          <path d="M7 5l5 5-5 5" />
         </svg>
         بازگشت
       </button>

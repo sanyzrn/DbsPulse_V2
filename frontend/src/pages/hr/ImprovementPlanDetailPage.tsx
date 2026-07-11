@@ -138,8 +138,9 @@ export function ImprovementPlanDetailPage() {
   return (
     <div className="space-y-4">
       <Link to="/hr/improvement-plans" className="inline-flex items-center gap-1 text-sm font-medium text-pulse-600 hover:text-pulse-700">
+        {/* RTL: فلش «بازگشت» به سمت راست است */}
         <svg viewBox="0 0 20 20" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M13 5l-5 5 5 5" />
+          <path d="M7 5l5 5-5 5" />
         </svg>
         بازگشت به فهرست
       </Link>

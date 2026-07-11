@@ -83,9 +83,11 @@ export function Layout() {
             </div>
           </div>
 
-          {/* ناوبری — در عرض‌های کم به‌صورت افقی اسکرول می‌خورد */}
+          {/* ناوبری — در عرض‌های کم آیتم‌ها به خط بعد می‌شکنند (wrap) به‌جای اسکرول
+              افقی؛ اسکرول افقی یک اسکرول‌بار ۶ پیکسلیِ قرمز پایین منو می‌ساخت که هم
+              ارتفاع کم منو را می‌بلعید و هم زشت بود. */}
           <nav className="border-t border-gray-100 px-3 py-2 sm:px-4" aria-label="منوی اصلی">
-            <ul className="flex gap-1 overflow-x-auto">
+            <ul className="flex flex-wrap gap-1">
               {links.map((link) => (
                 <li key={link.to}>
                   <NavLink to={link.to} className={navLinkClass}>

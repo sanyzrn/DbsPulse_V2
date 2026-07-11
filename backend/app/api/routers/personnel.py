@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user, require_roles
 from app.db.session import get_db
-from app.models.enums import EvaluationStatus, UserRole
+from app.models.enums import EvaluationStatus, PersonnelStatus, UserRole
 from app.models.evaluation import EvaluationRecord
 from app.models.evaluation_access import EvaluationAccess
 from app.models.personnel import Personnel
@@ -15,6 +15,49 @@ from app.services.audit import log_event
 from app.services.excel import build_personnel_workbook
 
 router = APIRouter(prefix="/api/personnel", tags=["personnel"])
+
+# ستون‌های مجاز برای مرتب‌سازی فهرست پرسنل — با نگاشت صریح تا کاربر نتواند نام
+# ستون دلخواه تزریق کند.
+_PERSONNEL_SORT_COLUMNS = {
+    "full_name": Personnel.full_name,
+    "personnel_code": Personnel.personnel_code,
+    "org_unit": Personnel.org_unit,
+    "job_title": Personnel.job_title,
+    "contract_end_date": Personnel.contract_end_date,
+    "created_at": Personnel.created_at,
+}
+
+
+def _apply_personnel_filters(
+    query,
+    *,
+    q: str | None,
+    status_filter: PersonnelStatus | None,
+    org_unit: str | None,
+    is_manager: bool | None,
+):
+    """فیلترهای ترکیب‌پذیر فهرست/خروجی پرسنل — یک‌جا تا list و export.xlsx رفتار
+    یکسان داشته باشند."""
+    if q:
+        pattern = f"%{q.strip()}%"
+        query = query.where(
+            Personnel.full_name.ilike(pattern)
+            | Personnel.personnel_code.ilike(pattern)
+            | Personnel.job_title.ilike(pattern)
+            | Personnel.org_unit.ilike(pattern)
+        )
+    if status_filter is not None:
+        query = query.where(Personnel.status == status_filter)
+    if org_unit:
+        query = query.where(Personnel.org_unit == org_unit)
+    if is_manager is not None:
+        query = query.where(Personnel.is_manager == is_manager)
+    return query
+
+
+def _personnel_order_by(sort_by: str, sort_dir: str):
+    column = _PERSONNEL_SORT_COLUMNS.get(sort_by, Personnel.full_name)
+    return column.desc() if sort_dir == "desc" else column.asc()
 
 _ACCESS_COLUMN_BY_ROLE = {
     UserRole.unit_supervisor: EvaluationAccess.unit_supervisor_user_id,
@@ -50,6 +93,11 @@ def _can_view_personnel(db: Session, personnel_id: int, current_user: CurrentUse
 def list_personnel(
     accessible_to_me: bool = False,
     q: str | None = None,
+    status_filter: PersonnelStatus | None = Query(default=None, alias="status"),
+    org_unit: str | None = None,
+    is_manager: bool | None = None,
+    sort_by: str = Query(default="full_name"),
+    sort_dir: str = Query(default="asc", pattern="^(asc|desc)$"),
     limit: int = Query(default=50, ge=1, le=1000),
     offset: int = Query(default=0, ge=0),
     db: Session = Depends(get_db),
@@ -65,17 +113,16 @@ def list_personnel(
         query = query.join(EvaluationAccess, EvaluationAccess.personnel_id == Personnel.id).where(
             column == current_user.id
         )
-    if q:
-        pattern = f"%{q.strip()}%"
-        query = query.where(
-            Personnel.full_name.ilike(pattern)
-            | Personnel.personnel_code.ilike(pattern)
-            | Personnel.job_title.ilike(pattern)
-            | Personnel.org_unit.ilike(pattern)
-        )
+    query = _apply_personnel_filters(
+        query, q=q, status_filter=status_filter, org_unit=org_unit, is_manager=is_manager
+    )
 
     total = db.scalar(select(func.count()).select_from(query.subquery())) or 0
-    items = list(db.scalars(query.order_by(Personnel.full_name).limit(limit).offset(offset)))
+    items = list(
+        db.scalars(
+            query.order_by(_personnel_order_by(sort_by, sort_dir)).limit(limit).offset(offset)
+        )
+    )
     return PersonnelPage(total=total, items=[PersonnelRead.model_validate(p) for p in items])
 
 
@@ -95,20 +142,20 @@ def list_org_units(
 @router.get("/export.xlsx")
 def export_personnel_excel(
     q: str | None = None,
+    status_filter: PersonnelStatus | None = Query(default=None, alias="status"),
+    org_unit: str | None = None,
+    is_manager: bool | None = None,
+    sort_by: str = Query(default="full_name"),
+    sort_dir: str = Query(default="asc", pattern="^(asc|desc)$"),
     db: Session = Depends(get_db),
     current_user: CurrentUser = Depends(require_roles(UserRole.hr)),
 ) -> FastAPIResponse:
-    """خروجی Excel از فهرست پرسنل (فقط HR)؛ q همان جست‌وجوی فهرست را اعمال می‌کند."""
-    query = select(Personnel)
-    if q:
-        pattern = f"%{q.strip()}%"
-        query = query.where(
-            Personnel.full_name.ilike(pattern)
-            | Personnel.personnel_code.ilike(pattern)
-            | Personnel.job_title.ilike(pattern)
-            | Personnel.org_unit.ilike(pattern)
-        )
-    rows = list(db.scalars(query.order_by(Personnel.full_name)))
+    """خروجی Excel از فهرست پرسنل (فقط HR) با همان فیلترها/مرتب‌سازی فهرست، تا HR
+    دقیقاً همان چیزی را که روی صفحه فیلتر کرده دریافت کند."""
+    query = _apply_personnel_filters(
+        select(Personnel), q=q, status_filter=status_filter, org_unit=org_unit, is_manager=is_manager
+    )
+    rows = list(db.scalars(query.order_by(_personnel_order_by(sort_by, sort_dir))))
     log_event(db, actor_user_id=current_user.id, event_type="personnel_excel_exported")
     db.commit()
     return FastAPIResponse(

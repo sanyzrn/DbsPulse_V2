@@ -18,6 +18,10 @@ SNAPSHOT_VERSION = 1
 
 def build_final_snapshot(db: Session, record: EvaluationRecord) -> dict:
     personnel = db.get(Personnel, record.subject_personnel_id)
+    # FK تضمین می‌کند پرسنل وجود دارد، اما یک نگهبان صریح مانع 500 مبهم در صورت
+    # ناسازگاری داده می‌شود و پیام روشن می‌دهد.
+    if personnel is None:
+        raise ValueError("پرسنل مرتبط با این ارزیابی یافت نشد؛ امکان ساخت سند نهایی نیست")
     scores = db.scalars(
         select(EvaluationScore).where(EvaluationScore.evaluation_record_id == record.id)
     ).all()
@@ -55,12 +59,14 @@ def build_final_snapshot(db: Session, record: EvaluationRecord) -> dict:
         else None,
         "recommendation": record.recommendation,
         "evaluator_comment": record.evaluator_comment,
+        # اگر شاخصی پس از امتیازدهی حذف شده باشد، snapshot نباید 500 بدهد؛ ردیف با
+        # برچسب جایگزین حفظ می‌شود تا امتیاز ثبت‌شده در سند نهایی گم نشود.
         "scores": [
             {
                 "indicator_id": s.indicator_id,
-                "category": indicators_by_id[s.indicator_id].category,
-                "description": indicators_by_id[s.indicator_id].description,
-                "section": indicators_by_id[s.indicator_id].section.value,
+                "category": ind.category if (ind := indicators_by_id.get(s.indicator_id)) else "—",
+                "description": ind.description if ind else "(شاخص حذف‌شده)",
+                "section": ind.section.value if ind else "general",
                 "score": s.score,
                 "evidence_text": s.evidence_text,
             }

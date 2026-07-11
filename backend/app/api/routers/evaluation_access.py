@@ -44,6 +44,10 @@ def get_access(
     db: Session = Depends(get_db),
     current_user: CurrentUser = Depends(require_roles(UserRole.hr)),
 ) -> EvaluationAccess | None:
+    # پرسنل ناموجود باید 404 بگیرد (نه 200 با بدنهٔ null) تا با upsert_access یکسان
+    # باشد و تایپوی شناسه پنهان نماند.
+    if db.get(Personnel, personnel_id) is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="پرسنل یافت نشد")
     return db.scalar(select(EvaluationAccess).where(EvaluationAccess.personnel_id == personnel_id))
 
 

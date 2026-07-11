@@ -46,6 +46,16 @@ def _get_plan_or_404(db: Session, plan_id: int) -> ImprovementPlan:
     return plan
 
 
+def _ensure_plan_open(plan: ImprovementPlan) -> None:
+    """اهداف فقط روی برنامهٔ باز قابل افزودن/ویرایش/حذف‌اند؛ برنامهٔ تکمیل/لغوشده
+    یک سند بسته است و نباید پس از بسته‌شدن تغییر کند."""
+    if plan.status != ImprovementPlanStatus.open:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="این برنامه دیگر باز نیست؛ امکان تغییر اهداف وجود ندارد",
+        )
+
+
 def _ensure_owner_is_valid(db: Session, owner_user_id: int | None) -> None:
     if owner_user_id is None:
         return
@@ -347,6 +357,7 @@ def add_goal(
     current_user: CurrentUser = Depends(require_roles(UserRole.hr)),
 ) -> ImprovementPlanGoal:
     plan = _get_plan_or_404(db, plan_id)
+    _ensure_plan_open(plan)
     next_order = (
         db.scalar(
             select(func.coalesce(func.max(ImprovementPlanGoal.display_order), -1)).where(
@@ -375,6 +386,7 @@ def update_goal(
     goal = db.get(ImprovementPlanGoal, goal_id)
     if goal is None or goal.plan_id != plan_id:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="هدف یافت نشد")
+    _ensure_plan_open(_get_plan_or_404(db, plan_id))
     updates = payload.model_dump(exclude_unset=True)
     for field, value in updates.items():
         setattr(goal, field, value)
@@ -393,5 +405,6 @@ def delete_goal(
     goal = db.get(ImprovementPlanGoal, goal_id)
     if goal is None or goal.plan_id != plan_id:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="هدف یافت نشد")
+    _ensure_plan_open(_get_plan_or_404(db, plan_id))
     db.delete(goal)
     db.commit()

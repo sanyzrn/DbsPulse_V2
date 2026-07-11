@@ -3,6 +3,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { apiClient, extractErrorMessage } from "../../api/client";
 import {
   useDebouncedValue,
+  useOrgUnits,
   usePersonnelList,
   useUsersList,
 } from "../../api/queries";
@@ -11,7 +12,7 @@ import { ExcelExportButton } from "../../components/ExcelExportButton";
 import { PaginationControls } from "../../components/PaginationControls";
 import { useToast } from "../../components/Toast";
 import { Button } from "../../ui/Button";
-import { PageHeader } from "../../ui/Card";
+import { FilterSelect, PageHeader, TableSkeleton } from "../../ui/Card";
 import { Modal } from "../../ui/Modal";
 import { Table } from "../../ui/Table";
 import { JalaliDatePicker } from "../../ui/JalaliDatePicker";
@@ -151,16 +152,36 @@ export function PersonnelPage() {
   const [profilePerson, setProfilePerson] = useState<Personnel | null>(null);
   const [editingPersonnel, setEditingPersonnel] = useState<Personnel | null>(null);
   const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState<"" | "active" | "inactive">("");
+  const [orgUnitFilter, setOrgUnitFilter] = useState("");
+  const [managerFilter, setManagerFilter] = useState<"" | "true" | "false">("");
   const [page, setPage] = useState(0);
   const debouncedSearch = useDebouncedValue(search);
 
-  const { data, error: loadError } = usePersonnelList({
+  const listParams = {
     q: debouncedSearch,
+    status: statusFilter || undefined,
+    org_unit: orgUnitFilter || undefined,
+    is_manager: managerFilter === "" ? undefined : managerFilter === "true",
+  } as const;
+
+  const { data, error: loadError, isPending } = usePersonnelList({
+    ...listParams,
     limit: PAGE_SIZE,
     offset: page * PAGE_SIZE,
   });
   const { data: usersPage } = useUsersList({ limit: 1000 });
   const users = usersPage?.items ?? [];
+  const { data: orgUnits = [] } = useOrgUnits(true);
+  const hasActiveFilter = Boolean(search || statusFilter || orgUnitFilter || managerFilter);
+
+  function resetFilters() {
+    setSearch("");
+    setStatusFilter("");
+    setOrgUnitFilter("");
+    setManagerFilter("");
+    setPage(0);
+  }
 
   const total = data?.total ?? 0;
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
@@ -291,7 +312,7 @@ export function PersonnelPage() {
               <ExcelExportButton
                 url="/personnel/export.xlsx"
                 filename="personnel.xlsx"
-                params={{ q: debouncedSearch || undefined }}
+                params={listParams}
               />
               <div className="relative">
                 <svg viewBox="0 0 20 20" className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
@@ -299,7 +320,7 @@ export function PersonnelPage() {
                   <path d="M14 14l3 3" />
                 </svg>
                 <input
-                  className="w-full rounded-xl border border-gray-200 bg-gray-100 py-1.5 pr-9 pl-3 text-sm text-gray-700 outline-none transition-colors duration-150 focus:border-pulse-500 focus:bg-white sm:w-80"
+                  className="w-full rounded-xl border border-gray-200 bg-gray-100 py-1.5 pr-9 pl-3 text-sm text-gray-700 outline-none transition-colors duration-150 focus:border-pulse-500 focus:bg-white sm:w-72"
                   placeholder="جست‌وجو (نام، کد پرسنلی، عنوان شغلی، واحد)…"
                   value={search}
                   onChange={(e) => {
@@ -310,9 +331,62 @@ export function PersonnelPage() {
               </div>
             </div>
           </div>
+
+          {/* فیلترهای ترکیب‌پذیر فهرست پرسنل */}
+          <div className="mb-4 flex flex-wrap items-center gap-2">
+            <FilterSelect
+              aria-label="فیلتر واحد سازمانی"
+              value={orgUnitFilter}
+              onChange={(v) => {
+                setOrgUnitFilter(v);
+                setPage(0);
+              }}
+            >
+              <option value="">همهٔ واحدها</option>
+              {orgUnits.map((u) => (
+                <option key={u} value={u}>
+                  {u}
+                </option>
+              ))}
+            </FilterSelect>
+            <FilterSelect
+              aria-label="فیلتر وضعیت"
+              value={statusFilter}
+              onChange={(v) => {
+                setStatusFilter(v as "" | "active" | "inactive");
+                setPage(0);
+              }}
+            >
+              <option value="">همهٔ وضعیت‌ها</option>
+              <option value="active">فعال</option>
+              <option value="inactive">غیرفعال</option>
+            </FilterSelect>
+            <FilterSelect
+              aria-label="فیلتر نوع پرسنل"
+              value={managerFilter}
+              onChange={(v) => {
+                setManagerFilter(v as "" | "true" | "false");
+                setPage(0);
+              }}
+            >
+              <option value="">همه (مدیر و غیرمدیر)</option>
+              <option value="true">فقط مدیران</option>
+              <option value="false">فقط غیرمدیران</option>
+            </FilterSelect>
+            {hasActiveFilter && (
+              <button
+                onClick={resetFilters}
+                className="rounded-xl border border-gray-200 bg-white px-3 py-1.5 text-sm font-medium text-gray-500 transition-colors hover:bg-gray-50 hover:text-gray-700"
+              >
+                حذف فیلترها
+              </button>
+            )}
+          </div>
+
           {loadError != null && (
             <p className="mb-2 text-sm text-red-600">{extractErrorMessage(loadError)}</p>
           )}
+          {isPending && <TableSkeleton rows={6} />}
           {data && (
             <Table
               bordered={false}

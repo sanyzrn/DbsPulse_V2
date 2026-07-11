@@ -143,7 +143,7 @@ function MyPlanCard({ plan, index }: { plan: ImprovementPlanDetail; index: numbe
 
 export function MyEvaluationsPage() {
   const { data, isPending, error } = useMyEvaluations();
-  const { data: plans = [] } = useMyImprovementPlans();
+  const { data: plans = [], error: plansError } = useMyImprovementPlans();
 
   return (
     <div className="space-y-4">
@@ -153,6 +153,11 @@ export function MyEvaluationsPage() {
       />
       <RoleOverviewCards />
 
+      {plansError != null && (
+        <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">
+          {extractErrorMessage(plansError)}
+        </p>
+      )}
       {plans.map((plan, i) => (
         <MyPlanCard key={plan.id} plan={plan} index={i} />
       ))}

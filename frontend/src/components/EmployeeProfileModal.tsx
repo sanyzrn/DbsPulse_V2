@@ -19,6 +19,7 @@ import {
   usePersonTrend,
   usePersonnelDetail,
 } from "../api/queries";
+import { extractErrorMessage } from "../api/client";
 import { Button } from "../ui/Button";
 import { Modal } from "../ui/Modal";
 import { formatDate } from "../utils/dates";
@@ -79,7 +80,7 @@ export function EmployeeProfileModal({
   personName?: string;
   onClose: () => void;
 }) {
-  const { data: personnel } = usePersonnelDetail(personnelId);
+  const { data: personnel, isError, error } = usePersonnelDetail(personnelId);
   const { data: radar = [] } = usePersonRadar(personnelId);
   const { data: trend = [] } = usePersonTrend(personnelId);
   const { data: inProgress } = usePersonInProgress(personnelId);
@@ -92,10 +93,20 @@ export function EmployeeProfileModal({
         size="lg"
         footer={<Button onClick={onClose}>بستن</Button>}
       >
-        <div className="space-y-3 py-4">
-          <div className="skeleton h-24" />
-          <div className="skeleton h-64" />
-        </div>
+        {isError ? (
+          // بدون این شاخه، خطای واکشی به یک اسکلتون بی‌پایان منجر می‌شد.
+          <div className="py-8 text-center">
+            <p className="text-sm font-medium text-red-600">
+              بارگذاری پروفایل این پرسنل ممکن نشد.
+            </p>
+            <p className="mt-1 text-xs text-gray-500">{extractErrorMessage(error)}</p>
+          </div>
+        ) : (
+          <div className="space-y-3 py-4">
+            <div className="skeleton h-24" />
+            <div className="skeleton h-64" />
+          </div>
+        )}
       </Modal>
     );
   }

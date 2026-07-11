@@ -106,6 +106,12 @@ export function useEvaluationDetail(id: number | null) {
 export interface PersonnelListParams {
   accessible_to_me?: boolean;
   q?: string;
+  /** فیلترهای پیشرفتهٔ HR — همگی اختیاری و ترکیب‌پذیر */
+  status?: "active" | "inactive";
+  org_unit?: string;
+  is_manager?: boolean;
+  sort_by?: string;
+  sort_dir?: "asc" | "desc";
   limit: number;
   offset: number;
 }
@@ -116,7 +122,7 @@ export function usePersonnelList(params: PersonnelListParams) {
     queryFn: async () =>
       (
         await apiClient.get<Page<Personnel>>("/personnel", {
-          params: { ...params, q: params.q || undefined },
+          params: compactParams(params),
         })
       ).data,
     placeholderData: keepPreviousData,
@@ -132,13 +138,19 @@ export function usePersonnelDetail(id: number | null) {
   });
 }
 
-export function useUsersList(params: { role?: UserRole; q?: string; limit: number; offset?: number }) {
+export function useUsersList(params: {
+  role?: UserRole;
+  q?: string;
+  is_active?: boolean;
+  limit: number;
+  offset?: number;
+}) {
   return useQuery({
     queryKey: ["users", params],
     queryFn: async () =>
       (
         await apiClient.get<Page<AppUser>>("/users", {
-          params: { ...params, q: params.q || undefined },
+          params: compactParams(params),
         })
       ).data,
     placeholderData: keepPreviousData,
@@ -160,13 +172,19 @@ export function useIndicators(options?: { section?: "general" | "specialized"; i
   });
 }
 
-export function useAuditLog(params: { event_type?: string; limit: number; offset: number }) {
+export function useAuditLog(params: {
+  event_type?: string;
+  created_from?: string;
+  created_to?: string;
+  limit: number;
+  offset: number;
+}) {
   return useQuery({
     queryKey: ["audit-log", params],
     queryFn: async () =>
       (
         await apiClient.get<AuditLogPage>("/audit-log", {
-          params: { ...params, event_type: params.event_type || undefined },
+          params: compactParams(params),
         })
       ).data,
     placeholderData: keepPreviousData,

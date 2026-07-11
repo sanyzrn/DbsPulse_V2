@@ -4,6 +4,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { motion } from "motion/react";
 import { apiClient, extractErrorMessage } from "../../api/client";
 import {
+  useDebouncedValue,
   useEligibleEvaluations,
   useImprovementPlans,
 } from "../../api/queries";
@@ -12,7 +13,7 @@ import { ExcelExportButton } from "../../components/ExcelExportButton";
 import { PaginationControls } from "../../components/PaginationControls";
 import { useToast } from "../../components/Toast";
 import { Button } from "../../ui/Button";
-import { Card, EmptyState, PageHeader, TableScroll } from "../../ui/Card";
+import { Card, EmptyState, PageHeader, TableScroll, TableSkeleton } from "../../ui/Card";
 import { PctBadge } from "../../ui/Meters";
 import { Modal } from "../../ui/Modal";
 import { Table } from "../../ui/Table";
@@ -64,6 +65,7 @@ function CreatePlanRow({
         review_date: reviewDate,
       });
       showSuccess("برنامه بهبود ساخته شد");
+      setOpen(false); // مودال پس از ثبت موفق بسته می‌شود (قبلاً باز می‌ماند)
       onCreated();
     } catch (err) {
       showError(extractErrorMessage(err));
@@ -145,12 +147,19 @@ function CreatePlanRow({
 export function ImprovementPlansPage() {
   const queryClient = useQueryClient();
   const [statusFilter, setStatusFilter] = useState<ImprovementPlanStatus | "">("");
+  const [search, setSearch] = useState("");
   const [page, setPage] = useState(0);
   const [profilePerson, setProfilePerson] = useState<{ id: number; name: string } | null>(null);
+  const debouncedSearch = useDebouncedValue(search);
 
-  const { data: eligible = [] } = useEligibleEvaluations();
-  const { data, error } = useImprovementPlans({
+  const {
+    data: eligible = [],
+    isPending: eligiblePending,
+    error: eligibleError,
+  } = useEligibleEvaluations();
+  const { data, error, isPending } = useImprovementPlans({
     status: statusFilter || undefined,
+    q: debouncedSearch || undefined,
     limit: PAGE_SIZE,
     offset: page * PAGE_SIZE,
   });
@@ -169,7 +178,11 @@ export function ImprovementPlansPage() {
       />
 
       <Card title={`نیازمند برنامه بهبود (${eligible.length.toLocaleString("fa-IR")})`}>
-        {eligible.length === 0 ? (
+        {eligibleError != null ? (
+          <p className="py-4 text-center text-sm text-red-600">{extractErrorMessage(eligibleError)}</p>
+        ) : eligiblePending ? (
+          <TableSkeleton rows={3} />
+        ) : eligible.length === 0 ? (
           <EmptyState>ارزیابی نهایی‌شده‌ای در انتظار برنامه بهبود نیست.</EmptyState>
         ) : (
           <TableScroll>
@@ -204,10 +217,26 @@ export function ImprovementPlansPage() {
             <ExcelExportButton
               url="/improvement-plans/export.xlsx"
               filename="improvement-plans.xlsx"
-              params={{ status: statusFilter || undefined }}
+              params={{ status: statusFilter || undefined, q: debouncedSearch || undefined }}
             />
             <div className="relative">
+              <svg viewBox="0 0 20 20" className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
+                <circle cx="9" cy="9" r="6" />
+                <path d="M14 14l3 3" />
+              </svg>
+              <input
+                className="w-full rounded-xl border border-gray-200 bg-gray-100 py-1.5 pr-9 pl-3 text-sm text-gray-700 outline-none transition-colors duration-150 focus:border-pulse-500 focus:bg-white sm:w-60"
+                placeholder="جست‌وجو (نام پرسنل یا عنوان)…"
+                value={search}
+                onChange={(e) => {
+                  setSearch(e.target.value);
+                  setPage(0);
+                }}
+              />
+            </div>
+            <div className="relative">
             <select
+              aria-label="فیلتر وضعیت"
               className="appearance-none rounded-xl border border-gray-200 bg-gray-100 py-1.5 pr-3 pl-8 text-sm text-gray-700 outline-none transition-colors duration-150 focus:border-pulse-500 focus:bg-white"
               value={statusFilter}
               onChange={(e) => {
@@ -226,10 +255,23 @@ export function ImprovementPlansPage() {
               <path d="M6 8l4 4 4-4" />
             </svg>
             </div>
+            {(statusFilter || search) && (
+              <button
+                onClick={() => {
+                  setStatusFilter("");
+                  setSearch("");
+                  setPage(0);
+                }}
+                className="rounded-xl border border-gray-200 bg-white px-3 py-1.5 text-sm font-medium text-gray-500 transition-colors hover:bg-gray-50 hover:text-gray-700"
+              >
+                حذف فیلترها
+              </button>
+            )}
           </div>
         }
       >
         {error != null && <p className="mb-2 text-sm text-red-600">{extractErrorMessage(error)}</p>}
+        {isPending && <TableSkeleton rows={5} />}
         {data && data.items.length > 0 && (
           <Table
             bordered={false}

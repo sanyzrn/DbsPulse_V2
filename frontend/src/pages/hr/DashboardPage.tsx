@@ -376,10 +376,13 @@ function ExpiringContractsCard() {
   async function runReminders() {
     setRunning(true);
     try {
-      const { data } = await apiClient.post<{ contract_expiry: number; sla_reminder: number }>(
-        "/admin/run-scheduled-jobs"
-      );
-      const total = data.contract_expiry + data.sla_reminder;
+      const { data } = await apiClient.post<{
+        contract_expiry: number;
+        sla_reminder: number;
+        improvement_review: number;
+      }>("/admin/run-scheduled-jobs");
+      // شمارش هر سه نوع یادآوری (قبلاً improvement_review از مجموع جا می‌افتاد)
+      const total = data.contract_expiry + data.sla_reminder + data.improvement_review;
       await queryClient.invalidateQueries({ queryKey: ["notifications"] });
       showSuccess(
         total > 0

@@ -319,6 +319,54 @@ export function usePeriodProgress(periodId: number | null) {
   });
 }
 
+export function useReportSummary(filters: import("../types").ReportFilters) {
+  return useQuery({
+    queryKey: ["dashboard", "report", "summary", filters],
+    queryFn: async () =>
+      (
+        await apiClient.get<import("../types").ReportSummary>("/dashboard/report/summary", {
+          params: compactParams(filters),
+        })
+      ).data,
+    placeholderData: keepPreviousData,
+  });
+}
+
+export function useIndicatorBreakdown(
+  indicatorId: number | null,
+  filters: import("../types").ReportFilters
+) {
+  return useQuery({
+    queryKey: ["dashboard", "report", "indicator", indicatorId, filters],
+    queryFn: async () =>
+      (
+        await apiClient.get<import("../types").IndicatorBreakdown>(
+          `/dashboard/report/indicator/${indicatorId}`,
+          { params: compactParams(filters) }
+        )
+      ).data,
+    enabled: indicatorId !== null,
+    placeholderData: keepPreviousData,
+  });
+}
+
+export function useEmployeeVsUnit(
+  personnelId: number | null,
+  filters: { period_id?: number; created_from?: string; created_to?: string }
+) {
+  return useQuery({
+    queryKey: ["dashboard", "report", "employee-vs-unit", personnelId, filters],
+    queryFn: async () =>
+      (
+        await apiClient.get<import("../types").EmployeeVsUnit>("/dashboard/report/employee-vs-unit", {
+          params: compactParams({ ...filters, personnel_id: personnelId ?? undefined }),
+        })
+      ).data,
+    enabled: personnelId !== null,
+    placeholderData: keepPreviousData,
+  });
+}
+
 export function usePipeline() {
   return useQuery({
     queryKey: ["dashboard", "pipeline"],

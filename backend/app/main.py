@@ -23,6 +23,7 @@ from app.api.routers import (
     notifications,
     periods,
     personnel,
+    reports,
     users,
     verify,
 )
@@ -113,6 +114,7 @@ app.include_router(evaluations.router)
 app.include_router(improvement_plans.router)
 app.include_router(me.router)
 app.include_router(dashboard.router)
+app.include_router(reports.router)
 app.include_router(audit_log.router)
 app.include_router(notifications.router)
 app.include_router(periods.router)

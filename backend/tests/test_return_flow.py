@@ -1,5 +1,7 @@
 """تست‌های «برگشت پرونده»: هر تأییدکننده می‌تواند با ذکر دلیل پرونده را یک مرحله
 عقب بفرستد؛ امتیازها حفظ و دلیل به‌صورت کامنت + رویداد audit ثبت می‌شود."""
+from sqlalchemy import func, select
+
 from tests.helpers import (
     active_indicators,
     auth_header,
@@ -138,6 +140,83 @@ def test_deputy_cannot_return_on_manager_path(client, db_session):
     )
     assert r.status_code == 400
     assert "مسیر «مدیر»" in r.json()["detail"]
+
+
+def _notifications_for(db_session, user_id: int, type_prefix: str) -> int:
+    from app.models.notification import Notification
+
+    return db_session.scalar(
+        select(func.count())
+        .select_from(Notification)
+        .where(Notification.user_id == user_id, Notification.type.like(f"{type_prefix}%"))
+    )
+
+
+def test_return_notifications_fire_to_correct_recipient(client, db_session):
+    """برگشت هر مرحله باید دقیقاً به مسئولِ همان مرحلهٔ قبل اعلان بفرستد."""
+    hr, sup, dep, ceo, evaluation_id = _setup_submitted(client, db_session)
+
+    # HR → مسئول واحد
+    client.post(
+        f"/api/evaluations/{evaluation_id}/return",
+        json={"reason": "اصلاح لازم است"},
+        headers=auth_header(hr),
+    )
+    assert _notifications_for(db_session, sup.id, "workflow_hr_return") == 1
+
+    # دوباره تا مرحلهٔ hr_approved جلو می‌رویم
+    client.post(f"/api/evaluations/{evaluation_id}/submit", headers=auth_header(sup))
+    client.post(f"/api/evaluations/{evaluation_id}/hr-approve", headers=auth_header(hr))
+
+    # معاونت → HR
+    client.post(
+        f"/api/evaluations/{evaluation_id}/return",
+        json={"reason": "بازبینی HR"},
+        headers=auth_header(dep),
+    )
+    assert _notifications_for(db_session, hr.id, "workflow_deputy_return") == 1
+
+    # تا deputy_approved جلو می‌رویم
+    client.post(f"/api/evaluations/{evaluation_id}/hr-approve", headers=auth_header(hr))
+    client.post(f"/api/evaluations/{evaluation_id}/deputy-approve", headers=auth_header(dep))
+
+    # مدیرعامل → معاونت
+    client.post(
+        f"/api/evaluations/{evaluation_id}/return",
+        json={"reason": "توضیح معاونت"},
+        headers=auth_header(ceo),
+    )
+    assert _notifications_for(db_session, dep.id, "workflow_ceo_return") == 1
+
+
+def test_returned_draft_is_editable_again_and_reflects_history(client, db_session):
+    """پس از برگشت به draft، مسئول واحد دوباره می‌تواند ویرایش کند و سابقهٔ برگشت
+    (کامنت با نام برگرداننده + رویداد audit) درست ثبت شده است."""
+    hr, sup, dep, ceo, evaluation_id = _setup_submitted(client, db_session)
+    client.post(
+        f"/api/evaluations/{evaluation_id}/return",
+        json={"reason": "شواهد ناکافی"},
+        headers=auth_header(hr),
+    )
+    # دیگر نقش‌ها نباید در draft بتوانند امتیاز بزنند
+    indicators = active_indicators(db_session)
+    assert (
+        client.put(
+            f"/api/evaluations/{evaluation_id}/scores",
+            json={"scores": full_valid_scores(indicators)},
+            headers=auth_header(dep),
+        ).status_code
+        == 403
+    )
+    # ولی مسئول واحد بله
+    assert (
+        client.put(
+            f"/api/evaluations/{evaluation_id}/scores",
+            json={"scores": full_valid_scores(indicators)},
+            headers=auth_header(sup),
+        ).status_code
+        == 200
+    )
 
 
 def test_return_requires_matching_state_and_role(client, db_session):

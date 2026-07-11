@@ -196,6 +196,48 @@ def build_audit_log_workbook(
     return _to_bytes(wb)
 
 
+def build_report_workbook(
+    *,
+    total: int,
+    avg_final_pct: float | None,
+    by_org_unit: list[tuple[str, float, int]],
+    by_indicator: list[tuple[str, str, float, int]],
+) -> bytes:
+    """گزارش ترکیبی HR در یک فایل با سه برگه: خلاصه، به‌تفکیک واحد، به‌تفکیک شاخص."""
+    wb, summary_ws = _new_sheet("خلاصه", ["شاخص", "مقدار"])
+    summary_ws.append(["تعداد ارزیابی‌های نهایی‌شده (فیلترشده)", total])
+    summary_ws.append([
+        "میانگین امتیاز نهایی (٪)",
+        float(avg_final_pct) if avg_final_pct is not None else "—",
+    ])
+
+    unit_ws = wb.create_sheet("میانگین به‌تفکیک واحد")
+    unit_ws.sheet_view.rightToLeft = True
+    unit_headers = ["واحد سازمانی", "میانگین امتیاز نهایی ٪", "تعداد"]
+    unit_ws.append(unit_headers)
+    for cell in unit_ws[1]:
+        cell.font = Font(bold=True)
+    for column_index, header in enumerate(unit_headers, start=1):
+        unit_ws.column_dimensions[get_column_letter(column_index)].width = max(16, len(header) + 6)
+    for org_unit, avg, count in by_org_unit:
+        unit_ws.append([org_unit, float(avg), count])
+
+    indicator_ws = wb.create_sheet("میانگین به‌تفکیک شاخص")
+    indicator_ws.sheet_view.rightToLeft = True
+    indicator_headers = ["دسته", "شرح شاخص", "میانگین امتیاز (از ۵)", "تعداد"]
+    indicator_ws.append(indicator_headers)
+    for cell in indicator_ws[1]:
+        cell.font = Font(bold=True)
+    for column_index, header in enumerate(indicator_headers, start=1):
+        indicator_ws.column_dimensions[get_column_letter(column_index)].width = max(
+            18, len(header) + 6
+        )
+    for category, description, avg, count in by_indicator:
+        indicator_ws.append([category, description, float(avg), count])
+
+    return _to_bytes(wb)
+
+
 def build_improvement_plans_workbook(
     plans: list[ImprovementPlan],
     evaluation_codes: dict[int, str],

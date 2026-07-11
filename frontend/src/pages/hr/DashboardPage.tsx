@@ -62,9 +62,17 @@ const DASHBOARD_TABS = [
   { key: "analysis" as const, label: "تحلیل و گزارش‌ها" },
 ];
 
+// زیربخش‌های تب «تحلیل و گزارش‌ها» — هر بخش یک زیرتب جدا تا صفحه شلوغ نباشد.
+const ANALYSIS_SUBTABS = [
+  { key: "org" as const, label: "نمای سازمان" },
+  { key: "reports" as const, label: "گزارش‌های تحلیلی" },
+  { key: "person" as const, label: "کارنامهٔ فرد" },
+];
+
 export function DashboardPage() {
   const [selectedPersonId, setSelectedPersonId] = useState<number | null>(null);
   const [tab, setTab] = useState<"overview" | "analysis">("overview");
+  const [analysisTab, setAnalysisTab] = useState<"org" | "reports" | "person">("org");
 
   const { data: overview, error: overviewError } = useDashboardOverview();
   const { data: personnelPage } = usePersonnelList({ limit: 1000, offset: 0 });
@@ -174,6 +182,25 @@ export function DashboardPage() {
 
       {tab === "analysis" && (
       <div className="space-y-5">
+      {/* زیرتب‌های تحلیل — سبک‌تر از تب‌های اصلی تا سلسله‌مراتب مشخص باشد */}
+      <div role="tablist" className="inline-flex flex-wrap gap-1 rounded-xl border border-gray-100 bg-gray-50 p-1">
+        {ANALYSIS_SUBTABS.map((t) => (
+          <button
+            key={t.key}
+            role="tab"
+            aria-selected={analysisTab === t.key}
+            onClick={() => setAnalysisTab(t.key)}
+            className={`rounded-lg px-3.5 py-1.5 text-sm font-medium transition-colors ${
+              analysisTab === t.key ? "bg-white text-pulse-700 shadow-sm" : "text-gray-500 hover:text-gray-800"
+            }`}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      {analysisTab === "org" && (
+      <div className="space-y-5">
       {/* ── نمودار میله‌ای میانگین به تفکیک واحد ── */}
       <BarByOrgUnitCard data={overview.by_org_unit} />
 
@@ -221,8 +248,11 @@ export function DashboardPage() {
           emptyMessage="داده‌ای موجود نیست."
         />
       </div>
+      </div>
+      )}
 
       {/* ── کارت رادار + روند فرد ── */}
+      {analysisTab === "person" && (
       <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-card">
         <h2 className="mb-3 text-base font-bold text-gray-900">نمودار رادار شایستگی و روند فرد</h2>
         <div className="relative mb-4">
@@ -313,9 +343,10 @@ export function DashboardPage() {
           </div>
         )}
       </div>
+      )}
 
       {/* ── گزارش‌های تحلیلی فیلترشونده ── */}
-      <ReportsSection />
+      {analysisTab === "reports" && <ReportsSection />}
       </div>
       )}
     </div>

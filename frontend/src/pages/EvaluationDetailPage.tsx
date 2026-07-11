@@ -59,6 +59,9 @@ export function EvaluationDetailPage() {
     // هر اقدام گردش‌کار (تأیید/برگشت/کامنت) ممکن است اعلان جدیدی بسازد؛ زنگوله را
     // فوراً به‌روز می‌کنیم تا کاربر منتظر poll بعدی نماند.
     await queryClient.invalidateQueries({ queryKey: ["notifications"] });
+    // شمارنده‌های خلاصهٔ نقش/قیف/داشبورد نباید پس از یک گذار وضعیت کهنه بمانند
+    // (مثلاً «در انتظار تأیید من» باید فوراً کم شود)؛ کل فضای dashboard را باطل می‌کنیم.
+    await queryClient.invalidateQueries({ queryKey: ["dashboard"] });
   }
 
   const loadError = evaluationError != null ? extractErrorMessage(evaluationError) : null;

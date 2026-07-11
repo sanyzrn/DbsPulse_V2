@@ -30,6 +30,8 @@ function MyEvaluationCard({ item, index }: { item: MyEvaluation; index: number }
     try {
       await apiClient.post(`/me/evaluations/${item.id}/acknowledge`);
       await queryClient.invalidateQueries({ queryKey: ["me", "evaluations"] });
+      // کارت «در انتظار رؤیت شما» در خلاصهٔ نقش باید فوراً کم شود
+      await queryClient.invalidateQueries({ queryKey: ["dashboard"] });
       showSuccess("رؤیت شما ثبت شد");
     } catch (err) {
       showError(extractErrorMessage(err));

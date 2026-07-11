@@ -83,3 +83,62 @@ class InProgressEvaluation(BaseModel):
     status: EvaluationStatus
     was_returned: bool
     created_at: datetime
+
+
+# ─────────────────────────── گزارش‌های تحلیلی فیلترشوندهٔ HR ───────────────────────────
+
+
+class IndicatorReportStat(BaseModel):
+    """میانگین امتیاز یک شاخص در مجموعهٔ ارزیابی‌های فیلترشده (از ۵)."""
+
+    indicator_id: int
+    category: str
+    description: str
+    section: str
+    avg_score: float
+    count: int
+
+
+class ReportSummary(BaseModel):
+    """خلاصهٔ گزارش برای فیلترهای اعمال‌شده: مجموع، میانگین، به‌تفکیک واحد و شاخص."""
+
+    total_evaluations: int
+    avg_final_pct: float | None
+    by_org_unit: list[UnitStat]
+    by_indicator: list[IndicatorReportStat]
+
+
+class UnitIndicatorStat(BaseModel):
+    org_unit: str
+    avg_score: float
+    count: int
+
+
+class IndicatorBreakdown(BaseModel):
+    """ریز یک شاخص خاص به‌تفکیک واحد سازمانی (مقایسهٔ واحدها روی همان شاخص)."""
+
+    indicator_id: int
+    category: str
+    description: str
+    overall_avg: float | None
+    count: int
+    by_org_unit: list[UnitIndicatorStat]
+
+
+class EmployeeEvaluationPoint(BaseModel):
+    evaluation_code: str
+    finalized_at: str
+    final_weighted_pct: float
+
+
+class EmployeeVsUnit(BaseModel):
+    """مقایسهٔ امتیاز یک فرد با میانگین واحد سازمانی‌اش برای همان فیلترها."""
+
+    personnel_id: int
+    full_name: str
+    org_unit: str
+    employee_avg: float | None
+    unit_avg: float | None
+    evaluation_count: int
+    unit_evaluation_count: int
+    per_evaluation: list[EmployeeEvaluationPoint]

@@ -184,6 +184,68 @@ export interface RadarPoint {
   avg_score: number;
 }
 
+// ─────────── گزارش‌های تحلیلی فیلترشوندهٔ HR ───────────
+
+export interface ReportFilters {
+  period_id?: number;
+  org_unit?: string;
+  personnel_id?: number;
+  created_from?: string;
+  created_to?: string;
+  /** وضعیت پرسنل */
+  status?: PersonnelStatus;
+  contract_end_from?: string;
+  contract_end_to?: string;
+}
+
+export interface IndicatorReportStat {
+  indicator_id: number;
+  category: string;
+  description: string;
+  section: IndicatorSection;
+  avg_score: number;
+  count: number;
+}
+
+export interface ReportSummary {
+  total_evaluations: number;
+  avg_final_pct: number | null;
+  by_org_unit: UnitStat[];
+  by_indicator: IndicatorReportStat[];
+}
+
+export interface UnitIndicatorStat {
+  org_unit: string;
+  avg_score: number;
+  count: number;
+}
+
+export interface IndicatorBreakdown {
+  indicator_id: number;
+  category: string;
+  description: string;
+  overall_avg: number | null;
+  count: number;
+  by_org_unit: UnitIndicatorStat[];
+}
+
+export interface EmployeeEvaluationPoint {
+  evaluation_code: string;
+  finalized_at: string;
+  final_weighted_pct: number;
+}
+
+export interface EmployeeVsUnit {
+  personnel_id: number;
+  full_name: string;
+  org_unit: string;
+  employee_avg: number | null;
+  unit_avg: number | null;
+  evaluation_count: number;
+  unit_evaluation_count: number;
+  per_evaluation: EmployeeEvaluationPoint[];
+}
+
 export interface TrendPoint {
   evaluation_code: string;
   finalized_at: string;

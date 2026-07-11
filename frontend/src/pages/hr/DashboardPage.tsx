@@ -30,6 +30,7 @@ import {
 import { ExcelExportButton } from "../../components/ExcelExportButton";
 import { StatusBadge } from "../../components/StatusBadge";
 import { useToast } from "../../components/Toast";
+import { ReportsSection } from "./ReportsSection";
 import { CountUp, PctBadge, ScoreRing } from "../../ui/Meters";
 import { Table } from "../../ui/Table";
 import { formatDate } from "../../utils/dates";
@@ -282,6 +283,9 @@ export function DashboardPage() {
           </div>
         )}
       </div>
+
+      {/* ── گزارش‌های تحلیلی فیلترشونده (بخش جدید) ── */}
+      <ReportsSection />
     </div>
   );
 }

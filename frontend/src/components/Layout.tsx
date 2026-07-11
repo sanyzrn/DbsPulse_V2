@@ -48,7 +48,7 @@ export function Layout() {
   }
 
   const navLinkClass = ({ isActive }: { isActive: boolean }) =>
-    `whitespace-nowrap rounded-full px-3.5 py-1.5 text-sm transition-colors duration-150 ${
+    `whitespace-nowrap rounded-full px-3.5 py-1.5 text-sm transition-all duration-300 ${
       isActive ? "bg-charcoal-900 font-semibold text-white" : "text-gray-500 hover:text-gray-900"
     }`;
 
@@ -109,10 +109,10 @@ export function Layout() {
             <AnimatePresence mode="wait">
               <motion.div
                 key={location.pathname}
-                initial={{ opacity: 0, y: 8 }}
+                initial={{ opacity: 0, y: 6 }}
                 animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -6 }}
-                transition={{ duration: 0.24, ease: EASE_SOFT }}
+                exit={{ opacity: 0, y: -4 }}
+                transition={{ duration: 0.34, ease: EASE_SOFT }}
               >
                 <Outlet />
               </motion.div>

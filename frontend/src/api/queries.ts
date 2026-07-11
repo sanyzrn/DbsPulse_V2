@@ -60,6 +60,7 @@ export interface EvaluationListParams {
   created_to?: string;
   min_final_pct?: number;
   max_final_pct?: number;
+  subject_personnel_id?: number;
   limit: number;
   offset: number;
 }

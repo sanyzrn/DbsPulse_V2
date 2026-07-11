@@ -1,4 +1,7 @@
+import { useState } from "react";
 import { motion } from "motion/react";
+
+const DEV_LOGO_URL = "https://www.dbsgraphic.ir/logo/Dbs_logo_single.png";
 
 /** نشان‌های موقت برنامه و توسعه‌دهنده — قرمز برند، تک‌رنگ.
  * نشان اصلی شامل موج پالس متحرک است که هویت «DbsPulse» را منتقل می‌کند. */
@@ -39,6 +42,22 @@ export function BrandMark({ className = "h-9 w-9" }: { className?: string }) {
 }
 
 export function DevMark({ className = "h-4 w-4" }: { className?: string }) {
+  // لوگوی رسمی توسعه‌دهنده از دامنهٔ dbsgraphic بارگذاری می‌شود؛ اگر در دسترس نبود،
+  // به نشان تک‌رنگ محلی به‌عنوان جایگزین برمی‌گردیم تا هیچ‌وقت تصویر شکسته دیده نشود.
+  const [failed, setFailed] = useState(false);
+  if (!failed) {
+    return (
+      <img
+        src={DEV_LOGO_URL}
+        alt="dbs"
+        className={`${className} object-contain`}
+        loading="lazy"
+        decoding="async"
+        referrerPolicy="no-referrer"
+        onError={() => setFailed(true)}
+      />
+    );
+  }
   return (
     <svg viewBox="0 0 20 20" className={className} aria-hidden="true">
       <rect width="20" height="20" rx="6" fill="#b61615" />

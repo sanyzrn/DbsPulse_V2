@@ -245,6 +245,7 @@ def _apply_evaluation_filters(
     created_to: date | None,
     min_final_pct: float | None,
     max_final_pct: float | None,
+    subject_personnel_id: int | None = None,
 ):
     """فیلترهای ترکیب‌پذیر فهرست/خروجی ارزیابی‌ها — یک‌جا تا list و export.xlsx
     همیشه رفتار یکسان داشته باشند (خروجی همان چیزی است که HR فیلتر کرده)."""
@@ -291,6 +292,8 @@ def _apply_evaluation_filters(
         query = query.where(EvaluationRecord.final_weighted_pct >= min_final_pct)
     if max_final_pct is not None:
         query = query.where(EvaluationRecord.final_weighted_pct <= max_final_pct)
+    if subject_personnel_id is not None:
+        query = query.where(EvaluationRecord.subject_personnel_id == subject_personnel_id)
     return query
 
 
@@ -303,6 +306,7 @@ def list_evaluations(
     created_to: date | None = None,
     min_final_pct: float | None = Query(default=None, ge=0, le=100),
     max_final_pct: float | None = Query(default=None, ge=0, le=100),
+    subject_personnel_id: int | None = None,
     limit: int = Query(default=50, ge=1, le=200),
     offset: int = Query(default=0, ge=0),
     db: Session = Depends(get_db),
@@ -335,6 +339,7 @@ def list_evaluations(
         created_to=created_to,
         min_final_pct=min_final_pct,
         max_final_pct=max_final_pct,
+        subject_personnel_id=subject_personnel_id,
     )
 
     total = db.scalar(select(func.count()).select_from(query.subquery())) or 0

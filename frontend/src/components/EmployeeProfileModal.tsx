@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   Radar,
   RadarChart,
@@ -14,12 +15,14 @@ import {
   ResponsiveContainer,
 } from "recharts";
 import {
+  useEvaluations,
   usePersonInProgress,
   usePersonRadar,
   usePersonTrend,
   usePersonnelDetail,
 } from "../api/queries";
 import { extractErrorMessage } from "../api/client";
+import { StatusBadge } from "./StatusBadge";
 import { Button } from "../ui/Button";
 import { Modal } from "../ui/Modal";
 import { formatDate } from "../utils/dates";
@@ -80,10 +83,24 @@ export function EmployeeProfileModal({
   personName?: string;
   onClose: () => void;
 }) {
+  const navigate = useNavigate();
   const { data: personnel, isError, error } = usePersonnelDetail(personnelId);
   const { data: radar = [] } = usePersonRadar(personnelId);
   const { data: trend = [] } = usePersonTrend(personnelId);
   const { data: inProgress } = usePersonInProgress(personnelId);
+  // پرونده‌های ارزیابی این فرد که کاربر جاری اجازهٔ دیدنشان را دارد (HR همه، ارزیاب
+  // فقط پرونده‌های حوزهٔ خودش) — برای دکمهٔ «مشاهدهٔ پرونده».
+  const { data: evalsPage } = useEvaluations({
+    subject_personnel_id: personnelId,
+    limit: 20,
+    offset: 0,
+  });
+  const evaluations = evalsPage?.items ?? [];
+
+  function openEvaluation(evaluationId: number) {
+    onClose();
+    navigate(`/evaluations/${evaluationId}`);
+  }
 
   if (!personnel) {
     return (
@@ -163,6 +180,35 @@ export function EmployeeProfileModal({
                 برگشت‌خورده
               </span>
             )}
+            <Button variant="link" onClick={() => openEvaluation(inProgress.evaluation_id)}>
+              مشاهدهٔ پرونده
+            </Button>
+          </div>
+        )}
+
+        {/* پرونده‌های ارزیابی ثبت‌شدهٔ این فرد — با دکمهٔ مشاهده برای هر پرونده */}
+        {evaluations.length > 0 && (
+          <div className="rounded-2xl border border-gray-100 bg-white p-4">
+            <h3 className="mb-2 text-sm font-semibold text-gray-600">
+              پرونده‌های ارزیابی این فرد ({evaluations.length.toLocaleString("fa-IR")})
+            </h3>
+            <ul className="space-y-1.5">
+              {evaluations.map((e) => (
+                <li
+                  key={e.id}
+                  className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-gray-50 px-3 py-2 text-sm"
+                >
+                  <span className="flex flex-wrap items-center gap-2">
+                    <span className="font-medium text-gray-700">{e.evaluation_code}</span>
+                    <StatusBadge status={e.status} />
+                    <span className="text-xs text-gray-400">{formatDate(e.created_at)}</span>
+                  </span>
+                  <Button variant="link" onClick={() => openEvaluation(e.id)}>
+                    مشاهدهٔ پرونده
+                  </Button>
+                </li>
+              ))}
+            </ul>
           </div>
         )}
 

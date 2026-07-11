@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi.responses import Response
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
@@ -11,28 +12,67 @@ from app.models.user import User
 from app.schemas.auth import CurrentUser
 from app.schemas.user import UserCreate, UserPage, UserRead, UserUpdate
 from app.services.audit import log_event
+from app.services.excel import build_users_workbook
 from app.services.sessions import revoke_all_for_user
 
 router = APIRouter(prefix="/api/users", tags=["users"])
+
+
+def _apply_user_filters(query, *, role: UserRole | None, q: str | None, is_active: bool | None):
+    if role is not None:
+        query = query.where(User.role == role)
+    if q:
+        query = query.where(User.username.ilike(f"%{q.strip()}%"))
+    if is_active is not None:
+        query = query.where(User.is_active == is_active)
+    return query
 
 
 @router.get("", response_model=UserPage)
 def list_users(
     role: UserRole | None = None,
     q: str | None = None,
+    is_active: bool | None = None,
     limit: int = Query(default=50, ge=1, le=1000),
     offset: int = Query(default=0, ge=0),
     db: Session = Depends(get_db),
     current_user: CurrentUser = Depends(require_roles(UserRole.hr)),
 ) -> UserPage:
-    query = select(User)
-    if role is not None:
-        query = query.where(User.role == role)
-    if q:
-        query = query.where(User.username.ilike(f"%{q.strip()}%"))
+    query = _apply_user_filters(select(User), role=role, q=q, is_active=is_active)
     total = db.scalar(select(func.count()).select_from(query.subquery())) or 0
     items = list(db.scalars(query.order_by(User.username).limit(limit).offset(offset)))
     return UserPage(total=total, items=[UserRead.model_validate(u) for u in items])
+
+
+@router.get("/export.xlsx")
+def export_users_excel(
+    role: UserRole | None = None,
+    q: str | None = None,
+    is_active: bool | None = None,
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(require_roles(UserRole.hr)),
+) -> Response:
+    """خروجی Excel از فهرست کاربران (فقط HR) با همان فیلترهای فهرست."""
+    query = _apply_user_filters(select(User), role=role, q=q, is_active=is_active)
+    users = list(db.scalars(query.order_by(User.username)))
+    # نام پرسنل مرتبط با یک کوئری دسته‌ای (نه N+1)
+    personnel_ids = {u.personnel_id for u in users if u.personnel_id is not None}
+    personnel_names = (
+        dict(
+            db.execute(
+                select(Personnel.id, Personnel.full_name).where(Personnel.id.in_(personnel_ids))
+            ).all()
+        )
+        if personnel_ids
+        else {}
+    )
+    log_event(db, actor_user_id=current_user.id, event_type="users_excel_exported")
+    db.commit()
+    return Response(
+        content=build_users_workbook(users, personnel_names),
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": 'attachment; filename="users.xlsx"'},
+    )
 
 
 @router.post("", response_model=UserRead, status_code=status.HTTP_201_CREATED)

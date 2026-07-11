@@ -32,7 +32,9 @@ export function VerifyPage() {
       .then(({ data }) => {
         if (!active) return;
         setResult(data);
-        setStatus("valid");
+        // به فیلد valid پاسخ احترام می‌گذاریم؛ اگر سرور به هر دلیلی 200 با valid=false
+        // برگرداند (سند نامعتبر/نهایی‌نشده)، همان حالت «نامعتبر» نمایش داده می‌شود.
+        setStatus(data.valid ? "valid" : "invalid");
       })
       .catch(() => {
         if (active) setStatus("invalid");

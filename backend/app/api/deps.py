@@ -27,7 +27,14 @@ def get_current_user(
     if payload is None or payload.get("type") != "access":
         raise unauthorized
 
-    user = db.get(User, int(payload["sub"]))
+    # sub باید یک شناسهٔ عددی معتبر باشد؛ توکن دست‌کاری‌شده با sub غیرعددی نباید
+    # به یک 500 (ValueError کنترل‌نشده) منجر شود، بلکه همان 401 استاندارد را بگیرد.
+    try:
+        user_id = int(payload["sub"])
+    except (KeyError, TypeError, ValueError):
+        raise unauthorized from None
+
+    user = db.get(User, user_id)
     if user is None or not user.is_active:
         raise unauthorized
     if payload.get("tv") != user.token_version:

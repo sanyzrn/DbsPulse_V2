@@ -6,7 +6,7 @@ import { EmployeeProfileModal } from "../../components/EmployeeProfileModal";
 import { EvaluationActionButton } from "../../components/EvaluationActionButton";
 import { EvaluationList } from "../../components/EvaluationList";
 import { RoleOverviewCards } from "../../components/RoleOverviewCards";
-import { PageHeader } from "../../ui/Card";
+import { PageHeader, TableSkeleton } from "../../ui/Card";
 import { Table } from "../../ui/Table";
 import type { Personnel } from "../../types";
 
@@ -16,7 +16,7 @@ export function SupervisorHomePage() {
   const [startingId, setStartingId] = useState<number | null>(null);
   const [profilePerson, setProfilePerson] = useState<Personnel | null>(null);
   const navigate = useNavigate();
-  const { data, error: loadError } = usePersonnelList({
+  const { data, error: loadError, isPending } = usePersonnelList({
     accessible_to_me: true,
     limit: 1000,
     offset: 0,
@@ -66,6 +66,9 @@ export function SupervisorHomePage() {
           <p className="mb-2 text-sm text-red-600">{extractErrorMessage(loadError)}</p>
         )}
         {error && <p className="mb-2 text-sm text-red-600">{error}</p>}
+        {isPending ? (
+          <TableSkeleton rows={4} />
+        ) : (
         <Table
           bordered={false}
           headers={["نام", "عنوان شغلی", "واحد", ""]}
@@ -96,6 +99,7 @@ export function SupervisorHomePage() {
             />,
           ])}
         />
+        )}
       </div>
 
       <EvaluationList

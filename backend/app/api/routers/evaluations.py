@@ -10,7 +10,13 @@ from sqlalchemy.orm import Session
 from app.api.deps import get_current_user, require_roles
 from app.db.session import get_db
 from app.models.audit_log import AuditLog
-from app.models.enums import CommentStage, EvaluationStatus, PeriodStatus, UserRole
+from app.models.enums import (
+    CommentStage,
+    EvaluationStatus,
+    PeriodStatus,
+    PersonnelStatus,
+    UserRole,
+)
 from app.models.evaluation import EvaluationComment, EvaluationRecord, EvaluationScore
 from app.models.evaluation_access import EvaluationAccess
 from app.models.evaluation_period import EvaluationPeriod
@@ -119,6 +125,12 @@ def create_evaluation(
     personnel = db.get(Personnel, payload.subject_personnel_id)
     if personnel is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="پرسنل یافت نشد")
+    # ارزیابی فقط برای پرسنل فعال معنا دارد؛ داشبورد/دوره‌ها هم فقط فعال‌ها را می‌شمارند.
+    if personnel.status != PersonnelStatus.active:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="این پرسنل غیرفعال است؛ امکان شروع ارزیابی برای او وجود ندارد",
+        )
 
     access = db.scalar(
         select(EvaluationAccess).where(EvaluationAccess.personnel_id == personnel.id)
@@ -194,11 +206,22 @@ def create_evaluation(
     try:
         db.flush()
     except IntegrityError as exc:
-        # دو درخواست هم‌زمان: ایندکس یکتای جزئی برنده را مشخص می‌کند
+        # دو درخواست هم‌زمان: ایندکس یکتای جزئی برنده را مشخص می‌کند. پروندهٔ باز
+        # برنده را دوباره واکشی می‌کنیم تا مثل مسیر پیش‌بررسی، evaluation_id را هم
+        # برگردانیم و فرانت‌اند بتواند مستقیماً به همان پرونده هدایت کند.
         db.rollback()
+        winner = db.scalar(
+            select(EvaluationRecord).where(
+                EvaluationRecord.subject_personnel_id == personnel.id,
+                EvaluationRecord.status != EvaluationStatus.finalized,
+            )
+        )
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail={"message": "برای این پرسنل یک ارزیابی باز (نهایی‌نشده) وجود دارد؛ ابتدا همان پرونده را تکمیل کنید."},
+            detail={
+                "message": "برای این پرسنل یک ارزیابی باز (نهایی‌نشده) وجود دارد؛ ابتدا همان پرونده را تکمیل کنید.",
+                "evaluation_id": winner.id if winner else None,
+            },
         ) from exc
     log_event(
         db,
@@ -225,6 +248,24 @@ def _apply_evaluation_filters(
 ):
     """فیلترهای ترکیب‌پذیر فهرست/خروجی ارزیابی‌ها — یک‌جا تا list و export.xlsx
     همیشه رفتار یکسان داشته باشند (خروجی همان چیزی است که HR فیلتر کرده)."""
+    if (
+        min_final_pct is not None
+        and max_final_pct is not None
+        and min_final_pct > max_final_pct
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="کمینهٔ امتیاز نهایی نمی‌تواند از بیشینهٔ آن بزرگ‌تر باشد",
+        )
+    if (
+        created_from is not None
+        and created_to is not None
+        and created_from > created_to
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="تاریخ شروع بازه نمی‌تواند بعد از تاریخ پایان آن باشد",
+        )
     needs_personnel_join = bool(q) or bool(org_unit)
     if needs_personnel_join:
         query = query.join(Personnel, Personnel.id == EvaluationRecord.subject_personnel_id)

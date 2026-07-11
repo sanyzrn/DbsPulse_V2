@@ -2,6 +2,7 @@ from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from app.core.constants import (
+    EVIDENCE_MAX_WORDS,
     EVIDENCE_REQUIRED_MIN_WORDS,
     EVIDENCE_REQUIRED_SCORES,
     FINAL_RESULT_THRESHOLDS,
@@ -34,19 +35,26 @@ def validate_evidence(scores: list[dict], indicators_by_id: dict[int, Indicator]
     """فقط امتیازهای ۱ و ۵ به شواهد عینی (حداقل ۳ کلمه) نیاز دارند؛ برای ۲/۳/۴
     اختیاری است. هرگز به اعتبارسنجی فرانت‌اند تنها اعتماد نمی‌شود."""
     violations = []
+    too_long = []
     for row in scores:
-        if row["score"] not in EVIDENCE_REQUIRED_SCORES:
-            continue
         count = word_count(row.get("evidence_text"))
-        if count < EVIDENCE_REQUIRED_MIN_WORDS:
-            indicator = indicators_by_id.get(row["indicator_id"])
-            label = indicator.category if indicator else f"شاخص #{row['indicator_id']}"
+        indicator = indicators_by_id.get(row["indicator_id"])
+        label = indicator.category if indicator else f"شاخص #{row['indicator_id']}"
+        # حداقل کلمات فقط برای دو سرِ طیف (۱ و ۵) اجباری است.
+        if row["score"] in EVIDENCE_REQUIRED_SCORES and count < EVIDENCE_REQUIRED_MIN_WORDS:
             violations.append(f'«{label}» (حداقل ۳ کلمه لازم است، در حال حاضر: {count} کلمه)')
+        # سقف کلمات برای هر شواهدِ واردشده اعمال می‌شود (هر امتیازی)؛ فقط اعتبارسنجی
+        # فرانت‌اند کافی نیست — کاربر می‌تواند مستقیماً API را صدا بزند.
+        if count > EVIDENCE_MAX_WORDS:
+            too_long.append(f'«{label}» (حداکثر ۴۰ کلمه مجاز است، در حال حاضر: {count} کلمه)')
 
+    messages = []
     if violations:
-        raise ValueError(
-            "شواهد عینی برای شاخص‌های زیر ناقص است: " + "؛ ".join(violations)
-        )
+        messages.append("شواهد عینی برای شاخص‌های زیر ناقص است: " + "؛ ".join(violations))
+    if too_long:
+        messages.append("شواهد عینی برای شاخص‌های زیر بیش از حد طولانی است: " + "؛ ".join(too_long))
+    if messages:
+        raise ValueError(" | ".join(messages))
 
 
 def compute_result(scores: list[dict], indicators_by_id: dict[int, Indicator]) -> dict:

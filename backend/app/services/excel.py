@@ -8,9 +8,11 @@ from openpyxl import Workbook
 from openpyxl.styles import Font
 from openpyxl.utils import get_column_letter
 
+from app.models.audit_log import AuditLog
 from app.models.evaluation import EvaluationRecord
 from app.models.improvement_plan import ImprovementPlan
 from app.models.personnel import Personnel
+from app.models.user import User
 from app.services.pdf import to_jalali
 
 _PERSIAN_DIGITS = str.maketrans("0123456789", "۰۱۲۳۴۵۶۷۸۹")
@@ -128,6 +130,70 @@ _PLAN_HEADERS = [
 ]
 
 _PLAN_STATUS_LABELS = {"open": "باز", "completed": "تکمیل‌شده", "cancelled": "لغوشده"}
+
+
+_ROLE_LABELS = {
+    "unit_supervisor": "مسئول واحد",
+    "hr": "منابع انسانی",
+    "deputy": "معاونت",
+    "ceo": "مدیرعامل",
+    "employee": "کارمند",
+}
+
+_USER_HEADERS = [
+    "نام کاربری",
+    "نقش",
+    "وضعیت",
+    "پرسنل مرتبط",
+    "تاریخ ایجاد",
+]
+
+
+def build_users_workbook(users: list[User], personnel_names: dict[int, str]) -> bytes:
+    """نام پرسنل مرتبط از دیکشنری ازپیش‌واکشی‌شده می‌آید (کوئری دسته‌ای در روتر از
+    N+1 جلوگیری می‌کند)."""
+    wb, ws = _new_sheet("کاربران", _USER_HEADERS)
+    for u in users:
+        ws.append(
+            [
+                u.username,
+                _ROLE_LABELS.get(u.role.value, u.role.value),
+                "فعال" if u.is_active else "غیرفعال",
+                personnel_names.get(u.personnel_id, "") if u.personnel_id else "",
+                to_jalali(u.created_at.isoformat()),
+            ]
+        )
+    return _to_bytes(wb)
+
+
+_AUDIT_HEADERS = [
+    "زمان",
+    "کاربر",
+    "رویداد",
+    "کد ارزیابی",
+    "مقدار پیشین",
+    "مقدار جدید",
+]
+
+
+def build_audit_log_workbook(
+    rows: list[tuple["AuditLog", str | None, str | None]],
+    event_labels: dict[str, str],
+) -> bytes:
+    """هر ردیف: (AuditLog, نام کاربر, کد ارزیابی) — همان JOIN روتر تا از N+1 پرهیز شود."""
+    wb, ws = _new_sheet("گزارش رویدادها", _AUDIT_HEADERS)
+    for entry, username, evaluation_code in rows:
+        ws.append(
+            [
+                to_jalali(entry.created_at.isoformat()),
+                username or f"#{entry.actor_user_id}",
+                event_labels.get(entry.event_type, entry.event_type),
+                evaluation_code or "",
+                str(entry.old_value) if entry.old_value else "",
+                str(entry.new_value) if entry.new_value else "",
+            ]
+        )
+    return _to_bytes(wb)
 
 
 def build_improvement_plans_workbook(

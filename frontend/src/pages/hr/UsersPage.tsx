@@ -4,10 +4,11 @@ import { apiClient, extractErrorMessage } from "../../api/client";
 import { useDebouncedValue, usePersonnelList, useUsersList } from "../../api/queries";
 import { useAuth } from "../../auth/AuthContext";
 import { useConfirm } from "../../components/ConfirmDialog";
+import { ExcelExportButton } from "../../components/ExcelExportButton";
 import { PaginationControls } from "../../components/PaginationControls";
 import { useToast } from "../../components/Toast";
 import { Button } from "../../ui/Button";
-import { PageHeader } from "../../ui/Card";
+import { FilterSelect, PageHeader, TableSkeleton } from "../../ui/Card";
 import { Modal } from "../../ui/Modal";
 import { Table } from "../../ui/Table";
 import { ROLE_LABELS, type AppUser, type Personnel, type UserRole } from "../../types";
@@ -28,6 +29,7 @@ export function UsersPage() {
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [roleFilter, setRoleFilter] = useState<UserRole | "">("");
+  const [activeFilter, setActiveFilter] = useState<"" | "true" | "false">("");
   const [page, setPage] = useState(0);
   const [editingUser, setEditingUser] = useState<AppUser | null>(null);
   const debouncedSearch = useDebouncedValue(search);
@@ -35,14 +37,27 @@ export function UsersPage() {
   // برای نقش «کارمند» باید پرسنل متناظر انتخاب شود تا کارنامه‌اش را ببیند
   const { data: personnelData } = usePersonnelList({ limit: 1000, offset: 0 });
 
-  const { data, error: loadError } = useUsersList({
+  const listParams = {
     q: debouncedSearch,
     role: roleFilter || undefined,
+    is_active: activeFilter === "" ? undefined : activeFilter === "true",
+  } as const;
+
+  const { data, error: loadError, isPending } = useUsersList({
+    ...listParams,
     limit: PAGE_SIZE,
     offset: page * PAGE_SIZE,
   });
   const total = data?.total ?? 0;
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  const hasActiveFilter = Boolean(search || roleFilter || activeFilter);
+
+  function resetFilters() {
+    setSearch("");
+    setRoleFilter("");
+    setActiveFilter("");
+    setPage(0);
+  }
 
   async function createUser() {
     setError(null);
@@ -161,13 +176,13 @@ export function UsersPage() {
         <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
           <h2 className="text-base font-bold text-gray-900">فهرست کاربران</h2>
           <div className="flex flex-wrap items-center gap-2">
-            {/* فیلتر نقش — ترکیب‌پذیر با جست‌وجو */}
-            <select
+            <ExcelExportButton url="/users/export.xlsx" filename="users.xlsx" params={listParams} />
+            {/* فیلتر نقش — ترکیب‌پذیر با جست‌وجو و وضعیت */}
+            <FilterSelect
               aria-label="فیلتر نقش"
-              className="rounded-xl border border-gray-200 bg-gray-100 py-1.5 pr-3 pl-8 text-sm text-gray-700 outline-none transition-colors duration-150 focus:border-pulse-500 focus:bg-white"
               value={roleFilter}
-              onChange={(e) => {
-                setRoleFilter(e.target.value as UserRole | "");
+              onChange={(v) => {
+                setRoleFilter(v as UserRole | "");
                 setPage(0);
               }}
             >
@@ -177,14 +192,26 @@ export function UsersPage() {
                   {ROLE_LABELS[r]}
                 </option>
               ))}
-            </select>
+            </FilterSelect>
+            <FilterSelect
+              aria-label="فیلتر وضعیت"
+              value={activeFilter}
+              onChange={(v) => {
+                setActiveFilter(v as "" | "true" | "false");
+                setPage(0);
+              }}
+            >
+              <option value="">همهٔ وضعیت‌ها</option>
+              <option value="true">فعال</option>
+              <option value="false">غیرفعال</option>
+            </FilterSelect>
             <div className="relative">
               <svg viewBox="0 0 20 20" className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
                 <circle cx="9" cy="9" r="6" />
                 <path d="M14 14l3 3" />
               </svg>
               <input
-                className="w-full rounded-xl border border-gray-200 bg-gray-100 py-1.5 pr-9 pl-3 text-sm text-gray-700 outline-none transition-colors duration-150 focus:border-pulse-500 focus:bg-white sm:w-64"
+                className="w-full rounded-xl border border-gray-200 bg-gray-100 py-1.5 pr-9 pl-3 text-sm text-gray-700 outline-none transition-colors duration-150 focus:border-pulse-500 focus:bg-white sm:w-56"
                 placeholder="جست‌وجو (نام کاربری)…"
                 value={search}
                 onChange={(e) => {
@@ -193,11 +220,20 @@ export function UsersPage() {
                 }}
               />
             </div>
+            {hasActiveFilter && (
+              <button
+                onClick={resetFilters}
+                className="rounded-xl border border-gray-200 bg-white px-3 py-1.5 text-sm font-medium text-gray-500 transition-colors hover:bg-gray-50 hover:text-gray-700"
+              >
+                حذف فیلترها
+              </button>
+            )}
           </div>
         </div>
         {loadError != null && (
           <p className="mb-2 text-sm text-red-600">{extractErrorMessage(loadError)}</p>
         )}
+        {isPending && <TableSkeleton rows={6} />}
         {data && (
           <Table
             bordered={false}

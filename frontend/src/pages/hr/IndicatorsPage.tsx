@@ -6,7 +6,7 @@ import { useAppConfig, useIndicators } from "../../api/queries";
 import { useConfirm } from "../../components/ConfirmDialog";
 import { useToast } from "../../components/Toast";
 import { Button } from "../../ui/Button";
-import { PageHeader } from "../../ui/Card";
+import { PageHeader, TableSkeleton } from "../../ui/Card";
 import type { Indicator, IndicatorSection } from "../../types";
 
 const inputClass =
@@ -21,7 +21,7 @@ export function IndicatorsPage() {
   const [form, setForm] = useState({ category: "", description: "" });
   const [error, setError] = useState<string | null>(null);
 
-  const { data, error: loadError } = useIndicators({ section, includeInactive: true });
+  const { data, error: loadError, isPending } = useIndicators({ section, includeInactive: true });
 
   // نسخهٔ محلی مرتب‌شده که drag روی آن اعمال می‌شود؛ با هر تغییر بخش/داده هم‌گام می‌شود.
   const [items, setItems] = useState<Indicator[]>([]);
@@ -187,7 +187,9 @@ export function IndicatorsPage() {
           <span className="w-28 text-left">عملیات</span>
         </div>
 
-        {items.length === 0 ? (
+        {isPending ? (
+          <TableSkeleton rows={6} />
+        ) : items.length === 0 ? (
           <p className="py-6 text-center text-sm text-gray-400">شاخصی تعریف نشده است.</p>
         ) : (
           <Reorder.Group axis="y" values={items} onReorder={setItems} className="space-y-1.5">

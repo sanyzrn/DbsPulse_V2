@@ -81,6 +81,7 @@ export function LoginPage() {
               <input
                 id="login-username"
                 name="username"
+                required
                 autoComplete="username"
                 className="w-full rounded-xl border border-gray-200 bg-gray-100 px-4 py-2.5 text-sm text-gray-900 outline-none transition-colors duration-150 focus:border-pulse-500 focus:bg-white"
                 value={username}
@@ -94,6 +95,7 @@ export function LoginPage() {
                 id="login-password"
                 name="password"
                 type="password"
+                required
                 autoComplete="current-password"
                 className="w-full rounded-xl border border-gray-200 bg-gray-100 px-4 py-2.5 text-sm text-gray-900 outline-none transition-colors duration-150 focus:border-pulse-500 focus:bg-white"
                 value={password}

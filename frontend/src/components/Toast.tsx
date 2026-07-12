@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useRef, useState, type ReactNode } from "react";
 import { AnimatePresence, motion } from "motion/react";
+import { SPRING_SOFT } from "../ui/motion";
 
 type ToastKind = "success" | "error";
 
@@ -49,7 +50,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
               initial={{ opacity: 0, y: 24, scale: 0.9 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: 12, scale: 0.95 }}
-              transition={{ type: "spring", stiffness: 400, damping: 30 }}
+              transition={SPRING_SOFT}
               className={`pointer-events-auto flex items-center gap-2.5 rounded-2xl px-4 py-2.5 text-sm font-medium shadow-float ring-1 ring-black/5 ${
                 t.kind === "success" ? "bg-green-600 text-white" : "bg-pulse-600 text-white"
               }`}

@@ -12,7 +12,7 @@ import { ExcelExportButton } from "../../components/ExcelExportButton";
 import { PaginationControls } from "../../components/PaginationControls";
 import { useToast } from "../../components/Toast";
 import { Button } from "../../ui/Button";
-import { FilterSelect, PageHeader, TableSkeleton } from "../../ui/Card";
+import { CollapsibleCard, FilterSelect, PageHeader, TableSkeleton } from "../../ui/Card";
 import { Modal } from "../../ui/Modal";
 import { Table } from "../../ui/Table";
 import { JalaliDatePicker } from "../../ui/JalaliDatePicker";
@@ -213,8 +213,7 @@ export function PersonnelPage() {
     <div className="space-y-4">
       <PageHeader title="پرسنل" subtitle="ثبت پرسنل جدید و مدیریت دسترسی زنجیره ارزیابی هر فرد" />
       <div className="space-y-4">
-        <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-card">
-          <h2 className="mb-4 text-base font-bold text-gray-900">افزودن پرسنل</h2>
+        <CollapsibleCard title="افزودن پرسنل" subtitle="ثبت پرسنل جدید و تعیین دسترسی زنجیرهٔ ارزیابی">
           <form
             onSubmit={(e) => {
               e.preventDefault();
@@ -303,7 +302,7 @@ export function PersonnelPage() {
               افزودن
             </Button>
           </form>
-        </div>
+        </CollapsibleCard>
 
         <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-card">
           <div className="mb-4 flex flex-wrap items-center justify-between gap-2">

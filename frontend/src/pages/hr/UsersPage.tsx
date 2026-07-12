@@ -8,7 +8,7 @@ import { ExcelExportButton } from "../../components/ExcelExportButton";
 import { PaginationControls } from "../../components/PaginationControls";
 import { useToast } from "../../components/Toast";
 import { Button } from "../../ui/Button";
-import { FilterSelect, PageHeader, TableSkeleton } from "../../ui/Card";
+import { CollapsibleCard, FilterSelect, PageHeader, TableSkeleton } from "../../ui/Card";
 import { Modal } from "../../ui/Modal";
 import { Table } from "../../ui/Table";
 import { ROLE_LABELS, type AppUser, type Personnel, type UserRole } from "../../types";
@@ -104,8 +104,7 @@ export function UsersPage() {
   return (
     <div className="space-y-4">
       <PageHeader title="کاربران" subtitle="ساخت و مدیریت حساب‌های کاربری نقش‌های مختلف سامانه" />
-      <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-card">
-        <h2 className="mb-4 text-base font-bold text-gray-900">ساخت حساب کاربری</h2>
+      <CollapsibleCard title="ساخت حساب کاربری" subtitle="افزودن حساب برای نقش‌های مختلف سامانه">
         <form
           onSubmit={(e) => {
             e.preventDefault();
@@ -170,7 +169,7 @@ export function UsersPage() {
           <Button type="submit">ساخت کاربر</Button>
         </form>
         {error && <p className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p>}
-      </div>
+      </CollapsibleCard>
 
       <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-card">
         <div className="mb-4 flex flex-wrap items-center justify-between gap-2">

@@ -1,6 +1,7 @@
 import { useEffect, useRef, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { AnimatePresence, motion } from "motion/react";
+import { EASE_SOFT, SPRING_SOFT } from "./motion";
 
 const SIZES = {
   sm: "max-w-sm",
@@ -84,7 +85,7 @@ export function Modal({
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        transition={{ duration: 0.2 }}
+        transition={{ duration: 0.28, ease: EASE_SOFT }}
       >
         <motion.div
           ref={dialogRef}
@@ -93,10 +94,10 @@ export function Modal({
           aria-label={typeof title === "string" ? title : undefined}
           tabIndex={-1}
           className={`max-h-[90vh] w-full ${SIZES[size]} overflow-y-auto rounded-3xl bg-white shadow-float outline-none`}
-          initial={{ opacity: 0, scale: 0.95, y: 12 }}
+          initial={{ opacity: 0, scale: 0.96, y: 12 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.97, y: 8 }}
-          transition={{ type: "spring", stiffness: 320, damping: 28 }}
+          transition={SPRING_SOFT}
         >
           {/* بالای مودال: عنوان + دکمه بستن */}
           <div className="mb-3 flex items-start justify-between gap-3 border-b border-gray-100 px-6 pt-5 pb-4">

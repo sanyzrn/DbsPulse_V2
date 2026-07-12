@@ -6,7 +6,8 @@ import { useAppConfig, useIndicators } from "../../api/queries";
 import { useConfirm } from "../../components/ConfirmDialog";
 import { useToast } from "../../components/Toast";
 import { Button } from "../../ui/Button";
-import { PageHeader, TableSkeleton } from "../../ui/Card";
+import { CollapsibleCard, PageHeader, TableSkeleton } from "../../ui/Card";
+import { TAB_TRANSITION } from "../../ui/motion";
 import type { Indicator, IndicatorSection } from "../../types";
 
 const inputClass =
@@ -124,7 +125,7 @@ export function IndicatorsPage() {
               <motion.span
                 layoutId="indicator-tab"
                 className="absolute inset-0 rounded-xl bg-charcoal-900 shadow-sm"
-                transition={{ type: "spring", stiffness: 400, damping: 32 }}
+                transition={{ type: "spring", stiffness: 300, damping: 30 }}
               />
             )}
             <span className="relative">
@@ -136,8 +137,7 @@ export function IndicatorsPage() {
         ))}
       </div>
 
-      <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-card">
-        <h2 className="mb-4 text-base font-bold text-gray-900">افزودن شاخص</h2>
+      <CollapsibleCard title="افزودن شاخص" subtitle="افزودن شاخص جدید به بخش انتخاب‌شده (عمومی/تخصصی)">
         <form
           onSubmit={(e) => {
             e.preventDefault();
@@ -170,7 +170,7 @@ export function IndicatorsPage() {
           شاخص جدید به انتهای فهرست افزوده می‌شود. برای تغییر ترتیب، ردیف‌ها را با دستگیرهٔ کنارشان بکشید.
         </p>
         {error && <p className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p>}
-      </div>
+      </CollapsibleCard>
 
       <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-card">
         {loadError != null && (
@@ -187,6 +187,7 @@ export function IndicatorsPage() {
           <span className="w-28 text-left">عملیات</span>
         </div>
 
+        <motion.div key={section} {...TAB_TRANSITION}>
         {isPending ? (
           <TableSkeleton rows={6} />
         ) : items.length === 0 ? (
@@ -205,6 +206,7 @@ export function IndicatorsPage() {
             ))}
           </Reorder.Group>
         )}
+        </motion.div>
       </div>
     </div>
   );

@@ -7,6 +7,7 @@ import { useConfirm } from "../../components/ConfirmDialog";
 import { useToast } from "../../components/Toast";
 import { Button } from "../../ui/Button";
 import { PageHeader } from "../../ui/Card";
+import { Modal } from "../../ui/Modal";
 import { CountUp, PctBar } from "../../ui/Meters";
 import { Table } from "../../ui/Table";
 import { JalaliDatePicker } from "../../ui/JalaliDatePicker";
@@ -24,6 +25,7 @@ export function PeriodsPage() {
   const queryClient = useQueryClient();
   const [form, setForm] = useState(emptyForm);
   const [error, setError] = useState<string | null>(null);
+  const [showAddPeriod, setShowAddPeriod] = useState(false);
 
   const { data: periods = [], error: loadError } = usePeriods();
   const openPeriod = periods.find((p) => p.status === "open") ?? null;
@@ -38,6 +40,7 @@ export function PeriodsPage() {
       await apiClient.post("/periods", form);
       setForm(emptyForm);
       await invalidate();
+      setShowAddPeriod(false);
       showSuccess("دوره ارزیابی آغاز شد و به ارزیاب‌ها اطلاع داده شد");
     } catch (err) {
       const message = extractErrorMessage(err);
@@ -66,14 +69,34 @@ export function PeriodsPage() {
     <div className="space-y-4">
       <PageHeader title="دوره‌های ارزیابی" subtitle="آغاز، پایش پیشرفت و بستن دوره‌های ارزیابی سازمان" />
       {!openPeriod && (
-        <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-card">
-          <h2 className="mb-4 text-base font-bold text-gray-900">آغاز دوره ارزیابی جدید</h2>
+        <div className="flex justify-end">
+          <Button onClick={() => { setError(null); setShowAddPeriod(true); }}>
+            + آغاز دوره ارزیابی جدید
+          </Button>
+        </div>
+      )}
+      {showAddPeriod && !openPeriod && (
+        <Modal
+          title="آغاز دوره ارزیابی جدید"
+          onClose={() => setShowAddPeriod(false)}
+          footer={
+            <>
+              <Button variant="secondary" onClick={() => setShowAddPeriod(false)}>
+                انصراف
+              </Button>
+              <Button type="submit" form="add-period-form">
+                آغاز دوره
+              </Button>
+            </>
+          }
+        >
           <form
+            id="add-period-form"
             onSubmit={(e) => {
               e.preventDefault();
               createPeriod();
             }}
-            className="flex flex-wrap items-end gap-3 text-sm"
+            className="flex flex-wrap items-end gap-3 py-2 text-sm"
           >
             <label className="flex flex-col gap-1 text-xs font-medium text-gray-600">
               نام دوره (مثلاً «دوره پاییز ۱۴۰۵»)
@@ -87,10 +110,9 @@ export function PeriodsPage() {
               تاریخ پایان
               <JalaliDatePicker required className={inputClass} value={form.ends_on} onChange={(iso) => setForm({ ...form, ends_on: iso })} />
             </label>
-            <Button type="submit">آغاز دوره</Button>
           </form>
           {error && <p className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p>}
-        </div>
+        </Modal>
       )}
 
       {openPeriod && <OpenPeriodCard period={openPeriod} onClose={() => closePeriod(openPeriod)} />}

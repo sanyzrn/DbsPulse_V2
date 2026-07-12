@@ -12,7 +12,7 @@ import { ExcelExportButton } from "../../components/ExcelExportButton";
 import { PaginationControls } from "../../components/PaginationControls";
 import { useToast } from "../../components/Toast";
 import { Button } from "../../ui/Button";
-import { CollapsibleCard, FilterSelect, PageHeader, TableSkeleton } from "../../ui/Card";
+import { FilterSelect, PageHeader, TableSkeleton } from "../../ui/Card";
 import { Modal } from "../../ui/Modal";
 import { Table } from "../../ui/Table";
 import { JalaliDatePicker } from "../../ui/JalaliDatePicker";
@@ -149,6 +149,7 @@ export function PersonnelPage() {
   const [form, setForm] = useState(emptyForm);
   const [access, setAccess] = useState<AccessDraft>(emptyAccess);
   const [error, setError] = useState<string | null>(null);
+  const [showAddPersonnel, setShowAddPersonnel] = useState(false);
   const [profilePerson, setProfilePerson] = useState<Personnel | null>(null);
   const [editingPersonnel, setEditingPersonnel] = useState<Personnel | null>(null);
   const [search, setSearch] = useState("");
@@ -201,6 +202,7 @@ export function PersonnelPage() {
       setForm(emptyForm);
       setAccess(emptyAccess);
       await queryClient.invalidateQueries({ queryKey: ["personnel"] });
+      setShowAddPersonnel(false);
       showSuccess("پرسنل با موفقیت افزوده شد");
     } catch (err) {
       const message = extractErrorMessage(err);
@@ -213,8 +215,25 @@ export function PersonnelPage() {
     <div className="space-y-4">
       <PageHeader title="پرسنل" subtitle="ثبت پرسنل جدید و مدیریت دسترسی زنجیره ارزیابی هر فرد" />
       <div className="space-y-4">
-        <CollapsibleCard title="افزودن پرسنل" subtitle="ثبت پرسنل جدید و تعیین دسترسی زنجیرهٔ ارزیابی">
+        {showAddPersonnel && (
+          <Modal
+            title="افزودن پرسنل"
+            size="lg"
+            onClose={() => setShowAddPersonnel(false)}
+            footer={
+              <>
+                <Button variant="secondary" onClick={() => setShowAddPersonnel(false)}>
+                  انصراف
+                </Button>
+                <Button type="submit" form="add-personnel-form">
+                  افزودن
+                </Button>
+              </>
+            }
+          >
           <form
+            id="add-personnel-form"
+            className="py-2"
             onSubmit={(e) => {
               e.preventDefault();
               createPersonnel();
@@ -298,15 +317,18 @@ export function PersonnelPage() {
             </div>
 
             {error && <p className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p>}
-            <Button type="submit" className="mt-4">
-              افزودن
-            </Button>
           </form>
-        </CollapsibleCard>
+          </Modal>
+        )}
 
         <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-card">
           <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
-            <h2 className="text-base font-bold text-gray-900">فهرست پرسنل</h2>
+            <div className="flex items-center gap-3">
+              <h2 className="text-base font-bold text-gray-900">فهرست پرسنل</h2>
+              <Button onClick={() => { setError(null); setShowAddPersonnel(true); }}>
+                + افزودن پرسنل
+              </Button>
+            </div>
             <div className="flex flex-wrap items-center gap-2">
               <ExcelExportButton
                 url="/personnel/export.xlsx"

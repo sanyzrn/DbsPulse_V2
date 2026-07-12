@@ -10,7 +10,7 @@ import { PaginationControls } from "./PaginationControls";
 import { Table } from "../ui/Table";
 import { EmptyState } from "../ui/Card";
 import { JalaliDatePicker } from "../ui/JalaliDatePicker";
-import { EASE_SOFT } from "../ui/motion";
+import { EASE_SOFT, TAB_TRANSITION } from "../ui/motion";
 
 const PAGE_SIZE = 10;
 
@@ -272,6 +272,8 @@ export function EvaluationList({
         <p className="mb-2 text-sm text-red-600">{extractErrorMessage(error)}</p>
       )}
 
+      {/* محتوای تب با تعویض نرم (fade) هنگام جابه‌جایی بین تب‌های وضعیت */}
+      <motion.div key={activeTabKey} {...TAB_TRANSITION}>
       {/* اسکلتون بارگذاری */}
       {isPending && (
         <div className="space-y-2">
@@ -331,6 +333,7 @@ export function EvaluationList({
           />
         </>
       )}
+      </motion.div>
     </div>
   );
 }

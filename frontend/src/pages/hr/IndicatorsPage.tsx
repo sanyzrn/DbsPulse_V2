@@ -7,6 +7,8 @@ import { useConfirm } from "../../components/ConfirmDialog";
 import { useToast } from "../../components/Toast";
 import { Button } from "../../ui/Button";
 import { PageHeader, TableSkeleton } from "../../ui/Card";
+import { Modal } from "../../ui/Modal";
+import { TAB_TRANSITION } from "../../ui/motion";
 import type { Indicator, IndicatorSection } from "../../types";
 
 const inputClass =
@@ -20,6 +22,7 @@ export function IndicatorsPage() {
   const [section, setSection] = useState<IndicatorSection>("general");
   const [form, setForm] = useState({ category: "", description: "" });
   const [error, setError] = useState<string | null>(null);
+  const [showAddIndicator, setShowAddIndicator] = useState(false);
 
   const { data, error: loadError, isPending } = useIndicators({ section, includeInactive: true });
 
@@ -42,6 +45,7 @@ export function IndicatorsPage() {
       await apiClient.post("/indicators", { ...form, section });
       setForm({ category: "", description: "" });
       await invalidate();
+      setShowAddIndicator(false);
       showSuccess("شاخص با موفقیت افزوده شد");
     } catch (err) {
       const message = extractErrorMessage(err);
@@ -104,6 +108,7 @@ export function IndicatorsPage() {
     <div className="space-y-4">
       <PageHeader title="شاخص‌های ارزیابی" subtitle="تعریف و مدیریت شاخص‌های عمومی و تخصصی فرم ارزیابی" />
 
+      <div className="flex flex-wrap items-center justify-between gap-2">
       {/* تب‌های مدرن با نشانگر گرادیانت متحرک */}
       <div
         role="tablist"
@@ -124,7 +129,7 @@ export function IndicatorsPage() {
               <motion.span
                 layoutId="indicator-tab"
                 className="absolute inset-0 rounded-xl bg-charcoal-900 shadow-sm"
-                transition={{ type: "spring", stiffness: 400, damping: 32 }}
+                transition={{ type: "spring", stiffness: 300, damping: 30 }}
               />
             )}
             <span className="relative">
@@ -135,16 +140,37 @@ export function IndicatorsPage() {
           </button>
         ))}
       </div>
+        <Button onClick={() => { setError(null); setShowAddIndicator(true); }}>
+          + افزودن شاخص
+        </Button>
+      </div>
 
-      <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-card">
-        <h2 className="mb-4 text-base font-bold text-gray-900">افزودن شاخص</h2>
+      {showAddIndicator && (
+        <Modal
+          title="افزودن شاخص"
+          onClose={() => setShowAddIndicator(false)}
+          footer={
+            <>
+              <Button variant="secondary" onClick={() => setShowAddIndicator(false)}>
+                انصراف
+              </Button>
+              <Button type="submit" form="add-indicator-form">
+                افزودن
+              </Button>
+            </>
+          }
+        >
         <form
+          id="add-indicator-form"
           onSubmit={(e) => {
             e.preventDefault();
             createIndicator();
           }}
-          className="flex flex-wrap items-end gap-3 text-sm"
+          className="flex flex-wrap items-end gap-3 py-2 text-sm"
         >
+          <p className="w-full text-xs text-gray-500">
+            این شاخص به بخش «{section === "general" ? "عمومی" : "تخصصی"}» افزوده می‌شود.
+          </p>
           <label className="flex flex-col gap-1 text-xs font-medium text-gray-600">
             دسته (مثلاً «تعهد سازمانی»)
             <input
@@ -163,14 +189,10 @@ export function IndicatorsPage() {
               onChange={(e) => setForm({ ...form, description: e.target.value })}
             />
           </label>
-          <Button type="submit">افزودن</Button>
         </form>
-        {/* شاخص جدید خودکار به انتهای فهرست همین بخش اضافه می‌شود؛ ترتیب را با کشیدن تغییر دهید. */}
-        <p className="mt-3 text-xs text-gray-400">
-          شاخص جدید به انتهای فهرست افزوده می‌شود. برای تغییر ترتیب، ردیف‌ها را با دستگیرهٔ کنارشان بکشید.
-        </p>
         {error && <p className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p>}
-      </div>
+        </Modal>
+      )}
 
       <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-card">
         {loadError != null && (
@@ -187,6 +209,7 @@ export function IndicatorsPage() {
           <span className="w-28 text-left">عملیات</span>
         </div>
 
+        <motion.div key={section} {...TAB_TRANSITION}>
         {isPending ? (
           <TableSkeleton rows={6} />
         ) : items.length === 0 ? (
@@ -205,6 +228,7 @@ export function IndicatorsPage() {
             ))}
           </Reorder.Group>
         )}
+        </motion.div>
       </div>
     </div>
   );

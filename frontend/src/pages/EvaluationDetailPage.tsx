@@ -187,7 +187,7 @@ export function EvaluationDetailPage() {
               کد پرسنلی: {personnel.personnel_code} · عنوان شغلی: {personnel.job_title} · واحد: {personnel.org_unit}
             </p>
           </div>
-          <div className="text-left text-sm">
+          <div className="text-end text-sm">
             <p className="font-medium text-gray-800">{evaluation.evaluation_code}</p>
             <p className="text-gray-500">
               <StatusBadge status={evaluation.status} /> · {STAGE_LABELS[evaluation.stage]}

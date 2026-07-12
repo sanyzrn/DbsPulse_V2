@@ -31,6 +31,7 @@ export function UsersPage() {
   const [roleFilter, setRoleFilter] = useState<UserRole | "">("");
   const [activeFilter, setActiveFilter] = useState<"" | "true" | "false">("");
   const [page, setPage] = useState(0);
+  const [showAddUser, setShowAddUser] = useState(false);
   const [editingUser, setEditingUser] = useState<AppUser | null>(null);
   const debouncedSearch = useDebouncedValue(search);
 
@@ -75,6 +76,7 @@ export function UsersPage() {
       setForm({ username: "", password: "", role: "unit_supervisor" });
       setPersonnelId("");
       await queryClient.invalidateQueries({ queryKey: ["users"] });
+      setShowAddUser(false);
       showSuccess("کاربر با موفقیت ساخته شد");
     } catch (err) {
       const message = extractErrorMessage(err);
@@ -104,14 +106,28 @@ export function UsersPage() {
   return (
     <div className="space-y-4">
       <PageHeader title="کاربران" subtitle="ساخت و مدیریت حساب‌های کاربری نقش‌های مختلف سامانه" />
-      <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-card">
-        <h2 className="mb-4 text-base font-bold text-gray-900">ساخت حساب کاربری</h2>
+      {showAddUser && (
+        <Modal
+          title="ساخت حساب کاربری"
+          onClose={() => setShowAddUser(false)}
+          footer={
+            <>
+              <Button variant="secondary" onClick={() => setShowAddUser(false)}>
+                انصراف
+              </Button>
+              <Button type="submit" form="add-user-form">
+                ساخت کاربر
+              </Button>
+            </>
+          }
+        >
         <form
+          id="add-user-form"
           onSubmit={(e) => {
             e.preventDefault();
             createUser();
           }}
-          className="flex flex-wrap items-end gap-3 text-sm"
+          className="flex flex-wrap items-end gap-3 py-2 text-sm"
         >
           <label className="flex flex-col gap-1 text-xs font-medium text-gray-600">
             نام کاربری
@@ -167,14 +183,19 @@ export function UsersPage() {
               </select>
             </label>
           )}
-          <Button type="submit">ساخت کاربر</Button>
         </form>
         {error && <p className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p>}
-      </div>
+        </Modal>
+      )}
 
       <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-card">
         <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
-          <h2 className="text-base font-bold text-gray-900">فهرست کاربران</h2>
+          <div className="flex items-center gap-3">
+            <h2 className="text-base font-bold text-gray-900">فهرست کاربران</h2>
+            <Button onClick={() => { setError(null); setShowAddUser(true); }}>
+              + ساخت کاربر
+            </Button>
+          </div>
           <div className="flex flex-wrap items-center gap-2">
             <ExcelExportButton url="/users/export.xlsx" filename="users.xlsx" params={listParams} />
             {/* فیلتر نقش — ترکیب‌پذیر با جست‌وجو و وضعیت */}

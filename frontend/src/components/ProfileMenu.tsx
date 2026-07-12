@@ -57,7 +57,7 @@ export function ProfileMenu({ user, onLogout }: { user: CurrentUser; onLogout: (
             initial={{ opacity: 0, y: -8, scale: 0.97 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: -8, scale: 0.97 }}
-            transition={{ duration: 0.2, ease: "easeOut" }}
+            transition={{ duration: 0.26, ease: [0.22, 1, 0.36, 1] }}
           >
             {/* هدر تیره — همان زبان بصری کارت‌های «hero» تیره‌ی باقی اپ */}
             <div className="flex items-center gap-3 bg-charcoal-900 px-4 py-3.5">

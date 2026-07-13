@@ -158,9 +158,12 @@ REM 6. Start backend + frontend servers
 REM ------------------------------------------------------------
 echo [6/6] Starting servers...
 
+set "LAN_IP="
+for /f "usebackq delims=" %%I in (`powershell -NoProfile -Command "$ip = (Get-NetIPAddress -AddressFamily IPv4 | Where-Object { $_.IPAddress -notlike '127.*' -and $_.IPAddress -notlike '169.254.*' } | Select-Object -First 1 -ExpandProperty IPAddress); if ($ip) { $ip }"`) do set "LAN_IP=%%I"
+
 start "DbsPulse Backend (uvicorn - port 8000)" /D "%BACKEND%" cmd /k ""%VENV%\Scripts\uvicorn.exe" app.main:app --reload --host 0.0.0.0 --port 8000"
 
-start "DbsPulse Frontend (vite - port 5173)" /D "%FRONTEND%" cmd /k "npm run dev"
+start "DbsPulse Frontend (vite - port 5173)" /D "%FRONTEND%" cmd /k "npm run dev -- --host"
 
 echo.
 echo Waiting for the backend to come up...
@@ -189,6 +192,11 @@ echo ============================================================
 echo  DbsPulse is starting up.
 echo  Backend : http://localhost:8000
 echo  Frontend: http://localhost:5173
+if defined LAN_IP (
+    echo  LAN Link: http://!LAN_IP!:5173
+) else (
+    echo  LAN Link: unavailable - no active non-loopback IPv4 address detected.
+)
 echo  Two console windows were opened for the running servers.
 echo  Close those windows (or Ctrl+C inside them) to stop DbsPulse.
 echo ============================================================

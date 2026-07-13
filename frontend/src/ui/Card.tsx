@@ -1,6 +1,4 @@
-import { useState, type ReactNode } from "react";
-import { AnimatePresence, motion } from "motion/react";
-import { EASE_SOFT } from "./motion";
+import type { ReactNode } from "react";
 
 /** ظرف استاندارد بخش‌های صفحه با سایه مدرن و حاشیه ظریف. */
 export function Card({
@@ -27,67 +25,6 @@ export function Card({
         </div>
       )}
       {children}
-    </div>
-  );
-}
-
-/** کارت تاشو با هدر کلیک‌پذیر — برای «افشای تدریجی»: فرم‌ها/بخش‌های کم‌کاربرد
- * به‌صورت پیش‌فرض جمع‌اند تا محتوای اصلی صفحه شلوغ نشود، و با یک کلیک نرم باز می‌شوند. */
-export function CollapsibleCard({
-  title,
-  subtitle,
-  defaultOpen = false,
-  children,
-}: {
-  title: ReactNode;
-  subtitle?: ReactNode;
-  defaultOpen?: boolean;
-  children: ReactNode;
-}) {
-  const [open, setOpen] = useState(defaultOpen);
-  return (
-    <div className="overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-card">
-      <button
-        type="button"
-        onClick={() => setOpen((v) => !v)}
-        aria-expanded={open}
-        className="flex w-full items-center justify-between gap-3 px-5 py-4 text-right transition-colors duration-200 hover:bg-gray-50/70"
-      >
-        <span className="flex items-center gap-2.5">
-          <span className="flex h-8 w-8 flex-none items-center justify-center rounded-xl bg-pulse-50 text-pulse-600">
-            <svg viewBox="0 0 20 20" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-              <path d="M10 4v12M4 10h12" />
-            </svg>
-          </span>
-          <span>
-            <span className="block text-base font-bold text-gray-900">{title}</span>
-            {subtitle && <span className="mt-0.5 block text-xs text-gray-500">{subtitle}</span>}
-          </span>
-        </span>
-        <motion.span
-          aria-hidden
-          animate={{ rotate: open ? 180 : 0 }}
-          transition={{ duration: 0.3, ease: EASE_SOFT }}
-          className="flex-none text-gray-400"
-        >
-          <svg viewBox="0 0 20 20" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M6 8l4 4 4-4" />
-          </svg>
-        </motion.span>
-      </button>
-      <AnimatePresence initial={false}>
-        {open && (
-          <motion.div
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: "auto", opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            transition={{ duration: 0.32, ease: EASE_SOFT }}
-            className="overflow-hidden"
-          >
-            <div className="border-t border-gray-100 px-5 py-5">{children}</div>
-          </motion.div>
-        )}
-      </AnimatePresence>
     </div>
   );
 }

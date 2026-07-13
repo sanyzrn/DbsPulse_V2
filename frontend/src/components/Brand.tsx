@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { motion } from "motion/react";
 
-const DEV_LOGO_URL = "https://www.dbsgraphic.ir/logo/Dbs_logo_single.png";
+const DEV_LOGO_URL = "./logo/Dbs_logo_single.png";
 
 /** نشان‌های موقت برنامه و توسعه‌دهنده — قرمز برند، تک‌رنگ.
  * نشان اصلی شامل موج پالس متحرک است که هویت «DbsPulse» را منتقل می‌کند. */

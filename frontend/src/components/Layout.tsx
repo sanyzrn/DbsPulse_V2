@@ -8,6 +8,7 @@ import { Footer } from "./Footer";
 import { NotificationBell } from "./NotificationBell";
 import { ProfileMenu } from "./ProfileMenu";
 import { EASE_SOFT } from "../ui/motion";
+import { AnimatedGridBackground } from "./AnimatedGridBackground";
 
 const NAV_BY_ROLE: Record<string, { to: string; label: string }[]> = {
   hr: [
@@ -53,7 +54,9 @@ export function Layout() {
     }`;
 
   return (
-    <div className="flex min-h-screen flex-col bg-cream-50">
+    <div className="flex min-h-screen flex-col">
+      <AnimatedGridBackground />
+      <div className="pointer-events-none fixed inset-0 -z-10 bg-[radial-gradient(circle_at_top_left,rgba(191,191,191,1),transparent_20%)]" />
       {/* پرش به محتوای اصلی: کاربر کیبورد/screen reader مجبور نیست هر بار کل هدر
           (برند، زنگوله، منوی کاربر، ناوبری نقش) را Tab بزند تا به محتوای صفحه برسد */}
       <a

@@ -13,8 +13,7 @@ export function Footer() {
         </span>
       </div>
       <div dir="ltr" className="flex items-center gap-1.5">
-        <span>Developed by</span>
-        <span className="font-semibold text-pulse-700">{DEVELOPER_NAME}</span>
+        <span>Developed by {DEVELOPER_NAME}</span>
         <DevMark className="h-4 w-4" />
       </div>
     </footer>

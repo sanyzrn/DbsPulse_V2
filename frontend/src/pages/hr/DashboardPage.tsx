@@ -31,7 +31,7 @@ import { ReportsSection } from "./ReportsSection";
 import { PageHeader } from "../../ui/Card";
 import { CountUp, PctBadge, ScoreRing, SuppressedValue } from "../../ui/Meters";
 import { TAB_TRANSITION } from "../../ui/motion";
-import { HorizontalBarChart } from "../../ui/HorizontalBarChart";
+import { DotPlot } from "../../ui/plot";
 import { Table } from "../../ui/Table";
 import { formatDate } from "../../utils/dates";
 import type { EvaluationStatus } from "../../types";
@@ -418,8 +418,10 @@ function BarByOrgUnitCard({
   const hiddenCount = data.length - visible.length;
   if (visible.length === 0) return null;
   const chartData = visible.map((u) => ({
-    name: u.org_unit,
-    value: Math.round(u.avg_final_pct!),
+    key: u.org_unit,
+    label: u.org_unit,
+    value: u.avg_final_pct!,
+    note: `${u.count.toLocaleString("fa-IR")} ارزیابی`,
   }));
 
   return (
@@ -431,12 +433,7 @@ function BarByOrgUnitCard({
           (میانگینشان عملاً امتیاز فرد است).
         </p>
       )}
-      <HorizontalBarChart
-        data={chartData}
-        max={100}
-        axisWidth={130}
-        ariaLabel="میانگین امتیاز به تفکیک واحد سازمانی"
-      />
+      <DotPlot rows={chartData} ariaLabel="میانگین امتیاز به تفکیک واحد سازمانی" />
     </div>
   );
 }

@@ -129,13 +129,13 @@ describe("useScoreForm", () => {
   it("keeps the same drafts array when server data repeats, so autosave is not retriggered", () => {
     // یک آرایهٔ نو در هر refetch باعث می‌شد افکت autosave شلیک کند، آن هم کش را
     // به‌روز کند و دوباره همین چرخه — یک حلقهٔ ذخیرهٔ بی‌پایان.
-    const existing = [{ id: 3, indicator_id: 1, score: 3, evidence_text: null }];
+    const row = { id: 3, indicator_id: 1, score: 3, evidence_text: null };
     const { result, rerender } = renderHook(({ e }) => useScoreForm(INDICATORS, e), {
-      initialProps: { e: existing },
+      initialProps: { e: [row] },
     });
     const first = result.current.drafts;
 
-    rerender({ e: [{ ...existing[0] }] }); // همان محتوا، آرایه/شیء تازه
+    rerender({ e: [{ ...row }] }); // همان محتوا، آرایه/شیء تازه
 
     expect(result.current.drafts).toBe(first);
   });

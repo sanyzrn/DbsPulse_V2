@@ -18,6 +18,15 @@
  */
 import { useMemo, useState } from "react";
 import type { IndicatorReportStat } from "../types";
+import {
+  DOT_SOFT,
+  DOT_STRONG,
+  ROW_GRID,
+  ScaleTicks,
+  Track,
+  fa1,
+  faInt,
+} from "./plot";
 
 const MIN_SCORE = 1;
 const MAX_SCORE = 5;
@@ -27,30 +36,6 @@ const SECTION_LABEL: Record<string, string> = {
   general: "شاخص‌های عمومی",
   specialized: "شاخص‌های تخصصی",
 };
-
-/** الگوی ستون‌ها یک‌جا تعریف می‌شود تا خط‌کش بالای هر بخش و ریل همهٔ ردیف‌ها —
- * چه دسته و چه شاخص — دقیقاً هم‌تراز بمانند.
- *
- * عدد بین برچسب و ریل می‌نشیند، نه انتهای ردیف: نام دسته‌ها کوتاه است و اگر عدد
- * آن‌سوی ریل برود، وسط هر ردیف یک شکاف خالی می‌ماند.
- *
- * روی موبایل سهم ریل کمتر است، وگرنه نام دسته به «مسئولیت‌پذی…» می‌رسد و روی لمس
- * هم tooltip‌ای در کار نیست که متن کامل را نشان دهد. */
-const ROW_GRID =
-  "grid grid-cols-[minmax(0,1fr)_2.5rem_38%] sm:grid-cols-[minmax(0,1fr)_2.5rem_50%] items-center gap-x-2";
-
-const RAIL = "#f1f2f4";
-const LEAD_STRONG = "#f49f9f";
-const LEAD_SOFT = "#facaca";
-const DOT_STRONG = "#b61615";
-const DOT_SOFT = "#eb4847";
-
-const fa1 = (value: number) =>
-  value.toLocaleString("fa-IR", { minimumFractionDigits: 1, maximumFractionDigits: 1 });
-const faInt = (value: number) => value.toLocaleString("fa-IR");
-
-const offset = (value: number) =>
-  Math.min(100, Math.max(0, ((value - MIN_SCORE) / (MAX_SCORE - MIN_SCORE)) * 100));
 
 export type IndicatorSort = "form" | "lowest";
 
@@ -131,11 +116,8 @@ function buildSections(stats: IndicatorReportStat[], sort: IndicatorSort): Secti
   return blocks;
 }
 
-/** ریل ۱ تا ۵ با نقطه روی مقدار، به‌علاوهٔ نشانگر چین‌چینِ میانگین کل.
- *
- * نقطه با یک ظرفِ عرض‌صفرِ flex روی مقدار مرکز می‌شود نه با translate: ترجمه در
- * RTL باید علامتش عوض شود، ولی `justify-center` در هر دو جهت درست کار می‌کند. */
-function Track({
+/** ریل ۱ تا ۵ برای یک ردیف — نازک‌تر برای ردیف‌های ریزِ درون یک دسته. */
+function ScoreTrack({
   value,
   reference,
   strong = false,
@@ -144,50 +126,13 @@ function Track({
   reference: number | null;
   strong?: boolean;
 }) {
-  const position = offset(value);
   return (
-    <span className="relative block h-4">
-      <span
-        className="absolute inset-x-0 top-1/2 block h-[5px] -translate-y-1/2 rounded-full"
-        style={{ backgroundColor: RAIL }}
-      />
-      <span
-        className="absolute top-1/2 block h-[5px] -translate-y-1/2 rounded-full"
-        style={{
-          insetInlineStart: 0,
-          width: `${position}%`,
-          backgroundColor: strong ? LEAD_STRONG : LEAD_SOFT,
-        }}
-      />
-      {reference !== null && (
-        <span
-          className="absolute inset-y-0 flex w-0 justify-center"
-          style={{ insetInlineStart: `${offset(reference)}%` }}
-          aria-hidden
-        >
-          <span className="block w-0 self-stretch border-s border-dashed border-gray-300" />
-        </span>
-      )}
-      <span
-        className="absolute top-1/2 flex w-0 -translate-y-1/2 justify-center"
-        style={{ insetInlineStart: `${position}%` }}
-      >
-        <span
-          // هندسه در تست خوانده می‌شود: نقطهٔ نمرهٔ ۱ باید روی صفر درصد بنشیند،
-          // نه روی ۲۰٪ — همان اشتباهی که میلهٔ از-صفر مرتکب می‌شد.
-          data-testid="score-dot"
-          data-offset={position.toFixed(1)}
-          // shrink-0 حیاتی است: ظرف عرض‌صفر است و بدون آن، flex نقطه را تا صفر
-          // جمع می‌کند و اصلاً دیده نمی‌شود.
-          className="block shrink-0 rounded-full ring-2 ring-white"
-          style={{
-            width: strong ? 11 : 8,
-            height: strong ? 11 : 8,
-            backgroundColor: strong ? DOT_STRONG : DOT_SOFT,
-          }}
-        />
-      </span>
-    </span>
+    <Track
+      marks={[{ value, color: strong ? DOT_STRONG : DOT_SOFT, size: strong ? 11 : 8 }]}
+      min={MIN_SCORE}
+      max={MAX_SCORE}
+      reference={reference}
+    />
   );
 }
 
@@ -242,19 +187,7 @@ export function IndicatorScorePanel({
             <div className={`${ROW_GRID} mb-2`} aria-hidden>
               <span />
               <span />
-              <span className="relative block h-3">
-                {TICKS.map((tick) => (
-                  <span
-                    key={tick}
-                    className="absolute top-0 flex w-0 justify-center"
-                    style={{ insetInlineStart: `${offset(tick)}%` }}
-                  >
-                    <span className="shrink-0 text-[9px] leading-3 text-gray-400">
-                      {faInt(tick)}
-                    </span>
-                  </span>
-                ))}
-              </span>
+              <ScaleTicks ticks={TICKS} min={MIN_SCORE} max={MAX_SCORE} />
             </div>
 
             <div>
@@ -295,7 +228,7 @@ export function IndicatorScorePanel({
                       <span className="text-[12px] font-bold tabular-nums text-gray-900">
                         {fa1(category.value)}
                       </span>
-                      <Track value={category.value} reference={reference} strong />
+                      <ScoreTrack value={category.value} reference={reference} strong />
                     </button>
 
                     {isOpen && (
@@ -312,7 +245,7 @@ export function IndicatorScorePanel({
                               <span className="text-[11px] font-semibold tabular-nums text-gray-700">
                                 {fa1(indicator.value)}
                               </span>
-                              <Track value={indicator.value} reference={reference} />
+                              <ScoreTrack value={indicator.value} reference={reference} />
                             </div>
                           </div>
                         ))}

@@ -19,7 +19,7 @@ function categoryButton(name: string) {
 }
 
 function offsets(container: HTMLElement): number[] {
-  return Array.from(container.querySelectorAll("[data-testid='score-dot']")).map((el) =>
+  return Array.from(container.querySelectorAll("[data-testid='plot-dot']")).map((el) =>
     Number(el.getAttribute("data-offset")),
   );
 }

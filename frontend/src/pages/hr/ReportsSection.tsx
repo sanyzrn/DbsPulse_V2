@@ -2,11 +2,7 @@ import { useMemo, useState } from "react";
 import {
   Area,
   AreaChart,
-  Bar,
-  BarChart,
   CartesianGrid,
-  Cell,
-  LabelList,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -25,14 +21,13 @@ import {
 import { ChartDownloadCard } from "../../components/ChartDownloadCard";
 import { ExcelExportButton } from "../../components/ExcelExportButton";
 import { Card, EmptyState, FilterSelect, PageHeader, TableSkeleton } from "../../ui/Card";
-import { HorizontalBarChart } from "../../ui/HorizontalBarChart";
 import { IndicatorScorePanel, type IndicatorSort } from "../../ui/IndicatorScorePanel";
+import { DotPlot, Dumbbell, fa1 } from "../../ui/plot";
 import { CountUp, ScoreRing } from "../../ui/Meters";
 import { JalaliDatePicker } from "../../ui/JalaliDatePicker";
 import type { ReportFilters } from "../../types";
 
 const SERIES_COLOR = "#b61615";
-const UNIT_COLOR = "#6b7280";
 const GRID_STROKE = "#eef0f4";
 const AXIS_STROKE = "#e5e7eb";
 const TICK_STYLE = { fontSize: 11, fill: "#6b7280", fontFamily: "Vazirmatn, Tahoma, sans-serif" };
@@ -129,7 +124,12 @@ export function ReportsSection() {
   // «پنهان» را نشان دهد و صفر نشان‌دادنشان دروغ است. جدول‌ها نشانِ «محرمانه» دارند.
   const unitChartData = (summary?.by_org_unit ?? [])
     .filter((u) => u.avg_final_pct !== null)
-    .map((u) => ({ name: u.org_unit, value: Math.round(u.avg_final_pct!) }));
+    .map((u) => ({
+      key: u.org_unit,
+      label: u.org_unit,
+      value: u.avg_final_pct!,
+      note: `${faNum(u.count)} ارزیابی`,
+    }));
   // شاخص‌ها دیگر میلهٔ افقی نیستند (IndicatorScorePanel دلیلش را توضیح می‌دهد)؛
   // این‌جا فقط باید بدانیم بعد از سرکوب کوهورت چیزی برای نمایش مانده یا نه.
   const visibleIndicatorCount = (summary?.by_indicator ?? []).filter(
@@ -137,14 +137,15 @@ export function ReportsSection() {
   ).length;
   const indicatorUnitData = (indicatorBreakdown?.by_org_unit ?? [])
     .filter((u) => u.avg_score !== null)
-    .map((u) => ({ name: u.org_unit, value: Number(u.avg_score!.toFixed(2)) }));
-  const empComparisonData =
-    empVsUnit && (empVsUnit.employee_avg !== null || empVsUnit.unit_avg !== null)
-      ? [
-          { name: selectedPersonName ?? "این فرد", مقدار: empVsUnit.employee_avg ?? 0, fill: SERIES_COLOR },
-          { name: `میانگین واحد (${empVsUnit.org_unit})`, مقدار: empVsUnit.unit_avg ?? 0, fill: UNIT_COLOR },
-        ]
-      : [];
+    .map((u) => ({
+      key: u.org_unit,
+      label: u.org_unit,
+      value: u.avg_score!,
+      note: `${faNum(u.count)} نمره`,
+    }));
+  // یکی از دو طرف کافی است؛ Dumbbell خودش طرفِ نبود را «—» نشان می‌دهد.
+  const hasComparison =
+    empVsUnit != null && (empVsUnit.employee_avg !== null || empVsUnit.unit_avg !== null);
 
   return (
     <div className="space-y-4">
@@ -359,10 +360,9 @@ export function ReportsSection() {
             {chartEmptyMessage((summary?.by_org_unit ?? []).length, unitChartData.length, "برای فیلترهای فعلی داده‌ای وجود ندارد.")}
           </EmptyState>
         ) : (
-          <HorizontalBarChart
-            data={unitChartData}
-            max={100}
-            axisWidth={140}
+          <DotPlot
+            rows={unitChartData}
+            reference={summary?.avg_final_pct ?? null}
             ariaLabel="میانگین امتیاز نهایی به تفکیک واحد سازمانی"
           />
         )}
@@ -441,11 +441,13 @@ export function ReportsSection() {
               </span>{" "}
               از ۵
             </p>
-            <HorizontalBarChart
-              data={indicatorUnitData}
+            <DotPlot
+              rows={indicatorUnitData}
               min={1}
               max={5}
-              axisWidth={140}
+              ticks={[1, 2, 3, 4, 5]}
+              format={fa1}
+              reference={indicatorBreakdown?.overall_avg ?? null}
               ariaLabel="میانگین این شاخص به تفکیک واحد سازمانی"
             />
           </>
@@ -460,36 +462,25 @@ export function ReportsSection() {
       >
         {!filters.personnel_id ? (
           <EmptyState>برای مقایسه، از نوار فیلتر یک «پرسنل مشخص» انتخاب کنید.</EmptyState>
-        ) : empComparisonData.length === 0 ? (
+        ) : !hasComparison ? (
           <EmptyState>برای این فرد و فیلترها نتیجهٔ نهایی‌شده‌ای وجود ندارد.</EmptyState>
         ) : (
           <>
-            <div className="mb-4 flex flex-wrap gap-4 text-sm">
-              <span className="rounded-lg bg-pulse-50 px-3 py-1.5 font-medium text-pulse-700">
-                میانگین فرد: {empVsUnit?.employee_avg != null ? faNum(empVsUnit.employee_avg) : "—"}٪
-                {" "}({faNum(empVsUnit?.evaluation_count ?? 0)} ارزیابی)
-              </span>
-              <span className="rounded-lg bg-gray-100 px-3 py-1.5 font-medium text-gray-700">
-                میانگین واحد «{empVsUnit?.org_unit}»: {empVsUnit?.unit_avg != null ? faNum(empVsUnit.unit_avg) : "—"}٪
-                {" "}({faNum(empVsUnit?.unit_evaluation_count ?? 0)} ارزیابی)
-              </span>
-            </div>
-            <div style={{ height: 240 }}>
-              <ResponsiveContainer>
-                <BarChart data={empComparisonData} margin={{ top: 8, right: 16, bottom: 8, left: 0 }}>
-                  <CartesianGrid strokeDasharray="4 4" stroke={GRID_STROKE} vertical={false} />
-                  <XAxis dataKey="name" tick={{ ...TICK_STYLE, fontSize: 12 }} tickLine={false} axisLine={{ stroke: AXIS_STROKE }} />
-                  <YAxis domain={[0, 100]} tick={TICK_STYLE} tickLine={false} axisLine={false} width={36} />
-                  <Tooltip contentStyle={TOOLTIP_STYLE} formatter={faNum} cursor={{ fill: "rgba(107,114,128,0.06)" }} />
-                  <Bar dataKey="مقدار" radius={[6, 6, 0, 0]} animationDuration={800}>
-                    <LabelList dataKey="مقدار" position="top" formatter={(v) => (v == null ? "" : faNum(Number(v)))} style={{ fontSize: 12, fill: "#374151", fontFamily: "Vazirmatn, Tahoma, sans-serif" }} />
-                    {empComparisonData.map((entry, i) => (
-                      <Cell key={i} fill={entry.fill} />
-                    ))}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
+            {/* دو میلهٔ جدا، خواننده را وادار می‌کرد ارتفاع‌ها را با چشم تفریق کند؛
+                سؤال واقعی «چقدر فاصله؟» است، پس فاصله خودش نشانهٔ اصلی شد. */}
+            <Dumbbell
+              a={{
+                label: selectedPersonName ?? "این فرد",
+                value: empVsUnit?.employee_avg ?? null,
+                note: `${faNum(empVsUnit?.evaluation_count ?? 0)} ارزیابی`,
+              }}
+              b={{
+                label: `میانگین واحد «${empVsUnit?.org_unit}»`,
+                value: empVsUnit?.unit_avg ?? null,
+                note: `${faNum(empVsUnit?.unit_evaluation_count ?? 0)} ارزیابی`,
+              }}
+              ariaLabel="مقایسهٔ امتیاز فرد با میانگین واحد سازمانی"
+            />
             {(empVsUnit?.per_evaluation.length ?? 0) > 1 && (
               <div className="mt-4">
                 <h4 className="mb-2 text-sm font-semibold text-gray-600">روند امتیاز نهایی این فرد</h4>

@@ -57,15 +57,16 @@ function initialDrafts(indicators: Indicator[], existing: EvaluationScoreRow[]):
 }
 
 function sameDrafts(a: ScoreDraft[], b: ScoreDraft[]): boolean {
-  return (
-    a.length === b.length &&
-    a.every(
-      (d, i) =>
-        d.indicator_id === b[i].indicator_id &&
-        d.score === b[i].score &&
-        d.evidence_text === b[i].evidence_text
-    )
-  );
+  if (a.length !== b.length) return false;
+  return a.every((draft, i) => {
+    const other = b[i];
+    return (
+      other !== undefined &&
+      draft.indicator_id === other.indicator_id &&
+      draft.score === other.score &&
+      draft.evidence_text === other.evidence_text
+    );
+  });
 }
 
 export function useScoreForm(

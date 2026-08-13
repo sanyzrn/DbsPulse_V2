@@ -1,3 +1,26 @@
+# محیط مشترک بین سرویس migrate و backend — باید یکی باشند، وگرنه مایگریشن روی یک
+# دیتابیس اجرا می‌شود و اپ به دیتابیس دیگری وصل می‌شود.
+x-backend-env: &backend-env
+  DATABASE_URL: postgresql+psycopg://dbspulse:${POSTGRES_PASSWORD:-dbspulse_dev_password}@db:5432/dbspulse
+  # هشدار: مقادیر پیش‌فرض فقط برای اجرای محلی/دمو مناسب‌اند.
+  # پیش از استقرار واقعی، در فایل .env کنار همین docker-compose.yml مقادیر
+  # ENVIRONMENT=production و یک JWT_SECRET_KEY تصادفی و طولانی تنظیم کنید
+  # (در غیر این صورت برنامه در حالت production عمداً استارت نمی‌شود).
+  ENVIRONMENT: ${ENVIRONMENT:-development}
+  JWT_SECRET_KEY: ${JWT_SECRET_KEY:-change-this-to-a-long-random-string}
+  # کاربران نمونه با رمز مشترکِ منتشرشده. فقط برای دمو/توسعه؛ در production روشن
+  # کردنش باعث خطای صریح استارت‌آپ می‌شود.
+  SEED_DEMO_DATA: ${SEED_DEMO_DATA:-false}
+  # این دو تا امروز اصلاً به کانتینر پاس داده نمی‌شدند، یعنی با ENVIRONMENT=production
+  # اپ روی مقدار پیش‌فرضِ localhost می‌ماند و گارد استارت‌آپ جلویش را می‌گرفت —
+  # استقرار production با همین compose عملاً ممکن نبود.
+  CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:5173,http://localhost:8080}
+  PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-http://localhost:8080}
+  # در production به IP/شبکهٔ پروکسی محدودش کنید؛ با «*» هدر جعلی X-Forwarded-For
+  # محدودیت نرخ ورود را دور می‌زند.
+  FORWARDED_ALLOW_IPS: ${FORWARDED_ALLOW_IPS:-*}
+  ENABLE_SCHEDULER: ${ENABLE_SCHEDULER:-false}
+
 services:
   db:
     image: postgres:16
@@ -17,20 +40,27 @@ services:
       timeout: 5s
       retries: 10
 
-  backend:
+  # مایگریشن‌ها یک job جداگانه‌اند، نه بخشی از بوت اپ: در rollout چندنسخه‌ای نباید
+  # چند replica هم‌زمان schema را عوض کنند، و تغییر schema باید یک قدم صریح باشد.
+  # یک‌بار اجرا می‌شود، تا پایان موفق منتظر می‌مانیم، بعد بک‌اند بالا می‌آید.
+  migrate:
     build: ./backend
-    restart: unless-stopped
-    environment:
-      DATABASE_URL: postgresql+psycopg://dbspulse:${POSTGRES_PASSWORD:-dbspulse_dev_password}@db:5432/dbspulse
-      # هشدار: مقادیر پیش‌فرض فقط برای اجرای محلی/دمو مناسب‌اند.
-      # پیش از استقرار واقعی، در فایل .env کنار همین docker-compose.yml مقادیر
-      # ENVIRONMENT=production و یک JWT_SECRET_KEY تصادفی و طولانی تنظیم کنید
-      # (در غیر این صورت برنامه در حالت production عمداً استارت نمی‌شود).
-      ENVIRONMENT: ${ENVIRONMENT:-development}
-      JWT_SECRET_KEY: ${JWT_SECRET_KEY:-change-this-to-a-long-random-string}
+    command: alembic upgrade head
+    restart: "no"
+    environment: *backend-env
     depends_on:
       db:
         condition: service_healthy
+
+  backend:
+    build: ./backend
+    restart: unless-stopped
+    environment: *backend-env
+    depends_on:
+      db:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
     ports:
       # فقط روی loopback برای دیباگ محلی؛ ترافیک اصلی از طریق کانتینر frontend
       # (پروکسی /api) عبور می‌کند و بک‌اند نباید مستقیماً در معرض شبکه باشد.

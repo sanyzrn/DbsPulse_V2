@@ -477,7 +477,12 @@ def upsert_scores(
     db: Session = Depends(get_db),
     current_user: CurrentUser = Depends(get_current_user),
 ) -> list[dict]:
-    record = _get_record_or_404(db, evaluation_id)
+    # قفل ردیف مثل خودِ گذارها: بدون آن، بررسی وضعیتِ پایین می‌توانست روی وضعیتی
+    # پاس شود که یک submit هم‌زمان دارد عوضش می‌کند، و امتیاز *بعد از*
+    # finalize_scoring روی رکورد بنشیند — یعنی امتیازهای ذخیره‌شده با درصد نهاییِ
+    # ذخیره‌شده نخوانند. فرانت هم پیش‌نویس امتیاز را حین تایپ auto-save می‌کند،
+    # پس این پنجره در عمل باز است، نه تئوریک.
+    record = _get_record_or_404_for_update(db, evaluation_id)
 
     is_supervisor_draft = (
         record.status == EvaluationStatus.draft
@@ -515,7 +520,9 @@ def set_evaluator_comment(
     db: Session = Depends(get_db),
     current_user: CurrentUser = Depends(get_current_user),
 ) -> EvaluationRead:
-    record = _get_record_or_404(db, evaluation_id)
+    # همان دلیل upsert_scores: نظر ارزیاب هم روی رکوردی نوشته می‌شود که یک گذار
+    # هم‌زمان ممکن است داشته از زیرش عوضش کند.
+    record = _get_record_or_404_for_update(db, evaluation_id)
     # نمره‌دهنده اول این نظر را ثبت می‌کند: مسیر عادی مسئول واحد در draft است؛
     # مسیر «مدیر» معاونت خودش نمره‌دهندهٔ اول است و در hr_approved این کار را می‌کند.
     is_supervisor_draft = (

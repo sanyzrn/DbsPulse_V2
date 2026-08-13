@@ -1,4 +1,4 @@
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.orm import Session
 
@@ -10,8 +10,19 @@ from app.schemas.auth import CurrentUser
 
 bearer_scheme = HTTPBearer(auto_error=False)
 
+# تنها مسیرهایی که کاربرِ ملزم‌به‌تغییر‌رمز هم می‌تواند صدا بزند — وگرنه راه خروجی از
+# این وضعیت ندارد. لیست عمداً allowlist است نه blocklist: هر endpoint جدیدی به‌صورت
+# پیش‌فرض بسته می‌ماند و کسی یادش نمی‌رود گارد را اضافه کند.
+_FORCED_PASSWORD_CHANGE_EXEMPT_PATHS = frozenset(
+    {
+        "/api/auth/change-password",
+        "/api/auth/me",
+    }
+)
+
 
 def get_current_user(
+    request: Request,
     credentials: HTTPAuthorizationCredentials | None = Depends(bearer_scheme),
     db: Session = Depends(get_db),
 ) -> CurrentUser:
@@ -39,6 +50,15 @@ def get_current_user(
         raise unauthorized
     if payload.get("tv") != user.token_version:
         raise unauthorized
+
+    # «تغییر اجباری رمز» تا امروز فقط یک ریدایرکت در فرانت بود؛ یعنی هر کسی که
+    # مستقیم به API درخواست می‌زد آن را دور می‌زد. حساب‌هایی که رمزشان را HR ریست
+    # کرده (یا حساب دموی بازمانده) دقیقاً همان‌هایی‌اند که نباید بدون تغییر رمز کار کنند.
+    if user.must_change_password and request.url.path not in _FORCED_PASSWORD_CHANGE_EXEMPT_PATHS:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="پیش از استفاده از سامانه باید رمز عبور خود را تغییر دهید",
+        )
 
     return CurrentUser(
         id=user.id,

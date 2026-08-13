@@ -55,3 +55,18 @@ def test_production_rejects_localhost_public_base_url():
 def test_production_rejects_non_https_public_base_url():
     with pytest.raises(RuntimeError, match="https"):
         _settings(public_base_url="http://app.example.com")
+
+
+def test_production_rejects_demo_seed_flag():
+    with pytest.raises(RuntimeError, match="SEED_DEMO_DATA"):
+        _settings(seed_demo_data=True)
+
+
+def test_demo_seed_flag_is_off_by_default():
+    # پیش‌فرض باید خاموش باشد: یک محیط تازه که فقط مایگریشن خورده نباید
+    # اعتبارنامهٔ منتشرشده داشته باشد.
+    assert Settings(environment="development").seed_demo_data is False
+
+
+def test_development_allows_demo_seed_flag():
+    assert Settings(environment="development", seed_demo_data=True).seed_demo_data is True

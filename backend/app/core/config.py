@@ -17,6 +17,11 @@ class Settings(BaseSettings):
     # آدرس عمومی فرانت‌اند؛ برای ساخت لینک تأیید اصالت داخل QR سند PDF استفاده می‌شود
     public_base_url: str = "http://localhost:8080"
 
+    # کاربران/پرسنل نمونهٔ دمو (hr1، sup1، … با یک رمز مشترک و منتشرشده) فقط وقتی
+    # seed می‌شوند که این فلگ صراحتاً روشن باشد. پیش‌فرض خاموش است تا هیچ محیطی
+    # که تازه مایگریشن خورده — از جمله production — اعتبارنامهٔ عمومی نداشته باشد.
+    seed_demo_data: bool = False
+
     # زمان‌بند درون‌پروسه برای اعلان‌های فعالانه (انقضای قرارداد، تأخیر مراحل).
     # پیش‌فرض خاموش تا در تست/توسعه thread پس‌زمینه بالا نیاید؛ در استقرار روشن کنید.
     enable_scheduler: bool = False
@@ -51,6 +56,17 @@ class Settings(BaseSettings):
             raise RuntimeError(
                 "JWT_SECRET_KEY هنوز مقدار پیش‌فرض دمو است. پیش از اجرا در محیط production "
                 "یک مقدار تصادفی و طولانی برای JWT_SECRET_KEY در .env تنظیم کنید."
+            )
+        return self
+
+    @model_validator(mode="after")
+    def _forbid_demo_seed_in_production(self) -> "Settings":
+        # دادهٔ دمو با رمز منتشرشده هرگز نباید در production ساخته شود. گارد دوم
+        # (که حساب‌های از قبل ساخته‌شده را هم می‌گیرد) در core/startup_checks.py است.
+        if self.environment == "production" and self.seed_demo_data:
+            raise RuntimeError(
+                "SEED_DEMO_DATA در محیط production روشن است. کاربران نمونه رمز مشترکِ "
+                "منتشرشده دارند و نباید در محیط واقعی ساخته شوند؛ این مقدار را false کنید."
             )
         return self
 

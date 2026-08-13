@@ -48,18 +48,62 @@ _STATUS_LABELS = {
 }
 
 
-def _new_sheet(title: str, headers: list[str]) -> tuple[Workbook, "Workbook.worksheets"]:
+# کاراکترهایی که اگر اولین نویسهٔ یک سلول متنی باشند، Excel/LibreOffice محتوا را
+# فرمول حساب می‌کند (=cmd|'/c calc'!A1 و امثال آن). openpyxl هم رشتهٔ شروع‌شده با «=»
+# را مستقیماً به‌عنوان فرمول می‌نویسد، پس بدون این گارد، متنی که کاربر در «شواهد» یا
+# «عنوان برنامه» تایپ کرده در فایلِ HR به کد اجراشدنی تبدیل می‌شود.
+_FORMULA_TRIGGER_PREFIXES = ("=", "+", "-", "@", "\t", "\r", "\n")
+
+
+def _neutralise(value: object) -> object:
+    """پیشوند آپاستروف = «این سلول متن است، نه فرمول».
+
+    فقط روی رشته‌ها اثر دارد؛ عددها و تاریخ‌ها دست‌نخورده می‌مانند. هزینه‌اش این است
+    که یک متن آزادِ واقعاً شروع‌شده با «-» (مثل فهرست خط‌تیره‌ای) در فایل خروجی یک
+    آپاستروف اضافه نشان می‌دهد — معاملهٔ درستی در برابر اجرای فرمول ناخواسته.
+    """
+    if isinstance(value, str) and value.startswith(_FORMULA_TRIGGER_PREFIXES):
+        return "'" + value
+    return value
+
+
+class _SafeSheet:
+    """کاربرگ با ضدعفونی خودکار در `append`.
+
+    عمداً به‌جای ضدعفونی در محل هر فراخوانی: هر خروجی اکسل جدیدی که از این‌جا کاربرگ
+    بگیرد به‌صورت پیش‌فرض امن است و کسی یادش نمی‌رود گارد را اضافه کند.
+    """
+
+    def __init__(self, worksheet) -> None:
+        self._worksheet = worksheet
+
+    def append(self, values: list) -> None:
+        self._worksheet.append([_neutralise(value) for value in values])
+
+
+def _configure_sheet(worksheet, title: str, headers: list[str], min_width: int) -> _SafeSheet:
     """کاربرگ RTL با ردیف سرستون پررنگ و پهنای ستون متناسب — الگوی مشترک همه خروجی‌ها."""
-    wb = Workbook()
-    ws = wb.active
-    ws.title = title
-    ws.sheet_view.rightToLeft = True
-    ws.append(headers)
-    for cell in ws[1]:
+    worksheet.title = title
+    worksheet.sheet_view.rightToLeft = True
+    worksheet.append(headers)  # سرستون‌ها ثابت و از خود ماست، ورودی کاربر نیست
+    for cell in worksheet[1]:
         cell.font = Font(bold=True)
     for column_index, header in enumerate(headers, start=1):
-        ws.column_dimensions[get_column_letter(column_index)].width = max(14, len(header) + 6)
-    return wb, ws
+        worksheet.column_dimensions[get_column_letter(column_index)].width = max(
+            min_width, len(header) + 6
+        )
+    return _SafeSheet(worksheet)
+
+
+def _new_sheet(
+    title: str, headers: list[str], min_width: int = 14
+) -> tuple[Workbook, _SafeSheet]:
+    wb = Workbook()
+    return wb, _configure_sheet(wb.active, title, headers, min_width)
+
+
+def _extra_sheet(wb: Workbook, title: str, headers: list[str], min_width: int = 14) -> _SafeSheet:
+    return _configure_sheet(wb.create_sheet(title), title, headers, min_width)
 
 
 def _to_bytes(wb: Workbook) -> bytes:
@@ -211,27 +255,21 @@ def build_report_workbook(
         float(avg_final_pct) if avg_final_pct is not None else "—",
     ])
 
-    unit_ws = wb.create_sheet("میانگین به‌تفکیک واحد")
-    unit_ws.sheet_view.rightToLeft = True
-    unit_headers = ["واحد سازمانی", "میانگین امتیاز نهایی ٪", "تعداد"]
-    unit_ws.append(unit_headers)
-    for cell in unit_ws[1]:
-        cell.font = Font(bold=True)
-    for column_index, header in enumerate(unit_headers, start=1):
-        unit_ws.column_dimensions[get_column_letter(column_index)].width = max(16, len(header) + 6)
+    unit_ws = _extra_sheet(
+        wb,
+        "میانگین به‌تفکیک واحد",
+        ["واحد سازمانی", "میانگین امتیاز نهایی ٪", "تعداد"],
+        min_width=16,
+    )
     for org_unit, avg, count in by_org_unit:
         unit_ws.append([org_unit, float(avg), count])
 
-    indicator_ws = wb.create_sheet("میانگین به‌تفکیک شاخص")
-    indicator_ws.sheet_view.rightToLeft = True
-    indicator_headers = ["دسته", "شرح شاخص", "میانگین امتیاز (از ۵)", "تعداد"]
-    indicator_ws.append(indicator_headers)
-    for cell in indicator_ws[1]:
-        cell.font = Font(bold=True)
-    for column_index, header in enumerate(indicator_headers, start=1):
-        indicator_ws.column_dimensions[get_column_letter(column_index)].width = max(
-            18, len(header) + 6
-        )
+    indicator_ws = _extra_sheet(
+        wb,
+        "میانگین به‌تفکیک شاخص",
+        ["دسته", "شرح شاخص", "میانگین امتیاز (از ۵)", "تعداد"],
+        min_width=18,
+    )
     for category, description, avg, count in by_indicator:
         indicator_ws.append([category, description, float(avg), count])
 

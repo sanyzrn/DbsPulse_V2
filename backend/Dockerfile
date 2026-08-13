@@ -21,6 +21,14 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 
+# کانتینر به‌عنوان root اجرا نمی‌شود: اگر روزی یک آسیب‌پذیری اجرای کد پیدا شود،
+# مهاجم داخل کانتینر یک کاربر بی‌امتیاز است نه root. UID ثابت است تا اگر جایی
+# volume سوار شد، مالکیت فایل‌ها بین بازسازی‌های ایمیج تغییر نکند.
+RUN useradd --create-home --uid 10001 dbspulse \
+    && chmod +x ./docker-entrypoint.sh \
+    && chown -R dbspulse:dbspulse /app
+USER dbspulse
+
 EXPOSE 8000
 
 ENTRYPOINT ["./docker-entrypoint.sh"]

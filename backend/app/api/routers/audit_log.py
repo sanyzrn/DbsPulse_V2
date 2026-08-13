@@ -10,6 +10,7 @@ from app.db.session import get_db
 from app.models.audit_log import AuditLog
 from app.models.enums import UserRole
 from app.models.evaluation import EvaluationRecord
+from app.models.personnel import Personnel
 from app.models.user import User
 from app.schemas.audit_log import AuditLogPage, AuditLogRead
 from app.schemas.auth import CurrentUser
@@ -60,6 +61,9 @@ def _build_filters(
     evaluation_record_id: int | None,
     created_from: date | None,
     created_to: date | None,
+    actor_user_id: int | None,
+    personnel_id: int | None,
+    org_unit: str | None,
 ) -> list:
     filters = []
     if event_type is not None:
@@ -71,6 +75,26 @@ def _build_filters(
     if created_to is not None:
         # بازه شامل خودِ روز پایان است
         filters.append(AuditLog.created_at < created_to + timedelta(days=1))
+    if actor_user_id is not None:
+        filters.append(AuditLog.actor_user_id == actor_user_id)
+    if personnel_id is not None:
+        # فقط رویدادهایی که به یک ارزیابیِ همین پرسنل مربوط‌اند (اکثر رویدادهای
+        # مرتبط با پرسنل — نمره‌دهی، تأیید/برگشت، کامنت، PDF — از همین مسیرند)
+        filters.append(
+            AuditLog.evaluation_record_id.in_(
+                select(EvaluationRecord.id).where(
+                    EvaluationRecord.subject_personnel_id == personnel_id
+                )
+            )
+        )
+    if org_unit:
+        filters.append(
+            AuditLog.evaluation_record_id.in_(
+                select(EvaluationRecord.id)
+                .join(Personnel, Personnel.id == EvaluationRecord.subject_personnel_id)
+                .where(Personnel.org_unit == org_unit)
+            )
+        )
     return filters
 
 
@@ -94,12 +118,23 @@ def list_audit_log(
     evaluation_record_id: int | None = None,
     created_from: date | None = None,
     created_to: date | None = None,
+    actor_user_id: int | None = None,
+    personnel_id: int | None = None,
+    org_unit: str | None = None,
     limit: int = Query(default=50, ge=1, le=200),
     offset: int = Query(default=0, ge=0),
     db: Session = Depends(get_db),
     current_user: CurrentUser = Depends(require_roles(UserRole.hr)),
 ) -> AuditLogPage:
-    filters = _build_filters(event_type, evaluation_record_id, created_from, created_to)
+    filters = _build_filters(
+        event_type,
+        evaluation_record_id,
+        created_from,
+        created_to,
+        actor_user_id,
+        personnel_id,
+        org_unit,
+    )
     total = db.scalar(select(func.count()).select_from(AuditLog).where(*filters)) or 0
     # نام کاربر و کد ارزیابی با JOIN در همان کوئری صفحه حل می‌شوند؛ نسخه قبلی کل
     # جدول users و evaluation_records را برای ۵۰ ردیف در حافظه بارگذاری می‌کرد.
@@ -127,12 +162,23 @@ def export_audit_log_excel(
     evaluation_record_id: int | None = None,
     created_from: date | None = None,
     created_to: date | None = None,
+    actor_user_id: int | None = None,
+    personnel_id: int | None = None,
+    org_unit: str | None = None,
     db: Session = Depends(get_db),
     current_user: CurrentUser = Depends(require_roles(UserRole.hr)),
 ) -> Response:
     """خروجی Excel از گزارش رویدادها (فقط HR) با همان فیلترهای فهرست. برای پرهیز از
     فایل‌های عظیم، حداکثر ۵۰۰۰ ردیف اخیرِ منطبق با فیلتر صادر می‌شود."""
-    filters = _build_filters(event_type, evaluation_record_id, created_from, created_to)
+    filters = _build_filters(
+        event_type,
+        evaluation_record_id,
+        created_from,
+        created_to,
+        actor_user_id,
+        personnel_id,
+        org_unit,
+    )
     rows = _query_rows(db, filters, limit=5000, offset=0)
     entries = [(row, username, evaluation_code) for row, username, evaluation_code in rows]
     return Response(

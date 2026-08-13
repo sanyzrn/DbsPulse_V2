@@ -178,6 +178,9 @@ export function useAuditLog(params: {
   event_type?: string;
   created_from?: string;
   created_to?: string;
+  actor_user_id?: number;
+  personnel_id?: number;
+  org_unit?: string;
   limit: number;
   offset: number;
 }) {

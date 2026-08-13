@@ -65,6 +65,7 @@ export interface BarDatum {
 export function HorizontalBarChart({
   data,
   max,
+  min = 0,
   axisWidth = 150,
   valueFormatter = faNum,
   ariaLabel,
@@ -72,6 +73,10 @@ export function HorizontalBarChart({
   data: BarDatum[];
   /** سقف محور مقدار — ۱۰۰ برای درصد، ۵ برای امتیاز شاخص */
   max: number;
+  /** کف محور. برای درصد صفر است، ولی نمرهٔ شاخص از ۱ شروع می‌شود: با کف صفر،
+   *  یک‌پنجم ابتدای هر میله سهمی است که هر شاخصی به‌طور قطعی دارد و تفاوت واقعی
+   *  در بخش کوچکی از عرض فشرده می‌شود. */
+  min?: number;
   axisWidth?: number;
   valueFormatter?: (value: unknown) => string;
   ariaLabel?: string;
@@ -96,7 +101,7 @@ export function HorizontalBarChart({
           <CartesianGrid stroke={GRID_STROKE} horizontal={false} />
           <XAxis
             type="number"
-            domain={[0, max]}
+            domain={[min, max]}
             tick={TICK_STYLE}
             tickLine={false}
             axisLine={{ stroke: AXIS_STROKE }}

@@ -26,6 +26,7 @@ import { ChartDownloadCard } from "../../components/ChartDownloadCard";
 import { ExcelExportButton } from "../../components/ExcelExportButton";
 import { Card, EmptyState, FilterSelect, PageHeader, TableSkeleton } from "../../ui/Card";
 import { HorizontalBarChart } from "../../ui/HorizontalBarChart";
+import { IndicatorScorePanel, type IndicatorSort } from "../../ui/IndicatorScorePanel";
 import { CountUp, ScoreRing } from "../../ui/Meters";
 import { JalaliDatePicker } from "../../ui/JalaliDatePicker";
 import type { ReportFilters } from "../../types";
@@ -70,6 +71,7 @@ export function ReportsSection() {
   const [personnelSearch, setPersonnelSearch] = useState("");
   const debouncedPersonnelSearch = useDebouncedValue(personnelSearch);
   const [selectedIndicatorId, setSelectedIndicatorId] = useState<number | null>(null);
+  const [indicatorSort, setIndicatorSort] = useState<IndicatorSort>("form");
 
   const { data: orgUnits = [] } = useOrgUnits(true);
   const { data: periods = [] } = usePeriods();
@@ -128,16 +130,11 @@ export function ReportsSection() {
   const unitChartData = (summary?.by_org_unit ?? [])
     .filter((u) => u.avg_final_pct !== null)
     .map((u) => ({ name: u.org_unit, value: Math.round(u.avg_final_pct!) }));
-  // برچسبِ محور، «شرح» شاخص است نه category: چند شاخصِ متفاوت یک category مشترک
-  // دارند، پس با category نمودار ۲۰ میله با ۹ برچسب تکراری نشان می‌داد و معلوم
-  // نبود کدام میله کدام شاخص است. متن کامل در tooltip می‌آید.
-  const indicatorChartData = (summary?.by_indicator ?? [])
-    .filter((i) => i.avg_score !== null)
-    .map((i) => ({
-      name: i.description,
-      fullName: `${i.category} — ${i.description}`,
-      value: Number(i.avg_score!.toFixed(2)),
-    }));
+  // شاخص‌ها دیگر میلهٔ افقی نیستند (IndicatorScorePanel دلیلش را توضیح می‌دهد)؛
+  // این‌جا فقط باید بدانیم بعد از سرکوب کوهورت چیزی برای نمایش مانده یا نه.
+  const visibleIndicatorCount = (summary?.by_indicator ?? []).filter(
+    (i) => i.avg_score !== null,
+  ).length;
   const indicatorUnitData = (indicatorBreakdown?.by_org_unit ?? [])
     .filter((u) => u.avg_score !== null)
     .map((u) => ({ name: u.org_unit, value: Number(u.avg_score!.toFixed(2)) }));
@@ -374,22 +371,27 @@ export function ReportsSection() {
       {/* ── میانگین هر شاخص (بزرگ + دانلود) ── */}
       <ChartDownloadCard
         title="میانگین امتیاز هر شاخص (از ۵)"
-        subtitle="میانگین امتیاز هر شاخص در همهٔ پرسنل منطبق با فیلتر"
+        subtitle="میانگین نمره‌های منطبق با فیلتر، گروه‌بندی‌شده بر اساس دسته — روی هر دسته بزنید تا شرح شاخص‌هایش باز شود."
         filename="avg-by-indicator.png"
+        actions={
+          <FilterSelect
+            aria-label="ترتیب نمایش شاخص‌ها"
+            value={indicatorSort}
+            onChange={(v) => setIndicatorSort(v as IndicatorSort)}
+          >
+            <option value="form">ترتیب فرم ارزیابی</option>
+            <option value="lowest">کم‌امتیازترین در صدر</option>
+          </FilterSelect>
+        }
       >
         {summaryPending ? (
           <TableSkeleton rows={5} />
-        ) : indicatorChartData.length === 0 ? (
+        ) : visibleIndicatorCount === 0 ? (
           <EmptyState>
-            {chartEmptyMessage((summary?.by_indicator ?? []).length, indicatorChartData.length, "برای فیلترهای فعلی داده‌ای وجود ندارد.")}
+            {chartEmptyMessage((summary?.by_indicator ?? []).length, visibleIndicatorCount, "برای فیلترهای فعلی داده‌ای وجود ندارد.")}
           </EmptyState>
         ) : (
-          <HorizontalBarChart
-            data={indicatorChartData}
-            max={5}
-            axisWidth={230}
-            ariaLabel="میانگین امتیاز هر شاخص از ۵"
-          />
+          <IndicatorScorePanel stats={summary?.by_indicator ?? []} sort={indicatorSort} />
         )}
       </ChartDownloadCard>
 
@@ -441,6 +443,7 @@ export function ReportsSection() {
             </p>
             <HorizontalBarChart
               data={indicatorUnitData}
+              min={1}
               max={5}
               axisWidth={140}
               ariaLabel="میانگین این شاخص به تفکیک واحد سازمانی"

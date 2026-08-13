@@ -181,6 +181,8 @@ export function useAuditLog(params: {
   actor_user_id?: number;
   personnel_id?: number;
   org_unit?: string;
+  contract_end_from?: string;
+  contract_end_to?: string;
   limit: number;
   offset: number;
 }) {

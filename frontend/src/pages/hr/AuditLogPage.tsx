@@ -38,6 +38,8 @@ interface Filters {
   actorUserId: number | "";
   personnelId: number | "";
   orgUnit: string;
+  contractEndFrom: string;
+  contractEndTo: string;
 }
 
 const EMPTY_FILTERS: Filters = {
@@ -47,7 +49,13 @@ const EMPTY_FILTERS: Filters = {
   actorUserId: "",
   personnelId: "",
   orgUnit: "",
+  contractEndFrom: "",
+  contractEndTo: "",
 };
+
+function todayIso(): string {
+  return new Date().toISOString().slice(0, 10);
+}
 
 /** گزارش رویدادها با فیلترهای ترکیب‌پذیر: نوع رویداد، بازهٔ تاریخ، انجام‌دهنده،
  * پرسنل مشخص و واحد سازمانی — تا HR بتواند سابقهٔ یک واحد، یک نفر یا یک کاربر خاص
@@ -77,6 +85,8 @@ export function AuditLogPage() {
     actor_user_id: filters.actorUserId || undefined,
     personnel_id: filters.personnelId || undefined,
     org_unit: filters.orgUnit || undefined,
+    contract_end_from: filters.contractEndFrom || undefined,
+    contract_end_to: filters.contractEndTo || undefined,
   };
 
   const { data, error: queryError, isPending } = useAuditLog({
@@ -233,6 +243,54 @@ export function AuditLogPage() {
                   onChange={(iso) => patch({ createdTo: iso })}
                 />
               </label>
+
+              <label className="flex flex-col gap-1 text-xs font-medium text-gray-600">
+                پایان قرارداد از
+                <JalaliDatePicker
+                  className={filterInputClass}
+                  value={filters.contractEndFrom}
+                  onChange={(iso) => patch({ contractEndFrom: iso })}
+                />
+              </label>
+              <label className="flex flex-col gap-1 text-xs font-medium text-gray-600">
+                پایان قرارداد تا
+                <JalaliDatePicker
+                  className={filterInputClass}
+                  value={filters.contractEndTo}
+                  onChange={(iso) => patch({ contractEndTo: iso })}
+                />
+              </label>
+
+              {/* میان‌برهای «قرارداد رو به اتمام / منقضی» — همان الگوی گزارش‌های تحلیلی */}
+              <div className="flex flex-col gap-1 text-xs font-medium text-gray-600 sm:col-span-2 lg:col-span-2">
+                میان‌بر قرارداد
+                <div className="flex flex-wrap gap-1.5">
+                  {[
+                    { label: "۳۰ روز آینده", days: 30 },
+                    { label: "۹۰ روز آینده", days: 90 },
+                  ].map((preset) => (
+                    <button
+                      key={preset.days}
+                      type="button"
+                      onClick={() => {
+                        const d = new Date();
+                        d.setDate(d.getDate() + preset.days);
+                        patch({ contractEndFrom: todayIso(), contractEndTo: d.toISOString().slice(0, 10) });
+                      }}
+                      className="rounded-lg border border-gray-200 bg-white px-2 py-1 text-xs text-gray-600 hover:bg-gray-50"
+                    >
+                      {preset.label}
+                    </button>
+                  ))}
+                  <button
+                    type="button"
+                    onClick={() => patch({ contractEndFrom: "", contractEndTo: todayIso() })}
+                    className="rounded-lg border border-gray-200 bg-white px-2 py-1 text-xs text-gray-600 hover:bg-gray-50"
+                  >
+                    منقضی‌شده
+                  </button>
+                </div>
+              </div>
 
               {activeFilterCount > 0 && (
                 <div className="flex items-end sm:col-span-2 lg:col-span-6">

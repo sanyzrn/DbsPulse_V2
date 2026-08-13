@@ -64,6 +64,8 @@ def _build_filters(
     actor_user_id: int | None,
     personnel_id: int | None,
     org_unit: str | None,
+    contract_end_from: date | None,
+    contract_end_to: date | None,
 ) -> list:
     filters = []
     if event_type is not None:
@@ -95,6 +97,21 @@ def _build_filters(
                 .where(Personnel.org_unit == org_unit)
             )
         )
+    if contract_end_from is not None or contract_end_to is not None:
+        # میان‌بر «قرارداد رو به اتمام/منقضی» — همان قانونی که در گزارش‌های تحلیلی HR
+        # هست، اینجا هم برای دیدن رویدادهای مربوط به پرسنلِ نزدیک به پایان قرارداد
+        contract_conditions = []
+        if contract_end_from is not None:
+            contract_conditions.append(Personnel.contract_end_date >= contract_end_from)
+        if contract_end_to is not None:
+            contract_conditions.append(Personnel.contract_end_date <= contract_end_to)
+        filters.append(
+            AuditLog.evaluation_record_id.in_(
+                select(EvaluationRecord.id)
+                .join(Personnel, Personnel.id == EvaluationRecord.subject_personnel_id)
+                .where(*contract_conditions)
+            )
+        )
     return filters
 
 
@@ -121,6 +138,8 @@ def list_audit_log(
     actor_user_id: int | None = None,
     personnel_id: int | None = None,
     org_unit: str | None = None,
+    contract_end_from: date | None = None,
+    contract_end_to: date | None = None,
     limit: int = Query(default=50, ge=1, le=200),
     offset: int = Query(default=0, ge=0),
     db: Session = Depends(get_db),
@@ -134,6 +153,8 @@ def list_audit_log(
         actor_user_id,
         personnel_id,
         org_unit,
+        contract_end_from,
+        contract_end_to,
     )
     total = db.scalar(select(func.count()).select_from(AuditLog).where(*filters)) or 0
     # نام کاربر و کد ارزیابی با JOIN در همان کوئری صفحه حل می‌شوند؛ نسخه قبلی کل
@@ -165,6 +186,8 @@ def export_audit_log_excel(
     actor_user_id: int | None = None,
     personnel_id: int | None = None,
     org_unit: str | None = None,
+    contract_end_from: date | None = None,
+    contract_end_to: date | None = None,
     db: Session = Depends(get_db),
     current_user: CurrentUser = Depends(require_roles(UserRole.hr)),
 ) -> Response:
@@ -178,6 +201,8 @@ def export_audit_log_excel(
         actor_user_id,
         personnel_id,
         org_unit,
+        contract_end_from,
+        contract_end_to,
     )
     rows = _query_rows(db, filters, limit=5000, offset=0)
     entries = [(row, username, evaluation_code) for row, username, evaluation_code in rows]

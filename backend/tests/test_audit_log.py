@@ -94,6 +94,45 @@ def test_audit_log_filters_by_actor_personnel_and_org_unit(client, db_session):
     assert eval_a not in ids
 
 
+def test_audit_log_filters_by_contract_end_date(client, db_session):
+    """میان‌بر «قرارداد رو به اتمام»: رویدادهای پرونده‌های پرسنلی که پایان قراردادشان
+    در یک بازهٔ مشخص است، جدا از بقیه قابل مرور باشد."""
+    from datetime import date, timedelta
+
+    hr = make_user(db_session, "hr")
+    sup = make_user(db_session, "unit_supervisor")
+    dep = make_user(db_session, "deputy")
+    ceo = make_user(db_session, "ceo")
+    soon = make_personnel(
+        db_session,
+        contract_end_date=date.today() + timedelta(days=10),
+    )
+    later = make_personnel(
+        db_session,
+        contract_end_date=date.today() + timedelta(days=200),
+    )
+    make_access(db_session, soon, sup, dep, ceo)
+    make_access(db_session, later, sup, dep, ceo)
+    db_session.commit()
+
+    r = client.post("/api/evaluations", json={"subject_personnel_id": soon.id}, headers=auth_header(sup))
+    eval_soon = r.json()["id"]
+    r = client.post("/api/evaluations", json={"subject_personnel_id": later.id}, headers=auth_header(sup))
+    eval_later = r.json()["id"]
+
+    r = client.get(
+        "/api/audit-log",
+        params={
+            "contract_end_from": date.today().isoformat(),
+            "contract_end_to": (date.today() + timedelta(days=30)).isoformat(),
+        },
+        headers=auth_header(hr),
+    )
+    ids = {item["evaluation_record_id"] for item in r.json()["items"]}
+    assert eval_soon in ids
+    assert eval_later not in ids
+
+
 def test_audit_log_pagination(client, db_session):
     hr = make_user(db_session, "hr")
     db_session.commit()

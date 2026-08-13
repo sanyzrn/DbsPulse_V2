@@ -33,6 +33,10 @@ class EvaluationStatus(str, enum.Enum):
     hr_approved = "hr_approved"
     deputy_approved = "deputy_approved"
     finalized = "finalized"
+    # وضعیت پایانی دوم: پرونده‌ای که به هر دلیل (خروج تأییدکننده، تخصیص اشتباه،
+    # استعفای پرسنل) نباید ادامه پیدا کند. بدون این، تنها راه خروج از یک پروندهٔ
+    # گیرکرده SQL دستی روی پروداکشن بود.
+    cancelled = "cancelled"
 
 
 class CommentStage(str, enum.Enum):

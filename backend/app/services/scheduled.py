@@ -24,6 +24,7 @@ from app.models.improvement_plan import ImprovementPlan
 from app.models.personnel import Personnel
 from app.models.user import User
 from app.services.notifications import notify_once
+from app.services.workflow import IS_OPEN_RECORD
 
 
 def _active_hr_ids(db: Session) -> list[int]:
@@ -41,7 +42,7 @@ def run_contract_expiry_sweep(db: Session) -> int:
         select(EvaluationRecord.id)
         .where(
             EvaluationRecord.subject_personnel_id == Personnel.id,
-            EvaluationRecord.status != EvaluationStatus.finalized,
+            IS_OPEN_RECORD,
         )
         .exists()
     )
@@ -98,7 +99,7 @@ def run_sla_sweep(db: Session) -> int:
     cutoff = datetime.now(UTC) - timedelta(days=settings.sla_reminder_days)
     stalled = db.scalars(
         select(EvaluationRecord).where(
-            EvaluationRecord.status != EvaluationStatus.finalized,
+            IS_OPEN_RECORD,
             EvaluationRecord.created_at <= cutoff,
         )
     )
@@ -117,6 +118,50 @@ def run_sla_sweep(db: Session) -> int:
                 message=message,
                 dedup_key=f"sla:{record.id}:{record.status.value}",
                 within_days=settings.sla_reminder_days,
+                evaluation_record_id=record.id,
+                link=f"/evaluations/{record.id}",
+            ):
+                created += 1
+    return created
+
+
+def run_orphaned_case_sweep(db: Session) -> int:
+    """پرونده‌های بازی که مسئولِ مرحلهٔ فعلی‌شان دیگر کاربر فعالی نیست را به HR گزارش می‌کند.
+
+    این دقیقاً همان حالتی است که ابزارهای لغو/بازتخصیص برای آن ساخته شدند: گذار،
+    برابری `current_user.id` با مسئول ثبت‌شده را لازم دارد، پس اگر آن حساب غیرفعال
+    شود پرونده تا ابد سر جایش می‌ماند. بدون این جارو، HR فقط موقع تمدید قرارداد —
+    یعنی بدترین لحظهٔ ممکن — متوجهش می‌شد.
+    """
+    open_records = db.scalars(select(EvaluationRecord).where(IS_OPEN_RECORD))
+    hr_ids = _active_hr_ids(db)
+    created = 0
+
+    for record in open_records:
+        owner_ids = _current_owner_ids(db, record)
+        # وضعیت submitted صاحب مشخصی ندارد (هر HR فعالی می‌تواند اقدام کند)، پس
+        # «بی‌صاحب» بودنش معنای دیگری دارد و این‌جا موضوعیت ندارد.
+        if not owner_ids or record.status == EvaluationStatus.submitted:
+            continue
+
+        active_owners = db.scalars(
+            select(User.id).where(User.id.in_(owner_ids), User.is_active.is_(True))
+        ).all()
+        if active_owners:
+            continue
+
+        message = (
+            f"پرونده {record.evaluation_code} ({record.subject.full_name}) گیر کرده است: "
+            "مسئول مرحلهٔ فعلی دیگر کاربر فعالی نیست. مسئول جدید تعیین کنید یا پرونده را لغو کنید."
+        )
+        for hr_id in hr_ids:
+            if notify_once(
+                db,
+                user_id=hr_id,
+                type_="orphaned_case",
+                message=message,
+                dedup_key=f"orphaned:{record.id}:{record.status.value}",
+                within_days=settings.notification_dedup_days,
                 evaluation_record_id=record.id,
                 link=f"/evaluations/{record.id}",
             ):
@@ -168,6 +213,7 @@ def run_all_sweeps(db: Session) -> dict[str, int]:
     summary = {
         "contract_expiry": run_contract_expiry_sweep(db),
         "sla_reminder": run_sla_sweep(db),
+        "orphaned_case": run_orphaned_case_sweep(db),
         "improvement_review": run_improvement_review_sweep(db),
     }
     db.commit()

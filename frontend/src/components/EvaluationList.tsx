@@ -326,7 +326,7 @@ export function EvaluationList({
                 )}
               </div>,
               <span key="stage" className="text-gray-500">
-                {STAGE_LABELS[e.stage]}
+                {e.stage ? STAGE_LABELS[e.stage] : "—"}
               </span>,
               <button
                 key="action"

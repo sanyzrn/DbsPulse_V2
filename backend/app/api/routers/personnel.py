@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user, require_roles
 from app.db.session import get_db
-from app.models.enums import EvaluationStatus, PersonnelStatus, UserRole
+from app.models.enums import PersonnelStatus, UserRole
 from app.models.evaluation import EvaluationRecord
 from app.models.evaluation_access import EvaluationAccess
 from app.models.personnel import Personnel
@@ -13,6 +13,7 @@ from app.schemas.auth import CurrentUser
 from app.schemas.personnel import PersonnelCreate, PersonnelPage, PersonnelRead, PersonnelUpdate
 from app.services.audit import log_event
 from app.services.excel import build_personnel_workbook
+from app.services.workflow import IS_OPEN_RECORD
 
 router = APIRouter(prefix="/api/personnel", tags=["personnel"])
 
@@ -239,7 +240,7 @@ def update_personnel(
         open_evaluation = db.scalar(
             select(EvaluationRecord).where(
                 EvaluationRecord.subject_personnel_id == personnel.id,
-                EvaluationRecord.status != EvaluationStatus.finalized,
+                IS_OPEN_RECORD,
             )
         )
         if open_evaluation is not None:

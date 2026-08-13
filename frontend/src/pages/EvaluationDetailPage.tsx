@@ -11,6 +11,7 @@ import {
 } from "../api/queries";
 import { useAuth } from "../auth/AuthContext";
 import { useConfirm } from "../components/ConfirmDialog";
+import { HrRecoveryBox } from "../components/HrRecoveryBox";
 import { ScoreFormTable, computePreview, scoredRows, useScoreForm } from "../components/ScoreForm";
 import { StatusBadge } from "../components/StatusBadge";
 import { useToast } from "../components/Toast";
@@ -125,6 +126,13 @@ export function EvaluationDetailPage() {
     evaluation.stage === "ceo_final" &&
     evaluation.ceo_user_id === user.id;
 
+  // HR روی هر پروندهٔ باز — نه فقط آن‌هایی که در مرحلهٔ خودش هستند. کل هدف این است
+  // که پرونده‌ای که مسئولِ مرحله‌اش دیگر در دسترس نیست هم قابل نجات باشد.
+  const canRecoverStuckCase =
+    user.role === "hr" &&
+    evaluation.status !== "finalized" &&
+    evaluation.status !== "cancelled";
+
   const canComment =
     (user.role === "hr" && evaluation.status === "submitted") ||
     (user.role === "deputy" && evaluation.status === "hr_approved" && evaluation.deputy_user_id === user.id) ||
@@ -190,7 +198,8 @@ export function EvaluationDetailPage() {
           <div className="text-end text-sm">
             <p className="font-medium text-gray-800">{evaluation.evaluation_code}</p>
             <p className="flex flex-wrap items-center justify-end gap-1.5 text-gray-500">
-              <StatusBadge status={evaluation.status} /> · {STAGE_LABELS[evaluation.stage]}
+              <StatusBadge status={evaluation.status} />
+              {evaluation.stage && <> · {STAGE_LABELS[evaluation.stage]}</>}
               {evaluation.was_returned && (
                 <span
                   className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-[11px] font-medium text-amber-700"
@@ -386,6 +395,11 @@ export function EvaluationDetailPage() {
       {(canHrApprove || canDeputyApprove || canCeoFinalize) && (
         <ReturnBox evaluationId={evaluation.id} onReturned={load} />
       )}
+
+      {/* ابزار نجات پروندهٔ گیرکرده — HR روی هر پروندهٔ باز، در هر مرحله‌ای که باشد.
+          برخلاف «برگشت» که پرونده را یک مرحله عقب می‌برد، این‌ها وقتی لازم‌اند که خود
+          مسئولِ مرحله دیگر نمی‌تواند اقدام کند. */}
+      {canRecoverStuckCase && <HrRecoveryBox evaluation={evaluation} onChanged={load} />}
 
       <div className="flex justify-end gap-2">
         {canHrApprove && (

@@ -75,7 +75,8 @@ export type EvaluationStatus =
   | "submitted"
   | "hr_approved"
   | "deputy_approved"
-  | "finalized";
+  | "finalized"
+  | "cancelled";
 
 export interface EvaluationRecord {
   id: number;
@@ -86,7 +87,8 @@ export interface EvaluationRecord {
   unit_supervisor_user_id: number | null;
   deputy_user_id: number;
   ceo_user_id: number;
-  stage: EvaluationStage;
+  // null برای پروندهٔ لغوشده — در هیچ مرحله‌ای از زنجیره نیست
+  stage: EvaluationStage | null;
   status: EvaluationStatus;
   general_score_pct: number | null;
   specialized_score_pct: number | null;
@@ -311,6 +313,7 @@ export const STATUS_LABELS: Record<EvaluationStatus, string> = {
   hr_approved: "تأییدشده توسط HR",
   deputy_approved: "تأییدشده توسط معاونت",
   finalized: "نهایی‌شده",
+  cancelled: "لغوشده",
 };
 
 export interface Page<T> {

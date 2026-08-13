@@ -558,7 +558,11 @@ function ExpiringContractsCard() {
   );
 }
 
-const PIPELINE_ORDER: EvaluationStatus[] = [
+// قیف فقط مسیر پیشرفت است؛ «لغوشده» عمداً در آن نیست (بک‌اند هم برنمی‌گرداند) چون
+// پرونده‌ای که به مرحلهٔ بعد نمی‌رود، نرخ عبور قیف را مخدوش می‌کند.
+type PipelineStatus = Exclude<EvaluationStatus, "cancelled">;
+
+const PIPELINE_ORDER: PipelineStatus[] = [
   "draft",
   "submitted",
   "hr_approved",
@@ -567,7 +571,7 @@ const PIPELINE_ORDER: EvaluationStatus[] = [
 ];
 
 // رنگ هر مرحله قیف — از خاکستری به سبز
-const PIPELINE_COLORS: Record<EvaluationStatus, string> = {
+const PIPELINE_COLORS: Record<PipelineStatus, string> = {
   draft: "from-gray-300 to-gray-400",
   submitted: "from-blue-400 to-blue-500",
   hr_approved: "from-pulse-400 to-pulse-500",

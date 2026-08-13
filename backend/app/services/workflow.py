@@ -21,10 +21,29 @@ from app.schemas.auth import CurrentUser
 from app.services.audit import log_event
 from app.services.evaluation import compute_result, validate_evidence
 
+OPEN_STATUSES: frozenset[EvaluationStatus] = frozenset(
+    {
+        EvaluationStatus.draft,
+        EvaluationStatus.submitted,
+        EvaluationStatus.hr_approved,
+        EvaluationStatus.deputy_approved,
+    }
+)
+"""وضعیت‌هایی که پرونده هنوز «باز» است. finalized و cancelled پایانی‌اند."""
+
+IS_OPEN_RECORD = EvaluationRecord.status.in_(OPEN_STATUSES)
+"""شرط «پروندهٔ باز» برای کوئری‌ها.
+
+پیش از این، همه‌جا `status != finalized` نوشته می‌شد — که وقتی وضعیت پایانی دومی
+(cancelled) اضافه شد، در ۸ نقطهٔ مختلف غلط می‌شد و پروندهٔ لغوشده را «در جریان»
+می‌شمرد. یک منبع مشترک یعنی وضعیت پایانی بعدی فقط همین‌جا اضافه می‌شود."""
+
 
 @dataclass(frozen=True)
 class Transition:
-    from_status: EvaluationStatus
+    # مجموعه است نه تک‌مقدار: لغو پرونده از هر مرحلهٔ بازی ممکن است، بقیهٔ گذارها
+    # فقط از یک وضعیت مشخص.
+    from_statuses: frozenset[EvaluationStatus]
     to_status: EvaluationStatus
     allowed_role: UserRole
     # نام فیلدی روی رکورد که شناسه کاربر مجاز را نگه می‌دارد؛ None یعنی هر کاربری با نقش مجاز
@@ -35,7 +54,7 @@ class Transition:
 
 TRANSITIONS: dict[str, Transition] = {
     "submit": Transition(
-        from_status=EvaluationStatus.draft,
+        from_statuses=frozenset({EvaluationStatus.draft}),
         to_status=EvaluationStatus.submitted,
         allowed_role=UserRole.unit_supervisor,
         assignee_field="unit_supervisor_user_id",
@@ -43,7 +62,7 @@ TRANSITIONS: dict[str, Transition] = {
         error_detail="این ارزیابی در مرحله ثبت توسط شما نیست",
     ),
     "hr_approve": Transition(
-        from_status=EvaluationStatus.submitted,
+        from_statuses=frozenset({EvaluationStatus.submitted}),
         to_status=EvaluationStatus.hr_approved,
         allowed_role=UserRole.hr,
         assignee_field=None,
@@ -51,7 +70,7 @@ TRANSITIONS: dict[str, Transition] = {
         error_detail="این ارزیابی در انتظار بررسی منابع انسانی نیست",
     ),
     "deputy_approve": Transition(
-        from_status=EvaluationStatus.hr_approved,
+        from_statuses=frozenset({EvaluationStatus.hr_approved}),
         to_status=EvaluationStatus.deputy_approved,
         allowed_role=UserRole.deputy,
         assignee_field="deputy_user_id",
@@ -59,7 +78,7 @@ TRANSITIONS: dict[str, Transition] = {
         error_detail="این ارزیابی در مرحله تأیید معاونت توسط شما نیست",
     ),
     "ceo_finalize": Transition(
-        from_status=EvaluationStatus.deputy_approved,
+        from_statuses=frozenset({EvaluationStatus.deputy_approved}),
         to_status=EvaluationStatus.finalized,
         allowed_role=UserRole.ceo,
         assignee_field="ceo_user_id",
@@ -69,7 +88,7 @@ TRANSITIONS: dict[str, Transition] = {
     # گذارهای «برگشت پرونده»: هر تأییدکننده می‌تواند پرونده را با ذکر دلیل یک مرحله
     # عقب بفرستد. امتیازهای قبلی حفظ می‌شوند تا نمره‌دهنده فقط موارد لازم را اصلاح کند.
     "hr_return": Transition(
-        from_status=EvaluationStatus.submitted,
+        from_statuses=frozenset({EvaluationStatus.submitted}),
         to_status=EvaluationStatus.draft,
         allowed_role=UserRole.hr,
         assignee_field=None,
@@ -77,7 +96,7 @@ TRANSITIONS: dict[str, Transition] = {
         error_detail="این ارزیابی در انتظار بررسی منابع انسانی نیست",
     ),
     "deputy_return": Transition(
-        from_status=EvaluationStatus.hr_approved,
+        from_statuses=frozenset({EvaluationStatus.hr_approved}),
         to_status=EvaluationStatus.submitted,
         allowed_role=UserRole.deputy,
         assignee_field="deputy_user_id",
@@ -85,12 +104,24 @@ TRANSITIONS: dict[str, Transition] = {
         error_detail="این ارزیابی در مرحله بررسی معاونت توسط شما نیست",
     ),
     "ceo_return": Transition(
-        from_status=EvaluationStatus.deputy_approved,
+        from_statuses=frozenset({EvaluationStatus.deputy_approved}),
         to_status=EvaluationStatus.hr_approved,
         allowed_role=UserRole.ceo,
         assignee_field="ceo_user_id",
         error_status=http_status.HTTP_403_FORBIDDEN,
         error_detail="این ارزیابی در مرحله تأیید نهایی توسط شما نیست",
+    ),
+    # راه خروج از پروندهٔ گیرکرده. تا پیش از این هیچ گذار پایانی جز نهایی‌سازی وجود
+    # نداشت: اگر تأییدکننده‌ای استعفا می‌داد، مرحله‌اش هرگز کامل نمی‌شد و ایندکس یکتای
+    # جزئی هم اجازهٔ ساخت پروندهٔ جایگزین نمی‌داد — آن پرسنل برای همیشه غیرقابل‌ارزیابی
+    # می‌شد. تنها درمان، SQL دستی روی پروداکشن بود.
+    "cancel": Transition(
+        from_statuses=OPEN_STATUSES,
+        to_status=EvaluationStatus.cancelled,
+        allowed_role=UserRole.hr,
+        assignee_field=None,
+        error_status=http_status.HTTP_400_BAD_REQUEST,
+        error_detail="فقط پروندهٔ باز (نهایی‌نشده و لغونشده) قابل لغو است",
     ),
 }
 
@@ -100,7 +131,7 @@ def ensure_transition_allowed(
 ) -> Transition:
     spec = TRANSITIONS[action]
     denied = HTTPException(status_code=spec.error_status, detail=spec.error_detail)
-    if record.status != spec.from_status or current_user.role != spec.allowed_role:
+    if record.status not in spec.from_statuses or current_user.role != spec.allowed_role:
         raise denied
     if spec.assignee_field is not None and current_user.id != getattr(record, spec.assignee_field):
         raise denied

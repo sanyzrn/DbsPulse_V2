@@ -36,6 +36,7 @@ const IN_PROGRESS_STAGE_LABEL: Record<EvaluationStatus, string> = {
   hr_approved: "در انتظار تأیید معاونت",
   deputy_approved: "در انتظار تأیید نهایی مدیرعامل",
   finalized: "نهایی‌شده",
+  cancelled: "لغوشده — منتظر اقدام کسی نیست",
 };
 
 // یک رنگ واحد برای هر دو نمودار (تک‌سری‌اند: امتیاز یک نفر) — قبلاً یک گرادیانت

@@ -1,4 +1,5 @@
 from datetime import datetime
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, computed_field
 
@@ -11,6 +12,8 @@ _STAGE_BY_STATUS: dict[EvaluationStatus, EvaluationStage] = {
     EvaluationStatus.hr_approved: EvaluationStage.deputy_review,
     EvaluationStatus.deputy_approved: EvaluationStage.ceo_final,
     EvaluationStatus.finalized: EvaluationStage.ceo_final,
+    # cancelled عمداً این‌جا نیست: پروندهٔ لغوشده در هیچ مرحله‌ای «نیست» و نسبت‌دادن
+    # یک مرحله به آن گمراه‌کننده است. stage برای این حالت None برمی‌گردد.
 }
 
 
@@ -63,6 +66,24 @@ class ReturnRequest(BaseModel):
     reason: str = Field(min_length=1)
 
 
+class CancelRequest(BaseModel):
+    """لغو پرونده دلیل اجباری دارد — این یک تصمیم ثبت‌شدنی است، نه یک پاک‌کردن بی‌صدا."""
+
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+    reason: str = Field(min_length=1, max_length=1000)
+
+
+class StageOwnerReassign(BaseModel):
+    """جایگزینی مسئول یکی از سه مرحله روی یک پروندهٔ باز."""
+
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+    stage_field: Literal["unit_supervisor_user_id", "deputy_user_id", "ceo_user_id"]
+    new_user_id: int
+    reason: str = Field(min_length=1, max_length=1000)
+
+
 class EvaluationRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -89,8 +110,9 @@ class EvaluationRead(BaseModel):
 
     @computed_field  # type: ignore[prop-decorator]
     @property
-    def stage(self) -> EvaluationStage:
-        return _STAGE_BY_STATUS[self.status]
+    def stage(self) -> EvaluationStage | None:
+        """None برای پروندهٔ لغوشده — در هیچ مرحله‌ای از زنجیره نیست."""
+        return _STAGE_BY_STATUS.get(self.status)
 
 
 class EvaluationDetail(EvaluationRead):

@@ -6,6 +6,8 @@ const STYLE_BY_STATUS: Record<EvaluationStatus, string> = {
   hr_approved: "bg-pulse-50 text-pulse-700",
   deputy_approved: "bg-amber-50 text-amber-800",
   finalized: "bg-green-50 text-green-700",
+  // لغوشده عمداً خنثی و کم‌رنگ است، نه قرمزِ خطا: یک تصمیم اداری است، نه شکست.
+  cancelled: "bg-gray-100 text-gray-500 line-through decoration-gray-400",
 };
 
 const DOT_BY_STATUS: Record<EvaluationStatus, string> = {
@@ -14,6 +16,7 @@ const DOT_BY_STATUS: Record<EvaluationStatus, string> = {
   hr_approved: "bg-pulse-500",
   deputy_approved: "bg-amber-500",
   finalized: "bg-green-500",
+  cancelled: "bg-gray-400",
 };
 
 export function StatusBadge({ status }: { status: EvaluationStatus }) {

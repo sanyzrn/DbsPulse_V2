@@ -21,8 +21,10 @@ from app.models.evaluation import EvaluationComment, EvaluationRecord, Evaluatio
 from app.models.evaluation_access import EvaluationAccess
 from app.models.evaluation_period import EvaluationPeriod
 from app.models.personnel import Personnel
+from app.models.user import User
 from app.schemas.auth import CurrentUser
 from app.schemas.evaluation import (
+    CancelRequest,
     CommentCreate,
     CommentRead,
     EvaluationCreate,
@@ -32,15 +34,19 @@ from app.schemas.evaluation import (
     EvaluatorCommentUpdate,
     ReturnRequest,
     ScoresUpsert,
+    StageOwnerReassign,
 )
 from app.services.audit import log_event
 from app.services.documents import archive_final_pdf
 from app.services.evaluation import next_evaluation_code
 from app.services.excel import build_evaluations_workbook
-from app.services.notifications import notify
+from app.services.notifications import notify, notify_stage_owner_reassigned
 from app.services.pdf import weasyprint_available
+from app.services.self_evaluation import ensure_evaluators_are_not_the_subject
 from app.services.snapshot import build_final_snapshot
 from app.services.workflow import (
+    IS_OPEN_RECORD,
+    OPEN_STATUSES,
     active_indicators_by_id,
     apply_transition,
     finalize_scoring,
@@ -209,7 +215,7 @@ def create_evaluation(
     existing_open = db.scalar(
         select(EvaluationRecord).where(
             EvaluationRecord.subject_personnel_id == personnel.id,
-            EvaluationRecord.status != EvaluationStatus.finalized,
+            IS_OPEN_RECORD,
         )
     )
     if existing_open is not None:
@@ -246,7 +252,7 @@ def create_evaluation(
         winner = db.scalar(
             select(EvaluationRecord).where(
                 EvaluationRecord.subject_personnel_id == personnel.id,
-                EvaluationRecord.status != EvaluationStatus.finalized,
+                IS_OPEN_RECORD,
             )
         )
         raise HTTPException(
@@ -664,6 +670,120 @@ def return_evaluation(
         )
 
     apply_transition(db, record, action, current_user, before=_before)
+    db.commit()
+    db.refresh(record)
+    return _to_read(db, record)
+
+
+@router.post("/{evaluation_id}/cancel", response_model=EvaluationRead)
+def cancel_evaluation(
+    evaluation_id: int,
+    payload: CancelRequest,
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(require_roles(UserRole.hr)),
+) -> EvaluationRead:
+    """لغو پروندهٔ باز با دلیل اجباری — تنها راه خروج از پروندهٔ گیرکرده.
+
+    بدون این، پرونده‌ای که تأییدکننده‌اش از سازمان رفته هرگز کامل نمی‌شد و ایندکس
+    یکتای جزئی هم اجازهٔ ساخت پروندهٔ جایگزین نمی‌داد؛ آن پرسنل عملاً برای همیشه
+    غیرقابل‌ارزیابی می‌ماند و تنها درمانش SQL دستی روی پروداکشن بود.
+    """
+    record = _get_record_or_404_for_update(db, evaluation_id)
+
+    def _before() -> None:
+        # دلیل هم به‌صورت کامنت در خود پرونده می‌ماند و هم در audit — تصمیم است، نه پاک‌کردن.
+        db.add(
+            EvaluationComment(
+                evaluation_record_id=record.id,
+                commenter_user_id=current_user.id,
+                stage=CommentStage.hr_review,
+                comment_text=f"لغو پرونده — دلیل: {payload.reason}",
+            )
+        )
+        log_event(
+            db,
+            actor_user_id=current_user.id,
+            event_type="evaluation_cancelled",
+            evaluation_record_id=record.id,
+            old_value={"status": record.status.value},
+            new_value={"reason": payload.reason},
+        )
+
+    apply_transition(db, record, "cancel", current_user, before=_before)
+    db.commit()
+    db.refresh(record)
+    return _to_read(db, record)
+
+
+_REASSIGNABLE_STAGES: dict[str, tuple[UserRole, str]] = {
+    "unit_supervisor_user_id": (UserRole.unit_supervisor, "مسئول واحد"),
+    "deputy_user_id": (UserRole.deputy, "معاونت"),
+    "ceo_user_id": (UserRole.ceo, "مدیرعامل"),
+}
+
+
+@router.post("/{evaluation_id}/reassign", response_model=EvaluationRead)
+def reassign_stage_owner(
+    evaluation_id: int,
+    payload: StageOwnerReassign,
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(require_roles(UserRole.hr)),
+) -> EvaluationRead:
+    """جایگزینی مسئول یک مرحله روی پروندهٔ باز — بدون از دست رفتن امتیازها.
+
+    عمداً در جدول TRANSITIONS نیست: وضعیت را عوض نمی‌کند، پس گذار نیست. ولی از همان
+    قفل ردیف و همان مسیر audit استفاده می‌کند.
+    """
+    record = _get_record_or_404_for_update(db, evaluation_id)
+
+    if record.status not in OPEN_STATUSES:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="فقط مسئول مراحل یک پروندهٔ باز قابل تغییر است",
+        )
+
+    expected_role, stage_label = _REASSIGNABLE_STAGES[payload.stage_field]
+    previous_user_id = getattr(record, payload.stage_field)
+    if previous_user_id is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"این پرونده مرحلهٔ «{stage_label}» ندارد (مسیر «مدیر»)",
+        )
+
+    new_user = db.get(User, payload.new_user_id)
+    if new_user is None or not new_user.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"کاربر انتخاب‌شده برای «{stage_label}» یافت نشد یا غیرفعال است",
+        )
+    if new_user.role != expected_role:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"کاربر انتخاب‌شده برای «{stage_label}» باید نقش «{stage_label}» داشته باشد",
+        )
+    # همان نامساوی P0-10: جایگزین نباید خودِ ارزیابی‌شونده باشد.
+    ensure_evaluators_are_not_the_subject(
+        db, record.subject_personnel_id, [payload.new_user_id]
+    )
+
+    setattr(record, payload.stage_field, payload.new_user_id)
+    db.add(
+        EvaluationComment(
+            evaluation_record_id=record.id,
+            commenter_user_id=current_user.id,
+            stage=CommentStage.hr_review,
+            comment_text=f"تغییر مسئول «{stage_label}» — دلیل: {payload.reason}",
+        )
+    )
+    log_event(
+        db,
+        actor_user_id=current_user.id,
+        event_type="stage_owner_reassigned",
+        evaluation_record_id=record.id,
+        old_value={payload.stage_field: previous_user_id},
+        new_value={payload.stage_field: payload.new_user_id, "reason": payload.reason},
+    )
+    notify_stage_owner_reassigned(db, record, new_user.id, stage_label)
     db.commit()
     db.refresh(record)
     return _to_read(db, record)

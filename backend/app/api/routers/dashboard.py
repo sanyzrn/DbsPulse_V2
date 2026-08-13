@@ -29,10 +29,22 @@ from app.schemas.dashboard import (
     UnitStat,
 )
 from app.schemas.notification import ExpiringContract
+from app.services.workflow import IS_OPEN_RECORD
 
 router = APIRouter(prefix="/api/dashboard", tags=["dashboard"])
 
 _FINALIZED = EvaluationRecord.status == EvaluationStatus.finalized
+
+# قیف «پیشرفت» را نشان می‌دهد، پس cancelled عمداً در آن نیست: پروندهٔ لغوشده به
+# مرحلهٔ بعد نمی‌رود و آوردنش در قیف، نرخ عبور را مخدوش می‌کند. HR پرونده‌های لغوشده
+# را از فهرست ارزیابی‌ها با فیلتر وضعیت می‌بیند.
+_PIPELINE_STATUSES: tuple[EvaluationStatus, ...] = (
+    EvaluationStatus.draft,
+    EvaluationStatus.submitted,
+    EvaluationStatus.hr_approved,
+    EvaluationStatus.deputy_approved,
+    EvaluationStatus.finalized,
+)
 
 
 @router.get("/overview", response_model=DashboardOverview)
@@ -152,7 +164,7 @@ def pipeline(
             count=rows.get(status_member, (0, None))[0],
             oldest_created_at=rows.get(status_member, (0, None))[1],
         )
-        for status_member in EvaluationStatus
+        for status_member in _PIPELINE_STATUSES
     ]
 
 
@@ -171,7 +183,7 @@ def expiring_contracts(
         select(EvaluationRecord.id)
         .where(
             EvaluationRecord.subject_personnel_id == Personnel.id,
-            EvaluationRecord.status != EvaluationStatus.finalized,
+            IS_OPEN_RECORD,
         )
         .exists()
     )
@@ -269,7 +281,7 @@ def personnel_in_progress(
         select(EvaluationRecord)
         .where(
             EvaluationRecord.subject_personnel_id == personnel_id,
-            EvaluationRecord.status != EvaluationStatus.finalized,
+            IS_OPEN_RECORD,
         )
         .order_by(EvaluationRecord.created_at.desc())
     )
@@ -426,7 +438,7 @@ def role_overview(
             RoleOverviewCard(
                 key="open",
                 label="پرونده‌های باز",
-                value=_count_records(db, EvaluationRecord.status != EvaluationStatus.finalized),
+                value=_count_records(db, IS_OPEN_RECORD),
                 tone="pulse",
             ),
             RoleOverviewCard(

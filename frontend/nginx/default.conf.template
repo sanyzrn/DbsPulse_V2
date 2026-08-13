@@ -28,7 +28,18 @@ server {
         proxy_pass ${BACKEND_ORIGIN}/api/;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        # عمداً $remote_addr و نه $proxy_add_x_forwarded_for: حالت دوم هدرِ فرستادهٔ
+        # خودِ کلاینت را به ابتدای زنجیره اضافه می‌کرد، پس آدرسی که بک‌اند محدودیت
+        # نرخ ورود را روی آن کلید می‌زد توسط مهاجم قابل کنترل بود — با چرخاندن یک
+        # هدر، شمارنده صفر می‌شد. این‌جا هرچه کلاینت فرستاده باشد دور ریخته می‌شود
+        # و فقط آدرس واقعیِ اتصال می‌ماند.
+        #
+        # اگر پروکسی دیگری (CDN/لودبالانسر) جلوی همین nginx هست، $remote_addr آدرسِ
+        # آن پروکسی است نه کلاینت؛ در آن صورت این دو خط را اضافه کنید تا nginx خودش
+        # آدرس واقعی را از زنجیره دربیاورد:
+        #     set_real_ip_from <شبکهٔ آن پروکسی>;
+        #     real_ip_header X-Forwarded-For;
+        proxy_set_header X-Forwarded-For $remote_addr;
         proxy_set_header X-Forwarded-Proto $scheme;
     }
 

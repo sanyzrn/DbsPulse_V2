@@ -24,6 +24,12 @@ from app.schemas.auth import (
     LoginResponse,
 )
 from app.services.audit import log_event
+from app.services.login_guard import (
+    clear_failures,
+    locked_until,
+    notify_hr_of_lockout,
+    record_failure,
+)
 from app.services.sessions import (
     RefreshReuseError,
     create_session,
@@ -81,24 +87,54 @@ def login(
         detail="نام کاربری یا رمز عبور اشتباه است",
     )
     client_ip = request.client.host if request.client else None
+
+    # قفل حساب پیش از هر کاری بررسی می‌شود — حتی رمز درست هم در پنجرهٔ قفل پذیرفته
+    # نمی‌شود، وگرنه مهاجمی که رمز را همان تلاش آخر پیدا کرده از قفل عبور می‌کرد.
+    lock_expiry = locked_until(db, payload.username)
+    if lock_expiry is not None:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail=(
+                "به دلیل تلاش‌های ناموفق پیاپی، ورود به این حساب موقتاً قفل شده است؛ "
+                f"{settings.login_lockout_minutes} دقیقه دیگر دوباره تلاش کنید."
+            ),
+            headers={"Retry-After": str(settings.login_lockout_minutes * 60)},
+        )
+
+    def _fail(user_id: int | None) -> None:
+        """شکست را می‌شمارد و در صورت رسیدن به آستانه قفل می‌کند + به HR خبر می‌دهد."""
+        locked = record_failure(db, payload.username)
+        if user_id is not None:
+            log_event(
+                db, actor_user_id=user_id, event_type="login_failed", new_value={"ip": client_ip}
+            )
+        if locked is not None:
+            if user_id is not None:
+                log_event(
+                    db,
+                    actor_user_id=user_id,
+                    event_type="account_locked",
+                    new_value={"ip": client_ip, "until": locked.isoformat()},
+                )
+            notify_hr_of_lockout(db, payload.username, locked)
+        db.commit()
+
     user = db.scalar(select(User).where(User.username == payload.username))
     if user is None:
+        # نام کاربری ناموجود هم شمرده می‌شود، وگرنه خودِ رفتار قفل به یک اوراکل
+        # «این حساب وجود دارد» تبدیل می‌شد.
         verify_password(payload.password, _DUMMY_PASSWORD_HASH)
+        _fail(None)
         raise invalid_credentials
     if not verify_password(payload.password, user.password_hash):
-        log_event(
-            db,
-            actor_user_id=user.id,
-            event_type="login_failed",
-            new_value={"ip": client_ip},
-        )
-        db.commit()
+        _fail(user.id)
         raise invalid_credentials
     if not user.is_active:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN, detail="حساب کاربری غیرفعال است"
         )
 
+    clear_failures(db, payload.username)
     log_event(
         db,
         actor_user_id=user.id,

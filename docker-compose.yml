@@ -19,6 +19,9 @@ x-backend-env: &backend-env
   # در production به IP/شبکهٔ پروکسی محدودش کنید؛ با «*» هدر جعلی X-Forwarded-For
   # محدودیت نرخ ورود را دور می‌زند.
   FORWARDED_ALLOW_IPS: ${FORWARDED_ALLOW_IPS:-*}
+  # خالی = شمارندهٔ محدودیت نرخ در حافظهٔ همان پروسه. برای چند replica یک backend
+  # مشترک بدهید (مثلاً redis://redis:6379).
+  RATE_LIMIT_STORAGE_URI: ${RATE_LIMIT_STORAGE_URI:-}
   ENABLE_SCHEDULER: ${ENABLE_SCHEDULER:-false}
 
 services:

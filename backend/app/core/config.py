@@ -17,6 +17,24 @@ class Settings(BaseSettings):
     # آدرس عمومی فرانت‌اند؛ برای ساخت لینک تأیید اصالت داخل QR سند PDF استفاده می‌شود
     public_base_url: str = "http://localhost:8080"
 
+    # --- قفل حساب پس از تلاش ناموفق ورود (P0-04) -------------------------------
+    # محدودیت per-IP یک حملهٔ توزیع‌شده روی یک حساب مشخص را نمی‌گیرد؛ این شمارش
+    # per-username است و در دیتابیس می‌ماند (مشترک بین replica ها، مقاوم به ری‌استارت).
+    login_max_failed_attempts: int = 5
+    login_lockout_minutes: int = 15
+    # شکست‌های قدیمی‌تر از این پنجره در قفل امروز نقشی ندارند
+    login_attempt_window_minutes: int = 15
+
+    # محل نگهداری شمارندهٔ محدودیت نرخِ per-IP. خالی = حافظهٔ درون‌پروسه، که یعنی با
+    # N کارگر هر محدودیت عملاً N برابر می‌شود و با ری‌استارت صفر می‌شود. برای استقرار
+    # چندنسخه‌ای یک backend مشترک بدهید (مثلاً redis://redis:6379). قفلِ حساب بالا
+    # به این وابسته نیست و همیشه در دیتابیس مشترک است.
+    rate_limit_storage_uri: str = ""
+
+    # IP/شبکهٔ پروکسی‌ای که X-Forwarded-For اش قابل اعتماد است. «*» یعنی هر کلاینتی
+    # می‌تواند هدر جعلی بفرستد و محدودیت نرخِ per-IP را دور بزند.
+    forwarded_allow_ips: str = "*"
+
     # کاربران/پرسنل نمونهٔ دمو (hr1، sup1، … با یک رمز مشترک و منتشرشده) فقط وقتی
     # seed می‌شوند که این فلگ صراحتاً روشن باشد. پیش‌فرض خاموش است تا هیچ محیطی
     # که تازه مایگریشن خورده — از جمله production — اعتبارنامهٔ عمومی نداشته باشد.
@@ -67,6 +85,20 @@ class Settings(BaseSettings):
             raise RuntimeError(
                 "SEED_DEMO_DATA در محیط production روشن است. کاربران نمونه رمز مشترکِ "
                 "منتشرشده دارند و نباید در محیط واقعی ساخته شوند؛ این مقدار را false کنید."
+            )
+        return self
+
+    @model_validator(mode="after")
+    def _forbid_wildcard_trusted_proxy_in_production(self) -> "Settings":
+        # با «*»، uvicorn هر X-Forwarded-For ی را باور می‌کند؛ چون nginx جلویی هم
+        # هدر کلاینت را به زنجیره اضافه می‌کرد، آدرسی که محدودیت نرخ روی آن کلید
+        # می‌خورد عملاً توسط خود درخواست کنترل می‌شد — یعنی محدودیت با چرخاندن یک
+        # هدر دور می‌خورد.
+        if self.environment == "production" and self.forwarded_allow_ips.strip() == "*":
+            raise RuntimeError(
+                "FORWARDED_ALLOW_IPS در production نباید «*» باشد؛ آن را به IP یا شبکهٔ "
+                "reverse proxy محدود کنید، وگرنه محدودیت نرخ ورود با هدر جعلی "
+                "X-Forwarded-For دور زده می‌شود."
             )
         return self
 

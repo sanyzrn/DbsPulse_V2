@@ -23,6 +23,7 @@ from app.models.evaluation import EvaluationRecord
 from app.models.improvement_plan import ImprovementPlan
 from app.models.personnel import Personnel
 from app.models.user import User
+from app.services.login_guard import purge_stale
 from app.services.notifications import notify_once
 from app.services.workflow import IS_OPEN_RECORD
 
@@ -215,6 +216,9 @@ def run_all_sweeps(db: Session) -> dict[str, int]:
         "sla_reminder": run_sla_sweep(db),
         "orphaned_case": run_orphaned_case_sweep(db),
         "improvement_review": run_improvement_review_sweep(db),
+        # نگهداری، نه اعلان: ردیف‌های منقضیِ شمارش تلاش ورود را پاک می‌کند تا جدول
+        # با نام‌های کاربریِ تصادفیِ یک حملهٔ enumeration باد نکند.
+        "stale_login_attempts_purged": purge_stale(db),
     }
     db.commit()
     return summary

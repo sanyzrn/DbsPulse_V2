@@ -40,6 +40,22 @@ def db_session():
     engine.dispose()
 
 
+@pytest.fixture(autouse=True)
+def _reset_rate_limiter():
+    """سطل محدودیت نرخِ per-IP بین تست‌ها ریست می‌شود.
+
+    همهٔ تست‌ها از یک آدرس (testclient) درخواست می‌زنند، پس بدون این، هر تستی که به
+    /api/auth/login می‌زند سهمیهٔ تست‌های بعدی را می‌سوزاند و شکست‌ها به ترتیب اجرا
+    وابسته می‌شوند. تست خودِ محدودیت نرخ سالم می‌ماند چون سهمیه‌اش را در یک تست
+    مصرف می‌کند.
+    """
+    from app.core.rate_limit import limiter
+
+    limiter.reset()
+    yield
+    limiter.reset()
+
+
 @pytest.fixture()
 def client(db_session):
     from app.db.session import get_db

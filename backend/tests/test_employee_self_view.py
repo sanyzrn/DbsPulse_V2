@@ -244,7 +244,10 @@ def test_employee_cannot_touch_workflow_or_admin_endpoints(client, db_session):
     assert client.get("/api/dashboard/overview", headers=headers).status_code == 403
     assert client.get("/api/users", headers=headers).status_code == 403
     assert client.get("/api/audit-log", headers=headers).status_code == 403
-    assert client.get(f"/api/evaluations/{evaluation_id}/summary.pdf", headers=headers).status_code == 403
+    # سند *خودِ فرد* عمداً باز است (P0-06): سندی که دربارهٔ یک نفر است باید در
+    # اختیار خودش باشد. بستنِ آن روی پروندهٔ دیگران در test_employee_voice.py تست
+    # می‌شود؛ این‌جا فقط ثابت می‌کنیم بازشدنش سهوی نبوده.
+    assert client.get(f"/api/evaluations/{evaluation_id}/summary.pdf", headers=headers).status_code == 200
     # فهرست پرسنل برای کارمند خالی برمی‌گردد (fail-closed)
     r = client.get("/api/personnel", headers=headers)
     assert r.status_code == 200 and r.json()["total"] == 0

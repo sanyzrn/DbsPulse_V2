@@ -21,6 +21,7 @@ from app.models.evaluation import EvaluationComment, EvaluationRecord, Evaluatio
 from app.models.evaluation_access import EvaluationAccess
 from app.models.evaluation_period import EvaluationPeriod
 from app.models.personnel import Personnel
+from app.models.self_assessment import SelfAssessmentScore
 from app.models.user import User
 from app.schemas.auth import CurrentUser
 from app.schemas.evaluation import (
@@ -33,8 +34,11 @@ from app.schemas.evaluation import (
     EvaluationRead,
     EvaluatorCommentUpdate,
     HrHandover,
+    ObjectionResolution,
     ReturnRequest,
     ScoresUpsert,
+    SelfAssessmentRead,
+    SelfAssessmentScoreRead,
     StageOwnerReassign,
 )
 from app.services.audit import log_event
@@ -122,9 +126,32 @@ def _to_read(db: Session, record: EvaluationRecord) -> EvaluationRead:
     )
 
 
+def _self_assessment_of(db: Session, record: EvaluationRecord) -> SelfAssessmentRead | None:
+    """خودارزیابی فرد، برای نمایش کنار امتیاز ارزیاب.
+
+    None یعنی فرد چیزی ثبت نکرده — که کاملاً مجاز است: خودارزیابی اختیاری و
+    غیرمسدودکننده است.
+    """
+    if record.self_assessment_submitted_at is None:
+        return None
+    rows = db.scalars(
+        select(SelfAssessmentScore).where(
+            SelfAssessmentScore.evaluation_record_id == record.id
+        )
+    )
+    return SelfAssessmentRead(
+        submitted_at=record.self_assessment_submitted_at,
+        note=record.self_assessment_note,
+        scores=[SelfAssessmentScoreRead.model_validate(r) for r in rows],
+    )
+
+
 def _to_detail(db: Session, record: EvaluationRecord) -> EvaluationDetail:
     return EvaluationDetail.model_validate(record).model_copy(
-        update={"was_returned": _was_returned(db, record.id)}
+        update={
+            "was_returned": _was_returned(db, record.id),
+            "self_assessment": _self_assessment_of(db, record),
+        }
     )
 
 
@@ -815,6 +842,71 @@ def hr_handover(
     return _to_read(db, record)
 
 
+@router.post("/{evaluation_id}/resolve-objection", response_model=EvaluationRead)
+def resolve_objection(
+    evaluation_id: int,
+    payload: ObjectionResolution,
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(require_roles(UserRole.hr)),
+) -> EvaluationRead:
+    """ثبت پاسخ منابع انسانی به اعتراض کارمند.
+
+    اعتراضی که کسی موظف به پاسخ‌گویی به آن نباشد، تشریفات است. این endpoint اعتراض
+    را می‌بندد و پاسخ را کنار خودِ اعتراض در پرونده ثبت می‌کند.
+
+    نتیجهٔ ارزیابی و سند نهایی عمداً دست‌نخورده می‌مانند: اگر واقعاً باید امتیاز عوض
+    شود، مسیرش ارزیابی تازه است نه بازنویسی سندی که هش و امضا دارد.
+    """
+    record = _get_record_or_404_for_update(db, evaluation_id)
+
+    if record.objection_at is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="برای این پرونده اعتراضی ثبت نشده است",
+        )
+    if record.objection_resolved_at is not None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="به این اعتراض قبلاً پاسخ داده شده است",
+        )
+
+    record.objection_resolved_at = datetime.now(UTC)
+    record.objection_resolution = payload.resolution
+    record.objection_resolved_by_user_id = current_user.id
+    log_event(
+        db,
+        actor_user_id=current_user.id,
+        event_type="evaluation_objection_resolved",
+        evaluation_record_id=record.id,
+        old_value={"objection_reason": record.objection_reason},
+        new_value={"resolution": payload.resolution},
+    )
+
+    # خودِ معترض باید پاسخ را ببیند، وگرنه اعتراضش در سکوت گم می‌شود
+    subject_user_ids = list(
+        db.scalars(
+            select(User.id).where(
+                User.role == UserRole.employee,
+                User.personnel_id == record.subject_personnel_id,
+                User.is_active.is_(True),
+            )
+        )
+    )
+    if subject_user_ids:
+        notify(
+            db,
+            subject_user_ids,
+            type_="evaluation_objection_resolved",
+            message=f"به اعتراض شما دربارهٔ پروندهٔ {record.evaluation_code} پاسخ داده شد",
+            evaluation_record_id=record.id,
+            link="/me",
+        )
+
+    db.commit()
+    db.refresh(record)
+    return _to_read(db, record)
+
+
 _REASSIGNABLE_STAGES: dict[str, tuple[UserRole, str]] = {
     "unit_supervisor_user_id": (UserRole.unit_supervisor, "مسئول واحد"),
     "deputy_user_id": (UserRole.deputy, "معاونت"),
@@ -896,14 +988,25 @@ def evaluation_summary_pdf(
     current_user: CurrentUser = Depends(get_current_user),
 ) -> Response:
     record = _get_record_or_404(db, evaluation_id)
-    _ensure_can_view(record, current_user)
-    # خروجی PDF فقط برای منابع انسانی — سایر نقش‌ها حتی اگر پرونده را ببینند، اجازهٔ
-    # چاپ/دانلود سند رسمی را ندارند.
-    if current_user.role != UserRole.hr:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="خروجی PDF فقط برای منابع انسانی در دسترس است",
-        )
+
+    # سوژهٔ پرونده حق دارد سندِ مربوط به خودش را داشته باشد. تا پیش از این تنها
+    # کسی که می‌توانست کارنامهٔ هش‌شده و قابل‌تأیید یک نفر را دانلود کند HR بود —
+    # یعنی فرد سندی را که دربارهٔ اوست در اختیار نداشت و برای هر استفادهٔ بعدی
+    # (اعتراض، پروندهٔ حقوقی، کارفرمای بعدی) باید از سازمان درخواست می‌کرد.
+    is_subject = (
+        current_user.role == UserRole.employee
+        and current_user.personnel_id is not None
+        and current_user.personnel_id == record.subject_personnel_id
+    )
+    if not is_subject:
+        _ensure_can_view(record, current_user)
+        # سایر نقش‌های زنجیره پرونده را می‌بینند ولی سند رسمی را دانلود نمی‌کنند.
+        if current_user.role != UserRole.hr:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="خروجی PDF فقط برای منابع انسانی و خودِ فرد در دسترس است",
+            )
+
     if record.status != EvaluationStatus.finalized or record.final_snapshot is None:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST, detail="ارزیابی هنوز نهایی نشده است"
@@ -926,6 +1029,9 @@ def evaluation_summary_pdf(
         actor_user_id=current_user.id,
         event_type="pdf_downloaded",
         evaluation_record_id=record.id,
+        # دسترسی خودِ فرد به سندش هم ثبت می‌شود — نه به‌عنوان چیزی مشکوک، بلکه چون
+        # زنجیرهٔ حسابرسیِ یک سند رسمی باید کامل باشد و بگوید چه کسی نسخه‌ای دارد.
+        new_value={"by_subject": is_subject},
     )
 
     # سند آرشیوشده را سرو می‌کنیم؛ برای رکوردهای قدیمی (پیش از قابلیت آرشیو) در همین

@@ -265,6 +265,15 @@ export function useMyEvaluations() {
   });
 }
 
+/** پروندهٔ در جریانِ خود کارمند — فقط وضعیت، بدون امتیاز. */
+export function useMyOpenEvaluations() {
+  return useQuery({
+    queryKey: ["me", "evaluations", "open"],
+    queryFn: async () =>
+      (await apiClient.get<import("../types").MyOpenEvaluation[]>("/me/evaluations/open")).data,
+  });
+}
+
 /** برنامه‌های بهبودِ بازِ خود کارمند (فقط خواندنی). */
 export function useMyImprovementPlans() {
   return useQuery({

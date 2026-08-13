@@ -12,6 +12,8 @@ import {
 import { useAuth } from "../auth/AuthContext";
 import { useConfirm } from "../components/ConfirmDialog";
 import { HrOwnerBar, HrRecoveryBox } from "../components/HrRecoveryBox";
+import { ObjectionPanel } from "../components/ObjectionPanel";
+import { SelfAssessmentPanel } from "../components/SelfAssessmentPanel";
 import { ScoreFormTable, computePreview, scoredRows, useScoreForm } from "../components/ScoreForm";
 import { StatusBadge } from "../components/StatusBadge";
 import { useToast } from "../components/Toast";
@@ -395,6 +397,12 @@ export function EvaluationDetailPage() {
       {(canHrApprove || canDeputyApprove || canCeoFinalize) && (
         <ReturnBox evaluationId={evaluation.id} onReturned={load} />
       )}
+
+      {/* دیدگاه خودِ فرد، کنار امتیاز ارزیاب — برای دیدن اختلاف‌ها، نه میانگین‌گیری */}
+      <SelfAssessmentPanel evaluation={evaluation} indicators={indicators} />
+
+      {/* اعتراض ثبت‌شدهٔ کارمند + پاسخ منابع انسانی */}
+      <ObjectionPanel evaluation={evaluation} isHr={user.role === "hr"} onChanged={load} />
 
       {/* مسئولِ HR پرونده — تا وقتی کسی برنداشته، در صف مشترک است. */}
       {canRecoverStuckCase && (

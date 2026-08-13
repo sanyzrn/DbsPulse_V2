@@ -102,6 +102,10 @@ export interface EvaluationRecord {
   finalized_at: string | null;
   acknowledged_at: string | null;
   was_returned: boolean;
+  objection_at: string | null;
+  objection_reason: string | null;
+  objection_resolved_at: string | null;
+  objection_resolution: string | null;
 }
 
 export interface MyEvaluation {
@@ -115,6 +119,33 @@ export interface MyEvaluation {
   recommendation: string | null;
   finalized_at: string | null;
   acknowledged_at: string | null;
+  // مسیر اعتراض — «رؤیت» یعنی دیدم، نه یعنی پذیرفتم
+  objection_at: string | null;
+  objection_reason: string | null;
+  objection_resolved_at: string | null;
+  objection_resolution: string | null;
+}
+
+/** نمای «وضعیت‌فقط» از پروندهٔ در جریان — عمداً بدون هیچ امتیازی. */
+export interface MyOpenEvaluation {
+  id: number;
+  evaluation_code: string;
+  status: EvaluationStatus;
+  created_at: string;
+  stage_entered_at: string;
+  stage_label: string;
+}
+
+export interface SelfAssessmentScoreRow {
+  indicator_id: number;
+  score: number;
+  note: string | null;
+}
+
+export interface SelfAssessment {
+  submitted_at: string | null;
+  note: string | null;
+  scores: SelfAssessmentScoreRow[];
 }
 
 export interface EvaluationScoreRow {
@@ -139,6 +170,8 @@ export interface EvaluationCommentRow {
 export interface EvaluationDetail extends EvaluationRecord {
   scores: EvaluationScoreRow[];
   comments: EvaluationCommentRow[];
+  // دیدگاه خودِ فرد، کنار امتیاز ارزیاب. null یعنی چیزی ثبت نکرده (کاملاً مجاز).
+  self_assessment: SelfAssessment | null;
 }
 
 export const STAGE_LABELS: Record<EvaluationStage, string> = {

@@ -10,6 +10,7 @@ from app.models.login_attempt import LoginAttempt
 from app.models.notification import Notification
 from app.models.personnel import Personnel
 from app.models.scheduler_run import SchedulerRun
+from app.models.self_assessment import SelfAssessmentScore
 from app.models.user import User
 
 __all__ = [
@@ -28,5 +29,6 @@ __all__ = [
     "Notification",
     "Personnel",
     "SchedulerRun",
+    "SelfAssessmentScore",
     "User",
 ]

@@ -66,6 +66,26 @@ class EvaluationRecord(Base):
     acknowledged_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     acknowledged_by_user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
 
+    # خودارزیابی: نظر خودِ فرد، ثبت‌شده پیش از قطعی‌شدن نمرهٔ ارزیاب. در محاسبهٔ
+    # نتیجه هیچ نقشی ندارد (جدول جداست) — یک دیدگاه دوم است، نه یک رأی.
+    self_assessment_submitted_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    self_assessment_note: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    # اعتراض رسمی کارمند به نتیجه. «رؤیت» فقط ثبت می‌کند که فرد نتیجه را *دید*، نه
+    # این‌که با آن موافق است — بدون مسیر اعتراض، سامانه هیچ جایی برای مخالفت او ندارد
+    # و در هر بازبینی حقوقی، پاسخ «کارمند چه گفت؟» می‌شود «هیچ‌چیز ثبت نشده».
+    objection_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    objection_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
+    objection_resolved_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    objection_resolution: Mapped[str | None] = mapped_column(Text, nullable=True)
+    objection_resolved_by_user_id: Mapped[int | None] = mapped_column(
+        ForeignKey("users.id"), nullable=True
+    )
+
     scores: Mapped[list["EvaluationScore"]] = relationship(
         back_populates="evaluation_record", cascade="all, delete-orphan"
     )

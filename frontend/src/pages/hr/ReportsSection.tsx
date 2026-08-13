@@ -48,6 +48,22 @@ function faNum(value: unknown): string {
   return typeof value === "number" ? value.toLocaleString("fa-IR") : String(value);
 }
 
+/** پیام خالی‌بودن نمودار، وقتی همهٔ ردیف‌ها به‌خاطر سرکوب کوهورت حذف شده‌اند.
+ *
+ * «داده‌ای وجود ندارد» در این حالت دروغ است: داده هست، ولی جمعیتش برای نمایش
+ * بی‌نام کوچک است. این دو حالت باید در UI از هم جدا باشند، وگرنه HR فکر می‌کند
+ * فیلترش اشتباه بوده و دنبال داده‌ای می‌گردد که همان‌جاست. */
+function chartEmptyMessage(totalRows: number, visibleRows: number, fallback: string): string {
+  if (totalRows > 0 && visibleRows === 0)
+    return "داده هست، ولی تعداد افراد هر گروه کمتر از حد لازم برای نمایش میانگین بی‌نام است.";
+  return fallback;
+}
+
+/** شرح شاخص‌ها یک جملهٔ کامل است و محور نمودار جا ندارد؛ متن کامل در tooltip می‌آید. */
+function truncateLabel(text: string, max = 42): string {
+  return text.length <= max ? text : `${text.slice(0, max - 1).trimEnd()}…`;
+}
+
 const inputClass =
   "w-full rounded-xl border border-gray-200 bg-gray-100 px-3 py-1.5 text-sm text-gray-700 outline-none transition-colors duration-150 focus:border-pulse-500 focus:bg-white";
 
@@ -62,6 +78,17 @@ export function ReportsSection() {
   const { data: orgUnits = [] } = useOrgUnits(true);
   const { data: periods = [] } = usePeriods();
   const { data: indicators = [] } = useIndicators({ includeInactive: true });
+  // ترتیب خودِ سرور (section، سپس display_order) حفظ می‌شود؛ Map ترتیب درج را نگه می‌دارد.
+  const indicatorGroups = Array.from(
+    indicators
+      .reduce((groups, i) => {
+        const bucket = groups.get(i.category);
+        if (bucket) bucket.push(i);
+        else groups.set(i.category, [i]);
+        return groups;
+      }, new Map<string, typeof indicators>())
+      .entries(),
+  );
   const { data: personnelResults } = usePersonnelList({
     q: debouncedPersonnelSearch,
     limit: 30,
@@ -105,9 +132,16 @@ export function ReportsSection() {
   const unitChartData = (summary?.by_org_unit ?? [])
     .filter((u) => u.avg_final_pct !== null)
     .map((u) => ({ name: u.org_unit, میانگین: Math.round(u.avg_final_pct!) }));
+  // برچسبِ محور، «شرح» شاخص است نه category: چند شاخصِ متفاوت یک category مشترک
+  // دارند، پس با category نمودار ۲۰ میله با ۹ برچسب تکراری نشان می‌داد و معلوم
+  // نبود کدام میله کدام شاخص است. متن کامل در tooltip می‌آید.
   const indicatorChartData = (summary?.by_indicator ?? [])
     .filter((i) => i.avg_score !== null)
-    .map((i) => ({ name: i.category, میانگین: Number(i.avg_score!.toFixed(2)) }));
+    .map((i) => ({
+      name: truncateLabel(i.description),
+      fullName: `${i.category} — ${i.description}`,
+      میانگین: Number(i.avg_score!.toFixed(2)),
+    }));
   const indicatorUnitData = (indicatorBreakdown?.by_org_unit ?? [])
     .filter((u) => u.avg_score !== null)
     .map((u) => ({ name: u.org_unit, میانگین: Number(u.avg_score!.toFixed(2)) }));
@@ -328,7 +362,9 @@ export function ReportsSection() {
         {summaryPending ? (
           <TableSkeleton rows={4} />
         ) : unitChartData.length === 0 ? (
-          <EmptyState>برای فیلترهای فعلی داده‌ای وجود ندارد.</EmptyState>
+          <EmptyState>
+            {chartEmptyMessage((summary?.by_org_unit ?? []).length, unitChartData.length, "برای فیلترهای فعلی داده‌ای وجود ندارد.")}
+          </EmptyState>
         ) : (
           <div style={{ height: Math.max(280, unitChartData.length * 54) }}>
             <ResponsiveContainer>
@@ -358,15 +394,22 @@ export function ReportsSection() {
         {summaryPending ? (
           <TableSkeleton rows={5} />
         ) : indicatorChartData.length === 0 ? (
-          <EmptyState>برای فیلترهای فعلی داده‌ای وجود ندارد.</EmptyState>
+          <EmptyState>
+            {chartEmptyMessage((summary?.by_indicator ?? []).length, indicatorChartData.length, "برای فیلترهای فعلی داده‌ای وجود ندارد.")}
+          </EmptyState>
         ) : (
           <div style={{ height: Math.max(320, indicatorChartData.length * 34) }}>
             <ResponsiveContainer>
               <BarChart data={indicatorChartData} layout="vertical" margin={{ top: 8, right: 32, bottom: 8, left: 12 }}>
                 <CartesianGrid strokeDasharray="4 4" stroke={GRID_STROKE} horizontal={false} />
                 <XAxis type="number" domain={[0, 5]} tick={TICK_STYLE} tickLine={false} axisLine={{ stroke: AXIS_STROKE }} />
-                <YAxis type="category" dataKey="name" tick={{ ...TICK_STYLE, fontSize: 11 }} tickLine={false} axisLine={false} width={150} />
-                <Tooltip contentStyle={TOOLTIP_STYLE} formatter={faNum} cursor={{ fill: "rgba(107,114,128,0.06)" }} />
+                <YAxis type="category" dataKey="name" tick={{ ...TICK_STYLE, fontSize: 11 }} tickLine={false} axisLine={false} width={210} />
+                <Tooltip
+                  contentStyle={TOOLTIP_STYLE}
+                  formatter={faNum}
+                  labelFormatter={(_, payload) => payload?.[0]?.payload?.fullName ?? ""}
+                  cursor={{ fill: "rgba(107,114,128,0.06)" }}
+                />
                 <Bar dataKey="میانگین" radius={[0, 6, 6, 0]} fill={SERIES_COLOR} animationDuration={800}>
                   <LabelList dataKey="میانگین" position="right" formatter={(v) => (v == null ? "" : faNum(Number(v)))} style={{ fontSize: 11, fill: "#374151", fontFamily: "Vazirmatn, Tahoma, sans-serif", direction: "ltr" }} />
                 </Bar>
@@ -388,10 +431,19 @@ export function ReportsSection() {
             onChange={(v) => setSelectedIndicatorId(v ? Number(v) : null)}
           >
             <option value="">— انتخاب شاخص —</option>
-            {indicators.map((i) => (
-              <option key={i.id} value={i.id}>
-                {i.category}
-              </option>
+            {/* گروه‌بندی با optgroup و برچسب‌زدن با «شرح» شاخص.
+                قبلاً هر گزینه فقط category را نشان می‌داد، ولی category یک برچسب
+                گروه است نه شناسه: مثلاً سه شاخصِ کاملاً متفاوت همگی زیر «تعهد
+                سازمانی» هستند. نتیجه‌اش فهرستی بود که تکراری به‌نظر می‌رسید و
+                انتخاب از آن عملاً حدس زدن بود. */}
+            {indicatorGroups.map(([category, items]) => (
+              <optgroup key={category} label={category}>
+                {items.map((i) => (
+                  <option key={i.id} value={i.id}>
+                    {i.description}
+                  </option>
+                ))}
+              </optgroup>
             ))}
           </FilterSelect>
         }
@@ -401,7 +453,9 @@ export function ReportsSection() {
         ) : indicatorPending ? (
           <TableSkeleton rows={4} />
         ) : indicatorUnitData.length === 0 ? (
-          <EmptyState>برای این شاخص و فیلترها داده‌ای وجود ندارد.</EmptyState>
+          <EmptyState>
+            {chartEmptyMessage((indicatorBreakdown?.by_org_unit ?? []).length, indicatorUnitData.length, "برای این شاخص و فیلترها داده‌ای وجود ندارد.")}
+          </EmptyState>
         ) : (
           <>
             <p className="mb-3 text-sm text-gray-600">

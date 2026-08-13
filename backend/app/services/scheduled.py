@@ -95,13 +95,17 @@ def _current_owner_ids(db: Session, record: EvaluationRecord) -> list[int]:
 
 
 def run_sla_sweep(db: Session) -> int:
-    """به صاحبِ فعلیِ هر پرونده‌ای که بیش از حد آستانه در جریان مانده، یادآوری می‌فرستد.
-    dedup_key شامل وضعیت است تا با هر مرحله جدیدِ گیرکرده دوباره فعال شود."""
+    """به صاحبِ فعلیِ هر پرونده‌ای که بیش از حد آستانه *در همین مرحله* مانده، یادآوری
+    می‌فرستد. dedup_key شامل وضعیت است تا با هر مرحله جدیدِ گیرکرده دوباره فعال شود."""
+    # قبلاً معیار created_at بود، یعنی «سن کل پرونده». نتیجه‌اش دو خطای متقارن بود:
+    # پرونده‌ای که سه هفته در مراحل قبلی چرخیده، همان لحظهٔ رسیدن به مرحلهٔ جدید
+    # فوراً تأخیردار اعلام می‌شد (مسئول تازه‌کار بی‌دلیل نهیب می‌خورد)، و هیچ راهی
+    # نبود بفهمیم واقعاً کدام مرحله کند است.
     cutoff = datetime.now(UTC) - timedelta(days=settings.sla_reminder_days)
     stalled = db.scalars(
         select(EvaluationRecord).where(
             IS_OPEN_RECORD,
-            EvaluationRecord.created_at <= cutoff,
+            EvaluationRecord.stage_entered_at <= cutoff,
         )
     )
 
@@ -109,7 +113,7 @@ def run_sla_sweep(db: Session) -> int:
     for record in stalled:
         message = (
             f"پرونده {record.evaluation_code} ({record.subject.full_name}) بیش از "
-            f"{settings.sla_reminder_days} روز است منتظر اقدام شماست"
+            f"{settings.sla_reminder_days} روز است در همین مرحله منتظر اقدام شماست"
         )
         for owner_id in _current_owner_ids(db, record):
             if notify_once(

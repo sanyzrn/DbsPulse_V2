@@ -5,6 +5,9 @@ os.environ.setdefault(
 )
 os.environ.setdefault("ENVIRONMENT", "development")
 os.environ.setdefault("JWT_SECRET_KEY", "test-secret-key-not-for-production")
+# زمان‌بند در تست عمداً خاموش است: هر تست خودش جاروها را صدا می‌زند و یک حلقهٔ
+# پس‌زمینه فقط نویز و ناپایداری اضافه می‌کند.
+os.environ.setdefault("ENABLE_SCHEDULER", "false")
 
 import subprocess
 from pathlib import Path

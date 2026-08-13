@@ -186,6 +186,9 @@ def apply_transition(
         before()
     old_status = record.status
     record.status = spec.to_status
+    # ساعتِ مرحله با هر گذار صفر می‌شود — «چقدر در این مرحله مانده» تنها چیزی است که
+    # یادآوری تأخیر باید بسنجد. برگشت پرونده هم یک گذار است، پس درست هندل می‌شود.
+    record.stage_entered_at = datetime.now(UTC)
     if spec.to_status == EvaluationStatus.finalized and record.finalized_at is None:
         record.finalized_at = datetime.now(UTC)
     log_event(

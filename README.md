@@ -241,7 +241,7 @@ docker compose up -d --build
 
 1. یک لایهٔ **HTTPS / reverse proxy** جلوی سرویس `frontend` (پورت ۸۰۸۰) قرار دهید — نمونهٔ پیکربندی Nginx + Certbot در [`deploy/nginx-https.conf.example`](./deploy/nginx-https.conf.example) موجود است.
 2. **`FORWARDED_ALLOW_IPS`** را به IP/شبکهٔ پروکسی محدود کنید؛ با `*` هر کلاینتی می‌تواند هدر `X-Forwarded-For` جعلی بفرستد و محدودیت نرخ ورود را دور بزند.
-3. **`ENABLE_SCHEDULER`** فقط روی یک instance روشن شود — زمان‌بند درون‌پروسه است و با چند replica اعلان تکراری می‌سازد.
+3. **`ENABLE_SCHEDULER`** پیش‌فرض روشن است و با چند replica هم امن است: قفل توصیه‌ای Postgres یک instance را رهبر می‌کند و بقیه رد می‌شوند. تاریخچهٔ اجرا (موفق/ناموفق/ردشده) روی `GET /api/admin/scheduler-runs` قابل مشاهده است — بدون آن، «اجرا شد و چیزی نبود» از «اصلاً اجرا نشد» قابل تشخیص نیست.
 4. کاربر ادمین واقعی را خودتان بسازید؛ حساب‌های دمو در production اصلاً ساخته نمی‌شوند.
 
 ---

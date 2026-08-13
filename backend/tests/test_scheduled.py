@@ -97,9 +97,11 @@ def test_sla_sweep_reminds_current_owner_of_stalled_file(client, db_session):
     assert run_sla_sweep(db_session) == 0
     db_session.commit()
 
-    # پرونده را مصنوعاً قدیمی می‌کنیم (بیش از آستانه SLA)
+    # پرونده را مصنوعاً قدیمی می‌کنیم (بیش از آستانه SLA).
+    # معیار stage_entered_at است نه created_at: آن‌چه اهمیت دارد «چقدر در این مرحله
+    # مانده» است، نه «سن کل پرونده» (P1-02).
     record = db_session.get(EvaluationRecord, evaluation_id)
-    record.created_at = datetime.now(UTC) - timedelta(days=5)
+    record.stage_entered_at = datetime.now(UTC) - timedelta(days=5)
     db_session.flush()
 
     created = run_sla_sweep(db_session)
@@ -136,9 +138,9 @@ def test_sla_owner_follows_the_stage(client, db_session):
     client.post(f"/api/evaluations/{evaluation_id}/submit", headers=auth_header(sup))
     client.post(f"/api/evaluations/{evaluation_id}/hr-approve", headers=auth_header(hr))
 
-    # اکنون در وضعیت hr_approved (نوبت معاونت)؛ قدیمی‌اش می‌کنیم
+    # اکنون در وضعیت hr_approved (نوبت معاونت)؛ ساعتِ همین مرحله را عقب می‌بریم
     record = db_session.get(EvaluationRecord, evaluation_id)
-    record.created_at = datetime.now(UTC) - timedelta(days=5)
+    record.stage_entered_at = datetime.now(UTC) - timedelta(days=5)
     db_session.flush()
 
     run_sla_sweep(db_session)

@@ -9,6 +9,7 @@ from app.models.indicator import Indicator
 from app.models.login_attempt import LoginAttempt
 from app.models.notification import Notification
 from app.models.personnel import Personnel
+from app.models.scheduler_run import SchedulerRun
 from app.models.user import User
 
 __all__ = [
@@ -26,5 +27,6 @@ __all__ = [
     "LoginAttempt",
     "Notification",
     "Personnel",
+    "SchedulerRun",
     "User",
 ]

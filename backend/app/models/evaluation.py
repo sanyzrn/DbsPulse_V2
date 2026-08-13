@@ -54,6 +54,13 @@ class EvaluationRecord(Base):
     evaluator_comment: Mapped[str | None] = mapped_column(Text, nullable=True)
     final_snapshot: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    # لحظهٔ ورود به وضعیت فعلی. جاروی SLA پیش از این از created_at استفاده می‌کرد،
+    # یعنی «سن کل پرونده» را می‌سنجید نه «چقدر در این مرحله مانده». پرونده‌ای که سه
+    # هفته در سه مرحله چرخیده بود، لحظهٔ رسیدن به مرحلهٔ چهارم فوراً تأخیردار به‌نظر
+    # می‌رسید — و پرونده‌ای که تازه برگشت خورده هم همین‌طور.
+    stage_entered_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
     finalized_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     # رؤیت رسمی نتیجه توسط خود کارمند (نقش employee) پس از نهایی شدن
     acknowledged_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)

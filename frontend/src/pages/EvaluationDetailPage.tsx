@@ -11,7 +11,7 @@ import {
 } from "../api/queries";
 import { useAuth } from "../auth/AuthContext";
 import { useConfirm } from "../components/ConfirmDialog";
-import { HrRecoveryBox } from "../components/HrRecoveryBox";
+import { HrOwnerBar, HrRecoveryBox } from "../components/HrRecoveryBox";
 import { ScoreFormTable, computePreview, scoredRows, useScoreForm } from "../components/ScoreForm";
 import { StatusBadge } from "../components/StatusBadge";
 import { useToast } from "../components/Toast";
@@ -394,6 +394,11 @@ export function EvaluationDetailPage() {
 
       {(canHrApprove || canDeputyApprove || canCeoFinalize) && (
         <ReturnBox evaluationId={evaluation.id} onReturned={load} />
+      )}
+
+      {/* مسئولِ HR پرونده — تا وقتی کسی برنداشته، در صف مشترک است. */}
+      {canRecoverStuckCase && (
+        <HrOwnerBar evaluation={evaluation} currentUserId={user.id} onChanged={load} />
       )}
 
       {/* ابزار نجات پروندهٔ گیرکرده — HR روی هر پروندهٔ باز، در هر مرحله‌ای که باشد.

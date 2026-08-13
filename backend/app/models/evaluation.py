@@ -33,6 +33,11 @@ class EvaluationRecord(Base):
     unit_supervisor_user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
     deputy_user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False)
     ceo_user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False)
+    # مسئولِ HR این پرونده. سه مرحلهٔ دیگر همیشه صاحب مشخصی داشتند، ولی مرحلهٔ HR
+    # نداشت: هر کاربر HR روی هر پرونده‌ای می‌توانست اقدام کند، پس در سازمانی با چند
+    # نفر HR پاسخ سؤال «مسئولِ این پرونده که بود؟» وجود نداشت — فقط «چه کسی کلیک کرد».
+    # تا وقتی NULL است پرونده در صف مشترک HR می‌ماند و اولین اقدام، آن را claim می‌کند.
+    hr_user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
     # دوره‌ای که این ارزیابی در آن انجام شده؛ ارزیابی‌های خارج از دوره NULL می‌مانند
     period_id: Mapped[int | None] = mapped_column(ForeignKey("evaluation_periods.id"), nullable=True)
     # ستون stage حذف شد: همیشه ۱:۱ از status قابل استخراج بود و دو منبع حقیقت
@@ -64,10 +69,16 @@ class EvaluationRecord(Base):
     )
     # eager join تا فهرست‌ها بدون N+1 نام پرسنل را همراه داشته باشند
     subject: Mapped["Personnel"] = relationship(lazy="joined")
+    # همان دلیل: صف بررسی HR نام مالک را در هر ردیف نشان می‌دهد
+    hr_user: Mapped["User | None"] = relationship(lazy="joined", foreign_keys=[hr_user_id])
 
     @property
     def subject_full_name(self) -> str:
         return self.subject.full_name
+
+    @property
+    def hr_username(self) -> str | None:
+        return self.hr_user.username if self.hr_user else None
 
 
 class EvaluationScore(Base):

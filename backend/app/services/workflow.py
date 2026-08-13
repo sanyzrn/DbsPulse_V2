@@ -50,6 +50,13 @@ class Transition:
     assignee_field: str | None
     error_status: int
     error_detail: str
+    # اگر True و آن فیلد هنوز NULL باشد، هر کاربری با نقش مجاز می‌تواند اقدام کند و
+    # با همان اقدام مالک می‌شود. مخصوص مرحلهٔ HR که برخلاف سه مرحلهٔ دیگر از یک صف
+    # مشترک شروع می‌شود، نه از یک شخص از پیش تعیین‌شده.
+    claimable_if_unassigned: bool = False
+    # پیام مخصوصِ «این پرونده مالِ کاربر دیگری است» — وقتی error_detail خودش این
+    # معنا را نمی‌رساند (مثل مرحلهٔ HR که پیامش دربارهٔ وضعیت است، نه مالکیت).
+    owner_error_detail: str | None = None
 
 
 TRANSITIONS: dict[str, Transition] = {
@@ -65,9 +72,11 @@ TRANSITIONS: dict[str, Transition] = {
         from_statuses=frozenset({EvaluationStatus.submitted}),
         to_status=EvaluationStatus.hr_approved,
         allowed_role=UserRole.hr,
-        assignee_field=None,
+        assignee_field="hr_user_id",
+        claimable_if_unassigned=True,
         error_status=http_status.HTTP_400_BAD_REQUEST,
         error_detail="این ارزیابی در انتظار بررسی منابع انسانی نیست",
+        owner_error_detail="این پرونده در اختیار کاربر دیگری از منابع انسانی است",
     ),
     "deputy_approve": Transition(
         from_statuses=frozenset({EvaluationStatus.hr_approved}),
@@ -91,9 +100,11 @@ TRANSITIONS: dict[str, Transition] = {
         from_statuses=frozenset({EvaluationStatus.submitted}),
         to_status=EvaluationStatus.draft,
         allowed_role=UserRole.hr,
-        assignee_field=None,
+        assignee_field="hr_user_id",
+        claimable_if_unassigned=True,
         error_status=http_status.HTTP_400_BAD_REQUEST,
         error_detail="این ارزیابی در انتظار بررسی منابع انسانی نیست",
+        owner_error_detail="این پرونده در اختیار کاربر دیگری از منابع انسانی است",
     ),
     "deputy_return": Transition(
         from_statuses=frozenset({EvaluationStatus.hr_approved}),
@@ -133,8 +144,17 @@ def ensure_transition_allowed(
     denied = HTTPException(status_code=spec.error_status, detail=spec.error_detail)
     if record.status not in spec.from_statuses or current_user.role != spec.allowed_role:
         raise denied
-    if spec.assignee_field is not None and current_user.id != getattr(record, spec.assignee_field):
-        raise denied
+    if spec.assignee_field is not None:
+        assignee = getattr(record, spec.assignee_field)
+        # صف مشترک: تا وقتی کسی مالک نشده، هر کاربری با نقش مجاز می‌تواند برش دارد.
+        if not (assignee is None and spec.claimable_if_unassigned) and current_user.id != assignee:
+            # «مال تو نیست» با «هنوز نوبتش نشده» فرق دارد. برای مسئول واحد/معاونت/
+            # مدیرعامل همان error_detail خودش این را می‌گوید؛ مرحلهٔ HR چون از یک صف
+            # مشترک شروع می‌شود پیام جداگانه لازم دارد.
+            raise HTTPException(
+                status_code=http_status.HTTP_403_FORBIDDEN,
+                detail=spec.owner_error_detail or spec.error_detail,
+            )
     return spec
 
 
@@ -147,6 +167,21 @@ def apply_transition(
 ) -> None:
     """اعتبارسنجی گذار، اجرای منطق اختصاصی (مثل نهایی‌سازی امتیازها)، تغییر وضعیت و audit."""
     spec = ensure_transition_allowed(record, action, current_user)
+    # اقدام روی پروندهٔ بی‌مالک، همان اقدام را به مالک‌شدن تبدیل می‌کند — تا بعداً
+    # معلوم باشد «مسئولش که بود»، نه فقط «کی کلیک کرد».
+    if (
+        spec.claimable_if_unassigned
+        and spec.assignee_field is not None
+        and getattr(record, spec.assignee_field) is None
+    ):
+        setattr(record, spec.assignee_field, current_user.id)
+        log_event(
+            db,
+            actor_user_id=current_user.id,
+            event_type="hr_case_claimed",
+            evaluation_record_id=record.id,
+            new_value={spec.assignee_field: current_user.id, "implicit": True},
+        )
     if before is not None:
         before()
     old_status = record.status

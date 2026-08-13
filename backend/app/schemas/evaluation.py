@@ -74,6 +74,15 @@ class CancelRequest(BaseModel):
     reason: str = Field(min_length=1, max_length=1000)
 
 
+class HrHandover(BaseModel):
+    """واگذاری مسئولیتِ HR یک پرونده به کاربر دیگری از منابع انسانی."""
+
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+    new_hr_user_id: int
+    reason: str = Field(min_length=1, max_length=1000)
+
+
 class StageOwnerReassign(BaseModel):
     """جایگزینی مسئول یکی از سه مرحله روی یک پروندهٔ باز."""
 
@@ -95,6 +104,9 @@ class EvaluationRead(BaseModel):
     unit_supervisor_user_id: int | None
     deputy_user_id: int
     ceo_user_id: int
+    # مسئولِ HR این پرونده؛ null یعنی هنوز در صف مشترک منابع انسانی است
+    hr_user_id: int | None = None
+    hr_username: str | None = None
     status: EvaluationStatus
     general_score_pct: float | None
     specialized_score_pct: float | None

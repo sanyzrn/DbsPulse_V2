@@ -87,6 +87,9 @@ export interface EvaluationRecord {
   unit_supervisor_user_id: number | null;
   deputy_user_id: number;
   ceo_user_id: number;
+  // مسئولِ منابع انسانیِ این پرونده؛ null یعنی هنوز در صف مشترک HR است
+  hr_user_id: number | null;
+  hr_username: string | null;
   // null برای پروندهٔ لغوشده — در هیچ مرحله‌ای از زنجیره نیست
   stage: EvaluationStage | null;
   status: EvaluationStatus;

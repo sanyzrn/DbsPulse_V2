@@ -32,6 +32,7 @@ from app.schemas.evaluation import (
     EvaluationPage,
     EvaluationRead,
     EvaluatorCommentUpdate,
+    HrHandover,
     ReturnRequest,
     ScoresUpsert,
     StageOwnerReassign,
@@ -710,6 +711,105 @@ def cancel_evaluation(
         )
 
     apply_transition(db, record, "cancel", current_user, before=_before)
+    db.commit()
+    db.refresh(record)
+    return _to_read(db, record)
+
+
+@router.post("/{evaluation_id}/hr-claim", response_model=EvaluationRead)
+def hr_claim(
+    evaluation_id: int,
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(require_roles(UserRole.hr)),
+) -> EvaluationRead:
+    """برداشتن یک پروندهٔ بی‌مالک از صف مشترک منابع انسانی.
+
+    اقدام روی پرونده (تأیید/برگشت) هم به‌طور ضمنی همین کار را می‌کند؛ این endpoint
+    برای وقتی است که کسی می‌خواهد *پیش از* اقدام مسئولیتش را اعلام کند تا دو نفر
+    هم‌زمان روی یک پرونده کار نکنند.
+    """
+    record = _get_record_or_404_for_update(db, evaluation_id)
+
+    if record.status not in OPEN_STATUSES:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="فقط پروندهٔ باز می‌تواند مسئول منابع انسانی بگیرد",
+        )
+    if record.hr_user_id is not None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                f"این پرونده از قبل در اختیار «{record.hr_username}» است؛ "
+                "برای جابه‌جایی از «واگذاری» استفاده کنید."
+            ),
+        )
+
+    record.hr_user_id = current_user.id
+    log_event(
+        db,
+        actor_user_id=current_user.id,
+        event_type="hr_case_claimed",
+        evaluation_record_id=record.id,
+        new_value={"hr_user_id": current_user.id, "implicit": False},
+    )
+    db.commit()
+    db.refresh(record)
+    return _to_read(db, record)
+
+
+@router.post("/{evaluation_id}/hr-handover", response_model=EvaluationRead)
+def hr_handover(
+    evaluation_id: int,
+    payload: HrHandover,
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(require_roles(UserRole.hr)),
+) -> EvaluationRead:
+    """واگذاری مسئولیتِ HR به کاربر دیگری از منابع انسانی، با دلیل و ثبت در audit.
+
+    محدودیت آگاهانه: هر کاربر HR می‌تواند این کار را بکند، چون هنوز نقش «سرپرست HR»
+    وجود ندارد. پس این یک قفل سخت نیست — یک زنجیرهٔ مسئولیتِ قابل ردیابی است، که
+    خودش از وضعیت قبلی («هر HR روی هر پرونده، بدون هیچ ردی») بسیار بهتر است.
+    تفکیک واقعی نقش‌های HR گام میان‌مدت همین یافته است.
+    """
+    record = _get_record_or_404_for_update(db, evaluation_id)
+
+    if record.status not in OPEN_STATUSES:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="فقط مسئولِ منابع انسانیِ یک پروندهٔ باز قابل تغییر است",
+        )
+
+    new_owner = db.get(User, payload.new_hr_user_id)
+    if new_owner is None or not new_owner.is_active or new_owner.role != UserRole.hr:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="کاربر انتخاب‌شده یافت نشد، غیرفعال است، یا نقش منابع انسانی ندارد",
+        )
+    if new_owner.id == record.hr_user_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="این پرونده از قبل در اختیار همین کاربر است",
+        )
+
+    previous_owner_id = record.hr_user_id
+    record.hr_user_id = new_owner.id
+    db.add(
+        EvaluationComment(
+            evaluation_record_id=record.id,
+            commenter_user_id=current_user.id,
+            stage=CommentStage.hr_review,
+            comment_text=f"واگذاری مسئولیت منابع انسانی — دلیل: {payload.reason}",
+        )
+    )
+    log_event(
+        db,
+        actor_user_id=current_user.id,
+        event_type="hr_case_handed_over",
+        evaluation_record_id=record.id,
+        old_value={"hr_user_id": previous_owner_id},
+        new_value={"hr_user_id": new_owner.id, "reason": payload.reason},
+    )
+    notify_stage_owner_reassigned(db, record, new_owner.id, "منابع انسانی")
     db.commit()
     db.refresh(record)
     return _to_read(db, record)

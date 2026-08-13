@@ -25,6 +25,7 @@ import {
 import { ChartDownloadCard } from "../../components/ChartDownloadCard";
 import { ExcelExportButton } from "../../components/ExcelExportButton";
 import { Card, EmptyState, FilterSelect, PageHeader, TableSkeleton } from "../../ui/Card";
+import { HorizontalBarChart } from "../../ui/HorizontalBarChart";
 import { CountUp, ScoreRing } from "../../ui/Meters";
 import { JalaliDatePicker } from "../../ui/JalaliDatePicker";
 import type { ReportFilters } from "../../types";
@@ -57,11 +58,6 @@ function chartEmptyMessage(totalRows: number, visibleRows: number, fallback: str
   if (totalRows > 0 && visibleRows === 0)
     return "داده هست، ولی تعداد افراد هر گروه کمتر از حد لازم برای نمایش میانگین بی‌نام است.";
   return fallback;
-}
-
-/** شرح شاخص‌ها یک جملهٔ کامل است و محور نمودار جا ندارد؛ متن کامل در tooltip می‌آید. */
-function truncateLabel(text: string, max = 42): string {
-  return text.length <= max ? text : `${text.slice(0, max - 1).trimEnd()}…`;
 }
 
 const inputClass =
@@ -131,20 +127,20 @@ export function ReportsSection() {
   // «پنهان» را نشان دهد و صفر نشان‌دادنشان دروغ است. جدول‌ها نشانِ «محرمانه» دارند.
   const unitChartData = (summary?.by_org_unit ?? [])
     .filter((u) => u.avg_final_pct !== null)
-    .map((u) => ({ name: u.org_unit, میانگین: Math.round(u.avg_final_pct!) }));
+    .map((u) => ({ name: u.org_unit, value: Math.round(u.avg_final_pct!) }));
   // برچسبِ محور، «شرح» شاخص است نه category: چند شاخصِ متفاوت یک category مشترک
   // دارند، پس با category نمودار ۲۰ میله با ۹ برچسب تکراری نشان می‌داد و معلوم
   // نبود کدام میله کدام شاخص است. متن کامل در tooltip می‌آید.
   const indicatorChartData = (summary?.by_indicator ?? [])
     .filter((i) => i.avg_score !== null)
     .map((i) => ({
-      name: truncateLabel(i.description),
+      name: i.description,
       fullName: `${i.category} — ${i.description}`,
-      میانگین: Number(i.avg_score!.toFixed(2)),
+      value: Number(i.avg_score!.toFixed(2)),
     }));
   const indicatorUnitData = (indicatorBreakdown?.by_org_unit ?? [])
     .filter((u) => u.avg_score !== null)
-    .map((u) => ({ name: u.org_unit, میانگین: Number(u.avg_score!.toFixed(2)) }));
+    .map((u) => ({ name: u.org_unit, value: Number(u.avg_score!.toFixed(2)) }));
   const empComparisonData =
     empVsUnit && (empVsUnit.employee_avg !== null || empVsUnit.unit_avg !== null)
       ? [
@@ -366,22 +362,12 @@ export function ReportsSection() {
             {chartEmptyMessage((summary?.by_org_unit ?? []).length, unitChartData.length, "برای فیلترهای فعلی داده‌ای وجود ندارد.")}
           </EmptyState>
         ) : (
-          <div style={{ height: Math.max(280, unitChartData.length * 54) }}>
-            <ResponsiveContainer>
-              <BarChart data={unitChartData} layout="vertical" margin={{ top: 8, right: 40, bottom: 8, left: 12 }}>
-                <CartesianGrid strokeDasharray="4 4" stroke={GRID_STROKE} horizontal={false} />
-                <XAxis type="number" domain={[0, 100]} tick={TICK_STYLE} tickLine={false} axisLine={{ stroke: AXIS_STROKE }} />
-                <YAxis type="category" dataKey="name" tick={{ ...TICK_STYLE, fontSize: 12 }} tickLine={false} axisLine={false} width={130} />
-                <Tooltip contentStyle={TOOLTIP_STYLE} formatter={faNum} cursor={{ fill: "rgba(107,114,128,0.06)" }} />
-                <Bar dataKey="میانگین" radius={[0, 6, 6, 0]} fill={SERIES_COLOR} animationDuration={800}>
-                  {/* direction:ltr روی برچسب: تحت dir="rtl" صفحه، text-anchor="start" که
-                      Recharts برای position="right" می‌سازد معکوس تفسیر می‌شود و عدد به‌جای
-                      فاصله از میله، داخل خودِ میله می‌افتد (تقریباً نامرئی). */}
-                  <LabelList dataKey="میانگین" position="right" formatter={(v) => (v == null ? "" : faNum(Number(v)))} style={{ fontSize: 12, fill: "#374151", fontFamily: "Vazirmatn, Tahoma, sans-serif", direction: "ltr" }} />
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
+          <HorizontalBarChart
+            data={unitChartData}
+            max={100}
+            axisWidth={140}
+            ariaLabel="میانگین امتیاز نهایی به تفکیک واحد سازمانی"
+          />
         )}
       </ChartDownloadCard>
 
@@ -398,24 +384,12 @@ export function ReportsSection() {
             {chartEmptyMessage((summary?.by_indicator ?? []).length, indicatorChartData.length, "برای فیلترهای فعلی داده‌ای وجود ندارد.")}
           </EmptyState>
         ) : (
-          <div style={{ height: Math.max(320, indicatorChartData.length * 34) }}>
-            <ResponsiveContainer>
-              <BarChart data={indicatorChartData} layout="vertical" margin={{ top: 8, right: 32, bottom: 8, left: 12 }}>
-                <CartesianGrid strokeDasharray="4 4" stroke={GRID_STROKE} horizontal={false} />
-                <XAxis type="number" domain={[0, 5]} tick={TICK_STYLE} tickLine={false} axisLine={{ stroke: AXIS_STROKE }} />
-                <YAxis type="category" dataKey="name" tick={{ ...TICK_STYLE, fontSize: 11 }} tickLine={false} axisLine={false} width={210} />
-                <Tooltip
-                  contentStyle={TOOLTIP_STYLE}
-                  formatter={faNum}
-                  labelFormatter={(_, payload) => payload?.[0]?.payload?.fullName ?? ""}
-                  cursor={{ fill: "rgba(107,114,128,0.06)" }}
-                />
-                <Bar dataKey="میانگین" radius={[0, 6, 6, 0]} fill={SERIES_COLOR} animationDuration={800}>
-                  <LabelList dataKey="میانگین" position="right" formatter={(v) => (v == null ? "" : faNum(Number(v)))} style={{ fontSize: 11, fill: "#374151", fontFamily: "Vazirmatn, Tahoma, sans-serif", direction: "ltr" }} />
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
+          <HorizontalBarChart
+            data={indicatorChartData}
+            max={5}
+            axisWidth={230}
+            ariaLabel="میانگین امتیاز هر شاخص از ۵"
+          />
         )}
       </ChartDownloadCard>
 
@@ -465,19 +439,12 @@ export function ReportsSection() {
               </span>{" "}
               از ۵
             </p>
-            <div style={{ height: Math.max(260, indicatorUnitData.length * 54) }}>
-              <ResponsiveContainer>
-                <BarChart data={indicatorUnitData} layout="vertical" margin={{ top: 8, right: 32, bottom: 8, left: 12 }}>
-                  <CartesianGrid strokeDasharray="4 4" stroke={GRID_STROKE} horizontal={false} />
-                  <XAxis type="number" domain={[0, 5]} tick={TICK_STYLE} tickLine={false} axisLine={{ stroke: AXIS_STROKE }} />
-                  <YAxis type="category" dataKey="name" tick={{ ...TICK_STYLE, fontSize: 12 }} tickLine={false} axisLine={false} width={130} />
-                  <Tooltip contentStyle={TOOLTIP_STYLE} formatter={faNum} cursor={{ fill: "rgba(107,114,128,0.06)" }} />
-                  <Bar dataKey="میانگین" radius={[0, 6, 6, 0]} fill={SERIES_COLOR} animationDuration={800}>
-                    <LabelList dataKey="میانگین" position="right" formatter={(v) => (v == null ? "" : faNum(Number(v)))} style={{ fontSize: 12, fill: "#374151", fontFamily: "Vazirmatn, Tahoma, sans-serif", direction: "ltr" }} />
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
+            <HorizontalBarChart
+              data={indicatorUnitData}
+              max={5}
+              axisWidth={140}
+              ariaLabel="میانگین این شاخص به تفکیک واحد سازمانی"
+            />
           </>
         )}
       </ChartDownloadCard>

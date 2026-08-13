@@ -12,9 +12,6 @@ import {
   CartesianGrid,
   Tooltip,
   ResponsiveContainer,
-  Bar,
-  BarChart,
-  LabelList,
 } from "recharts";
 import { motion } from "motion/react";
 import { useQueryClient } from "@tanstack/react-query";
@@ -34,6 +31,7 @@ import { ReportsSection } from "./ReportsSection";
 import { PageHeader } from "../../ui/Card";
 import { CountUp, PctBadge, ScoreRing, SuppressedValue } from "../../ui/Meters";
 import { TAB_TRANSITION } from "../../ui/motion";
+import { HorizontalBarChart } from "../../ui/HorizontalBarChart";
 import { Table } from "../../ui/Table";
 import { formatDate } from "../../utils/dates";
 import type { EvaluationStatus } from "../../types";
@@ -421,7 +419,7 @@ function BarByOrgUnitCard({
   if (visible.length === 0) return null;
   const chartData = visible.map((u) => ({
     name: u.org_unit,
-    میانگین: Math.round(u.avg_final_pct!),
+    value: Math.round(u.avg_final_pct!),
   }));
 
   return (
@@ -433,28 +431,12 @@ function BarByOrgUnitCard({
           (میانگینشان عملاً امتیاز فرد است).
         </p>
       )}
-      <div style={{ height: Math.max(220, visible.length * 48) }}>
-        <ResponsiveContainer>
-          <BarChart data={chartData} layout="vertical" margin={{ top: 4, right: 24, bottom: 4, left: 8 }}>
-            <CartesianGrid strokeDasharray="4 4" stroke={GRID_STROKE} horizontal={false} />
-            <XAxis type="number" domain={[0, 100]} tick={TICK_STYLE} tickLine={false} axisLine={{ stroke: AXIS_STROKE }} />
-            <YAxis type="category" dataKey="name" tick={{ ...TICK_STYLE, fontSize: 11 }} tickLine={false} axisLine={false} width={90} />
-            <Tooltip contentStyle={TOOLTIP_STYLE} formatter={tooltipNumber} cursor={{ fill: "rgba(107,114,128,0.06)" }} />
-            <Bar dataKey="میانگین" radius={[0, 6, 6, 0]} fill={SERIES_COLOR} animationDuration={1000}>
-              <LabelList
-                dataKey="میانگین"
-                position="right"
-                formatter={(v) => (v == null ? "" : Number(v).toLocaleString("fa-IR"))}
-                // باگ RTL: text-anchor="start" که Recharts برای position="right" تولید می‌کند،
-                // با جهت ارثی rtl صفحه (html dir="rtl") به‌جای «شروع از x و ادامه به راست»
-                // به «پایان در x» تفسیر می‌شود؛ برچسب به‌جای فاصله از میله، داخل خودِ میله
-                // می‌افتد. direction:ltr فقط روی همین برچسب، بدون اثر روی برچسب‌های محور.
-                style={{ fontSize: 11, fill: "#6b7280", fontFamily: "Vazirmatn, Tahoma, sans-serif", direction: "ltr" }}
-              />
-            </Bar>
-          </BarChart>
-        </ResponsiveContainer>
-      </div>
+      <HorizontalBarChart
+        data={chartData}
+        max={100}
+        axisWidth={130}
+        ariaLabel="میانگین امتیاز به تفکیک واحد سازمانی"
+      />
     </div>
   );
 }

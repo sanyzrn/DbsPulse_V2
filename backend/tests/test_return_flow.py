@@ -91,6 +91,33 @@ def test_fresh_submission_is_not_flagged_as_returned(client, db_session):
     assert items[evaluation_id]["was_returned"] is False
 
 
+def test_was_returned_filter_isolates_returned_cases(client, db_session):
+    """فیلتر was_returned=true باید HR را مستقیم به پرونده‌های برگشت‌خورده ببرد (نه
+    فقط یک ستون نمایشی در فهرست، بلکه شرط WHERE واقعی پیش از صفحه‌بندی)."""
+    hr, sup, dep, ceo, returned_id = _setup_submitted(client, db_session)
+    client.post(
+        f"/api/evaluations/{returned_id}/return",
+        json={"reason": "نیاز به اصلاح"},
+        headers=auth_header(hr),
+    )
+    _, _, _, _, fresh_id = _setup_submitted(client, db_session)
+
+    r = client.get("/api/evaluations", params={"was_returned": True}, headers=auth_header(hr))
+    ids = {item["id"] for item in r.json()["items"]}
+    assert returned_id in ids
+    assert fresh_id not in ids
+
+    r = client.get("/api/evaluations", params={"was_returned": False}, headers=auth_header(hr))
+    ids = {item["id"] for item in r.json()["items"]}
+    assert fresh_id in ids
+    assert returned_id not in ids
+
+    # بدون فیلتر: هر دو دیده می‌شوند
+    r = client.get("/api/evaluations", params={"limit": 200}, headers=auth_header(hr))
+    ids = {item["id"] for item in r.json()["items"]}
+    assert {returned_id, fresh_id}.issubset(ids)
+
+
 def test_deputy_and_ceo_returns_step_back_one_stage(client, db_session):
     hr, sup, dep, ceo, evaluation_id = _setup_submitted(client, db_session)
     assert client.post(f"/api/evaluations/{evaluation_id}/hr-approve", headers=auth_header(hr)).status_code == 200

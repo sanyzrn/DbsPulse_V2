@@ -61,6 +61,7 @@ export interface EvaluationListParams {
   min_final_pct?: number;
   max_final_pct?: number;
   subject_personnel_id?: number;
+  was_returned?: boolean;
   limit: number;
   offset: number;
 }

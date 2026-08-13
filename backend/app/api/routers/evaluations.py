@@ -279,6 +279,7 @@ def _apply_evaluation_filters(
     min_final_pct: float | None,
     max_final_pct: float | None,
     subject_personnel_id: int | None = None,
+    was_returned: bool | None = None,
 ):
     """فیلترهای ترکیب‌پذیر فهرست/خروجی ارزیابی‌ها — یک‌جا تا list و export.xlsx
     همیشه رفتار یکسان داشته باشند (خروجی همان چیزی است که HR فیلتر کرده)."""
@@ -327,6 +328,20 @@ def _apply_evaluation_filters(
         query = query.where(EvaluationRecord.final_weighted_pct <= max_final_pct)
     if subject_personnel_id is not None:
         query = query.where(EvaluationRecord.subject_personnel_id == subject_personnel_id)
+    if was_returned is not None:
+        # پرونده‌های «برگشتی» یعنی دست‌کم یک رویداد evaluation_returned در سابقهٔ همان
+        # پرونده — همان قانونی که در پاسخ (was_returned روی هر آیتم) استفاده می‌شود،
+        # اینجا به‌عنوان فیلتر پیش از صفحه‌بندی هم اعمال می‌شود تا HR بتواند
+        # «فقط پرونده‌های برگشت‌خورده» را جدا و دقیق مرور کند.
+        returned_exists = (
+            select(AuditLog.id)
+            .where(
+                AuditLog.event_type == "evaluation_returned",
+                AuditLog.evaluation_record_id == EvaluationRecord.id,
+            )
+            .exists()
+        )
+        query = query.where(returned_exists if was_returned else ~returned_exists)
     return query
 
 
@@ -340,6 +355,7 @@ def list_evaluations(
     min_final_pct: float | None = Query(default=None, ge=0, le=100),
     max_final_pct: float | None = Query(default=None, ge=0, le=100),
     subject_personnel_id: int | None = None,
+    was_returned: bool | None = None,
     limit: int = Query(default=50, ge=1, le=200),
     offset: int = Query(default=0, ge=0),
     db: Session = Depends(get_db),
@@ -373,6 +389,7 @@ def list_evaluations(
         min_final_pct=min_final_pct,
         max_final_pct=max_final_pct,
         subject_personnel_id=subject_personnel_id,
+        was_returned=was_returned,
     )
 
     total = db.scalar(select(func.count()).select_from(query.subquery())) or 0
@@ -415,6 +432,7 @@ def export_evaluations_excel(
     created_to: date | None = None,
     min_final_pct: float | None = Query(default=None, ge=0, le=100),
     max_final_pct: float | None = Query(default=None, ge=0, le=100),
+    was_returned: bool | None = None,
     db: Session = Depends(get_db),
     current_user: CurrentUser = Depends(require_roles(UserRole.hr)),
 ) -> Response:
@@ -429,6 +447,7 @@ def export_evaluations_excel(
         created_to=created_to,
         min_final_pct=min_final_pct,
         max_final_pct=max_final_pct,
+        was_returned=was_returned,
     )
     records = db.scalars(query.order_by(EvaluationRecord.created_at.desc())).all()
     log_event(db, actor_user_id=current_user.id, event_type="excel_exported")

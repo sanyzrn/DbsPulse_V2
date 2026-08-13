@@ -4,13 +4,21 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user, require_roles
+from app.core.security import hash_password
 from app.db.session import get_db
 from app.models.enums import PersonnelStatus, UserRole
 from app.models.evaluation import EvaluationRecord
 from app.models.evaluation_access import EvaluationAccess
 from app.models.personnel import Personnel
+from app.models.user import User
 from app.schemas.auth import CurrentUser
-from app.schemas.personnel import PersonnelCreate, PersonnelPage, PersonnelRead, PersonnelUpdate
+from app.schemas.personnel import (
+    PersonnelCreate,
+    PersonnelCreated,
+    PersonnelPage,
+    PersonnelRead,
+    PersonnelUpdate,
+)
 from app.services.audit import log_event
 from app.services.excel import build_personnel_workbook
 from app.services.workflow import IS_OPEN_RECORD
@@ -166,18 +174,37 @@ def export_personnel_excel(
     )
 
 
-@router.post("", response_model=PersonnelRead, status_code=status.HTTP_201_CREATED)
+@router.post("", response_model=PersonnelCreated, status_code=status.HTTP_201_CREATED)
 def create_personnel(
     payload: PersonnelCreate,
     db: Session = Depends(get_db),
     current_user: CurrentUser = Depends(require_roles(UserRole.hr)),
-) -> Personnel:
+) -> PersonnelCreated:
+    """ساخت پرسنل، و در صورت درخواست، حساب کاربری‌اش در همان تراکنش.
+
+    پیش از این، دسترسی دادن به یک کارمند سه کار جدا بود: ساخت پرسنل، ساخت کاربر،
+    و لینک‌کردن این دو. مرحلهٔ دوم و سوم به‌سادگی فراموش می‌شد و نتیجه‌اش کارمندی
+    بود که هیچ راهی برای دیدن کارنامهٔ خودش نداشت.
+    """
     existing = db.scalar(select(Personnel).where(Personnel.personnel_code == payload.personnel_code))
     if existing is not None:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST, detail="کد پرسنلی تکراری است"
         )
-    personnel = Personnel(**payload.model_dump(), created_by_user_id=current_user.id)
+
+    account = payload.account
+    # نام کاربری تکراری *پیش از* ساخت پرسنل بررسی می‌شود: هر دو در یک تراکنش‌اند، پس
+    # خطا هیچ‌کدام را نمی‌سازد — ولی پیام خطای زودهنگام برای HR روشن‌تر است.
+    if account is not None:
+        duplicate = db.scalar(select(User).where(User.username == account.username))
+        if duplicate is not None:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST, detail="نام کاربری تکراری است"
+            )
+
+    personnel = Personnel(
+        **payload.model_dump(exclude={"account"}), created_by_user_id=current_user.id
+    )
     db.add(personnel)
     db.flush()
     log_event(
@@ -190,9 +217,40 @@ def create_personnel(
             "full_name": personnel.full_name,
         },
     )
+
+    account_username: str | None = None
+    if account is not None:
+        user = User(
+            username=account.username,
+            password_hash=hash_password(account.password),
+            role=UserRole.employee,
+            personnel_id=personnel.id,
+            is_active=True,
+            # رمزی که HR تعیین کرده موقتی است و باید در اولین ورود عوض شود. از فاز ۰
+            # این فلگ در خود بک‌اند اعمال می‌شود، نه فقط با ریدایرکت فرانت.
+            must_change_password=True,
+        )
+        db.add(user)
+        db.flush()
+        account_username = user.username
+        log_event(
+            db,
+            actor_user_id=current_user.id,
+            event_type="user_created",
+            new_value={
+                "id": user.id,
+                "username": user.username,
+                "role": user.role.value,
+                "personnel_id": personnel.id,
+                "created_with_personnel": True,
+            },
+        )
+
     db.commit()
     db.refresh(personnel)
-    return personnel
+    return PersonnelCreated.model_validate(personnel).model_copy(
+        update={"account_username": account_username}
+    )
 
 
 @router.get("/{personnel_id}", response_model=PersonnelRead)

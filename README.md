@@ -209,7 +209,12 @@ npm run build     # بررسی نوع (tsc) + build تولیدی
       libharfbuzz0b libcairo2 libgdk-pixbuf-2.0-0 libffi8 shared-mime-info fonts-liberation
   ```
 - **macOS:** `brew install pango gdk-pixbuf libffi`
-- **Windows:** نصب کتابخانه‌های بومی GTK دشوار است؛ ساده‌ترین راه، اجرای بک‌اند داخل Docker یا WSL است.
+- **Windows:** رانتایم GTK3 را نصب کنید — این تنها چیزی است که کم دارید:
+  ```powershell
+  winget install --id tschoonj.GTKForWindows
+  ```
+  بعد از نصب، ترمینال را ببندید و باز کنید (تا PATH تازه خوانده شود) و بک‌اند را ری‌استارت کنید؛
+  WeasyPrint این کتابخانه‌ها را در لحظهٔ import پیدا می‌کند، پس بدون ری‌استارت همچنان خاموش می‌ماند.
 
 > فونت Vazirmatn برای رندر فارسی در `backend/app/templates/fonts/` قرار دارد و قالب آن را از مسیر محلی بارگذاری می‌کند؛ نیازی به فونت سیستمی نیست.
 

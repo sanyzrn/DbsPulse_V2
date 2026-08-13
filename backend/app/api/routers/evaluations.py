@@ -36,6 +36,7 @@ from app.schemas.evaluation import (
     HrHandover,
     ObjectionResolution,
     ReturnRequest,
+    ScoreRead,
     ScoresUpsert,
     SelfAssessmentRead,
     SelfAssessmentScoreRead,
@@ -153,6 +154,20 @@ def _to_detail(db: Session, record: EvaluationRecord) -> EvaluationDetail:
             "self_assessment": _self_assessment_of(db, record),
         }
     )
+
+
+def _persisted_scores(db: Session, record: EvaluationRecord) -> list[ScoreRead]:
+    """ردیف‌های امتیاز همان‌گونه که ذخیره شدند — با id.
+
+    فرانت پس از ذخیرهٔ خودکار همین را مستقیم در کش می‌نشاند، پس باید *دقیقاً* شکل
+    `scores` در EvaluationDetail را داشته باشد؛ وگرنه کش با ردیف‌های ناقص پر می‌شود.
+    """
+    rows = db.scalars(
+        select(EvaluationScore)
+        .where(EvaluationScore.evaluation_record_id == record.id)
+        .order_by(EvaluationScore.id)
+    ).all()
+    return [ScoreRead.model_validate(row) for row in rows]
 
 
 def _replace_scores(db: Session, record: EvaluationRecord, payload: ScoresUpsert) -> list[dict]:
@@ -504,13 +519,13 @@ def get_evaluation(
     return _to_detail(db, record)
 
 
-@router.put("/{evaluation_id}/scores", response_model=list[dict])
+@router.put("/{evaluation_id}/scores", response_model=list[ScoreRead])
 def upsert_scores(
     evaluation_id: int,
     payload: ScoresUpsert,
     db: Session = Depends(get_db),
     current_user: CurrentUser = Depends(get_current_user),
-) -> list[dict]:
+) -> list[ScoreRead]:
     # قفل ردیف مثل خودِ گذارها: بدون آن، بررسی وضعیتِ پایین می‌توانست روی وضعیتی
     # پاس شود که یک submit هم‌زمان دارد عوضش می‌کند، و امتیاز *بعد از*
     # finalize_scoring روی رکورد بنشیند — یعنی امتیازهای ذخیره‌شده با درصد نهاییِ
@@ -543,8 +558,9 @@ def upsert_scores(
         evaluation_record_id=record.id,
         new_value={"scored_indicators": len(rows)},
     )
+    saved = _persisted_scores(db, record)
     db.commit()
-    return rows
+    return saved
 
 
 @router.patch("/{evaluation_id}/evaluator-comment", response_model=EvaluationRead)

@@ -633,6 +633,7 @@ function EditableScoring({
   const { showSuccess, showError } = useToast();
   const confirm = useConfirm();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const { drafts, setScore, setEvidence, violations, unscored, isValid } = useScoreForm(
     indicators,
     existing,
@@ -649,9 +650,18 @@ function EditableScoring({
     setSaving(true);
     setError(null);
     try {
-      await apiClient.put(`/evaluations/${evaluationId}/scores`, {
-        scores: scoredRows(drafts),
-      });
+      const { data: saved } = await apiClient.put<EvaluationDetail["scores"]>(
+        `/evaluations/${evaluationId}/scores`,
+        { scores: scoredRows(drafts) }
+      );
+      // کش را با همان چیزی که سرور برگرداند به‌روز می‌کنیم. بدون این، ذخیرهٔ خودکار
+      // فقط سرور را عوض می‌کرد و کشِ ["evaluation", id] روی وضعیتِ *پیش از ذخیره*
+      // می‌ماند؛ بازگشت به همان صفحه بدون رفرش، فرم را از آن کشِ کهنه پر می‌کرد و
+      // پیش‌نویس‌ها ناپدید به‌نظر می‌رسیدند. setQueryData به‌جای invalidate، تا هر
+      // ذخیرهٔ دو‌ثانیه‌ای یک درخواست اضافه نسازد.
+      queryClient.setQueryData<EvaluationDetail>(["evaluation", evaluationId], (old) =>
+        old ? { ...old, scores: saved } : old
+      );
       setDirty(false);
       setLastSavedAt(new Date());
       if (!options?.silent) showSuccess("پیش‌نویس ذخیره شد");

@@ -56,6 +56,18 @@ function initialDrafts(indicators: Indicator[], existing: EvaluationScoreRow[]):
   });
 }
 
+function sameDrafts(a: ScoreDraft[], b: ScoreDraft[]): boolean {
+  return (
+    a.length === b.length &&
+    a.every(
+      (d, i) =>
+        d.indicator_id === b[i].indicator_id &&
+        d.score === b[i].score &&
+        d.evidence_text === b[i].evidence_text
+    )
+  );
+}
+
 export function useScoreForm(
   indicators: Indicator[],
   existing: EvaluationScoreRow[],
@@ -63,22 +75,33 @@ export function useScoreForm(
 ) {
   const [drafts, setDrafts] = useState<ScoreDraft[]>(() => initialDrafts(indicators, existing));
 
-  // مقداردهی اولیهٔ useState فقط یک‌بار اجرا می‌شود؛ اگر در نخستین رندر فهرست شاخص‌ها
-  // هنوز در حال بارگذاری (خالی) باشد — مثلاً در مسیر «مدیر» که ارزیابی بلافاصله پس از
-  // ساخت باز می‌شود — drafts خالی می‌ماند. وقتی شاخص‌ها رسیدند، یک‌بار دوباره مقداردهی
-  // می‌کنیم (بدون پاک‌کردن ویرایش‌های بعدی کاربر).
-  const seededRef = useRef(indicators.length > 0);
+  // مقداردهی اولیهٔ useState فقط یک‌بار اجرا می‌شود، ولی داده‌های سرور ممکن است *بعد*
+  // از نخستین رندر برسند:
+  //
+  //  • فهرست شاخص‌ها هنوز در حال بارگذاری باشد (مسیر «مدیر»، که ارزیابی بلافاصله پس
+  //    از ساخت باز می‌شود)؛
+  //  • یا ارزیابی از کش react-query بیاید و امتیازهای واقعی با refetch پس‌زمینه
+  //    برسند — دقیقاً حالتی که «بدون رفرش برگردم، پیش‌نویس‌ها نیستند» را می‌ساخت.
+  //
+  // پس تا وقتی کاربر دست به فرم نزده، هر بار که دادهٔ تازه‌ای رسید دوباره مقداردهی
+  // می‌کنیم. پس از نخستین ویرایش دیگر این کار را نمی‌کنیم تا تایپِ کاربر پاک نشود.
+  const touchedRef = useRef(false);
   useEffect(() => {
-    if (!seededRef.current && indicators.length > 0) {
-      seededRef.current = true;
-      setDrafts(initialDrafts(indicators, existing));
-    }
+    if (indicators.length === 0 || touchedRef.current) return;
+    // اگر محتوا همان است، *همان* آرایه را برمی‌گردانیم: یک آرایهٔ نو باعث رندر
+    // مجدد و شلیک autosave می‌شد، آن هم setQueryData می‌کرد و حلقه می‌ساخت.
+    setDrafts((prev) => {
+      const next = initialDrafts(indicators, existing);
+      return sameDrafts(prev, next) ? prev : next;
+    });
   }, [indicators, existing]);
 
   const setScore = (indicatorId: number, score: number) => {
+    touchedRef.current = true;
     setDrafts((prev) => prev.map((d) => (d.indicator_id === indicatorId ? { ...d, score } : d)));
   };
   const setEvidence = (indicatorId: number, evidence_text: string) => {
+    touchedRef.current = true;
     setDrafts((prev) =>
       prev.map((d) => (d.indicator_id === indicatorId ? { ...d, evidence_text } : d))
     );

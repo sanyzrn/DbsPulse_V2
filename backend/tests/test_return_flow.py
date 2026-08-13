@@ -219,6 +219,54 @@ def test_returned_draft_is_editable_again_and_reflects_history(client, db_sessio
     )
 
 
+def test_was_returned_is_visible_on_single_record_detail_not_just_the_list(client, db_session):
+    """باگ: was_returned فقط در پاسخ فهرستی (GET /evaluations) محاسبه می‌شد؛ صفحهٔ
+    جزئیات — یعنی همان‌جایی که بازبین واقعاً پرونده را می‌بیند و تصمیم می‌گیرد —
+    از GET تکی می‌آید که همیشه مقدار پیش‌فرض False را برمی‌گرداند، حتی برای
+    پرونده‌ای که چندبار برگشت خورده. باید هم در پاسخ خودِ POST /return و هم در
+    GET بعدی صحیح باشد، در همهٔ مراحل زنجیره."""
+    hr, sup, dep, ceo, evaluation_id = _setup_submitted(client, db_session)
+
+    # پیش از هر برگشتی: تک‌رکورد هم باید False باشد (نه فقط لیست)
+    detail = client.get(f"/api/evaluations/{evaluation_id}", headers=auth_header(hr)).json()
+    assert detail["was_returned"] is False
+
+    # برگشت اول (HR): هم پاسخ خودِ /return و هم GET بعدی باید True باشند
+    r = client.post(
+        f"/api/evaluations/{evaluation_id}/return",
+        json={"reason": "شواهد ناکافی"},
+        headers=auth_header(hr),
+    )
+    assert r.json()["was_returned"] is True
+    detail = client.get(f"/api/evaluations/{evaluation_id}", headers=auth_header(sup)).json()
+    assert detail["was_returned"] is True
+
+    # پس از پیشروی دوباره تا انتها (بدون برگشت جدید)، سابقهٔ برگشت باید در تک‌رکورد
+    # همچنان دیده شود — نه فقط تا زمانی که در فهرست ظاهر شود
+    indicators = active_indicators(db_session)
+    client.put(
+        f"/api/evaluations/{evaluation_id}/scores",
+        json={"scores": full_valid_scores(indicators)},
+        headers=auth_header(sup),
+    )
+    r = client.post(f"/api/evaluations/{evaluation_id}/submit", headers=auth_header(sup))
+    assert r.json()["was_returned"] is True
+
+    r = client.post(f"/api/evaluations/{evaluation_id}/hr-approve", headers=auth_header(hr))
+    assert r.json()["was_returned"] is True
+
+    r = client.post(f"/api/evaluations/{evaluation_id}/deputy-approve", headers=auth_header(dep))
+    assert r.json()["was_returned"] is True
+
+    r = client.post(f"/api/evaluations/{evaluation_id}/ceo-finalize", headers=auth_header(ceo))
+    assert r.json()["was_returned"] is True
+
+    # حتی پس از نهایی‌شدن، سابقهٔ برگشت گم نمی‌شود
+    detail = client.get(f"/api/evaluations/{evaluation_id}", headers=auth_header(hr)).json()
+    assert detail["was_returned"] is True
+    assert detail["status"] == "finalized"
+
+
 def test_return_requires_matching_state_and_role(client, db_session):
     hr, sup, dep, ceo, evaluation_id = _setup_submitted(client, db_session)
 

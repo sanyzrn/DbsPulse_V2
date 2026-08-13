@@ -88,6 +88,39 @@ def _ensure_can_view(record: EvaluationRecord, current_user: CurrentUser) -> Non
         )
 
 
+def _was_returned(db: Session, evaluation_id: int) -> bool:
+    """آیا این پرونده در طول عمرش دست‌کم یک‌بار برگشت خورده است. باگ: قبل از این،
+    فقط GET لیستی (list_evaluations) این مقدار را محاسبه می‌کرد؛ GET تکی
+    (صفحهٔ جزئیات — همان جایی که بازبین/ارزیاب واقعاً روی پرونده کار می‌کند) و
+    پاسخ همهٔ endpointهای گردش‌کار (submit/approve/return و...) چون مستقیماً از
+    شیء ORM سریالایز می‌شدند، همیشه مقدار پیش‌فرض False پیدانتیک را برمی‌گرداندند —
+    یعنی نشان «برگشتی» هرگز در صفحهٔ جزئیات دیده نمی‌شد، حتی برای پرونده‌ای که
+    چندبار برگشت خورده بود."""
+    return (
+        db.scalar(
+            select(AuditLog.id)
+            .where(
+                AuditLog.event_type == "evaluation_returned",
+                AuditLog.evaluation_record_id == evaluation_id,
+            )
+            .limit(1)
+        )
+        is not None
+    )
+
+
+def _to_read(db: Session, record: EvaluationRecord) -> EvaluationRead:
+    return EvaluationRead.model_validate(record).model_copy(
+        update={"was_returned": _was_returned(db, record.id)}
+    )
+
+
+def _to_detail(db: Session, record: EvaluationRecord) -> EvaluationDetail:
+    return EvaluationDetail.model_validate(record).model_copy(
+        update={"was_returned": _was_returned(db, record.id)}
+    )
+
+
 def _replace_scores(db: Session, record: EvaluationRecord, payload: ScoresUpsert) -> list[dict]:
     indicators_by_id = active_indicators_by_id(db)
     indicator_ids_seen = set()
@@ -412,10 +445,10 @@ def get_evaluation(
     evaluation_id: int,
     db: Session = Depends(get_db),
     current_user: CurrentUser = Depends(get_current_user),
-) -> EvaluationRecord:
+) -> EvaluationDetail:
     record = _get_record_or_404(db, evaluation_id)
     _ensure_can_view(record, current_user)
-    return record
+    return _to_detail(db, record)
 
 
 @router.put("/{evaluation_id}/scores", response_model=list[dict])
@@ -462,7 +495,7 @@ def set_evaluator_comment(
     payload: EvaluatorCommentUpdate,
     db: Session = Depends(get_db),
     current_user: CurrentUser = Depends(get_current_user),
-) -> EvaluationRecord:
+) -> EvaluationRead:
     record = _get_record_or_404(db, evaluation_id)
     # نمره‌دهنده اول این نظر را ثبت می‌کند: مسیر عادی مسئول واحد در draft است؛
     # مسیر «مدیر» معاونت خودش نمره‌دهندهٔ اول است و در hr_approved این کار را می‌کند.
@@ -484,7 +517,7 @@ def set_evaluator_comment(
     record.evaluator_comment = payload.evaluator_comment
     db.commit()
     db.refresh(record)
-    return record
+    return _to_read(db, record)
 
 
 @router.post("/{evaluation_id}/submit", response_model=EvaluationRead)
@@ -492,7 +525,7 @@ def submit_evaluation(
     evaluation_id: int,
     db: Session = Depends(get_db),
     current_user: CurrentUser = Depends(require_roles(UserRole.unit_supervisor)),
-) -> EvaluationRecord:
+) -> EvaluationRead:
     record = _get_record_or_404_for_update(db, evaluation_id)
     apply_transition(
         db, record, "submit", current_user,
@@ -500,7 +533,7 @@ def submit_evaluation(
     )
     db.commit()
     db.refresh(record)
-    return record
+    return _to_read(db, record)
 
 
 @router.post("/{evaluation_id}/hr-approve", response_model=EvaluationRead)
@@ -508,12 +541,12 @@ def hr_approve(
     evaluation_id: int,
     db: Session = Depends(get_db),
     current_user: CurrentUser = Depends(require_roles(UserRole.hr)),
-) -> EvaluationRecord:
+) -> EvaluationRead:
     record = _get_record_or_404_for_update(db, evaluation_id)
     apply_transition(db, record, "hr_approve", current_user)
     db.commit()
     db.refresh(record)
-    return record
+    return _to_read(db, record)
 
 
 @router.post("/{evaluation_id}/deputy-approve", response_model=EvaluationRead)
@@ -521,7 +554,7 @@ def deputy_approve(
     evaluation_id: int,
     db: Session = Depends(get_db),
     current_user: CurrentUser = Depends(require_roles(UserRole.deputy)),
-) -> EvaluationRecord:
+) -> EvaluationRead:
     record = _get_record_or_404_for_update(db, evaluation_id)
 
     def _before() -> None:
@@ -532,7 +565,7 @@ def deputy_approve(
     apply_transition(db, record, "deputy_approve", current_user, before=_before)
     db.commit()
     db.refresh(record)
-    return record
+    return _to_read(db, record)
 
 
 @router.post("/{evaluation_id}/ceo-finalize", response_model=EvaluationRead)
@@ -540,7 +573,7 @@ def ceo_finalize(
     evaluation_id: int,
     db: Session = Depends(get_db),
     current_user: CurrentUser = Depends(require_roles(UserRole.ceo)),
-) -> EvaluationRecord:
+) -> EvaluationRead:
     record = _get_record_or_404_for_update(db, evaluation_id)
 
     def _before() -> None:
@@ -557,7 +590,7 @@ def ceo_finalize(
     archive_final_pdf(db, record)
     db.commit()
     db.refresh(record)
-    return record
+    return _to_read(db, record)
 
 
 _RETURN_ACTION_BY_ROLE = {
@@ -575,7 +608,7 @@ def return_evaluation(
     current_user: CurrentUser = Depends(
         require_roles(UserRole.hr, UserRole.deputy, UserRole.ceo)
     ),
-) -> EvaluationRecord:
+) -> EvaluationRead:
     """برگشت پرونده یک مرحله به عقب با ذکر دلیل اجباری؛ امتیازهای قبلی حفظ می‌شوند."""
     record = _get_record_or_404_for_update(db, evaluation_id)
     action, comment_stage = _RETURN_ACTION_BY_ROLE[current_user.role]
@@ -607,7 +640,7 @@ def return_evaluation(
     apply_transition(db, record, action, current_user, before=_before)
     db.commit()
     db.refresh(record)
-    return record
+    return _to_read(db, record)
 
 
 @router.get("/{evaluation_id}/summary.pdf")

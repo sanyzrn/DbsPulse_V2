@@ -339,7 +339,10 @@ export function ReportsSection() {
                 <YAxis type="category" dataKey="name" tick={{ ...TICK_STYLE, fontSize: 12 }} tickLine={false} axisLine={false} width={130} />
                 <Tooltip contentStyle={TOOLTIP_STYLE} formatter={faNum} cursor={{ fill: "rgba(107,114,128,0.06)" }} />
                 <Bar dataKey="میانگین" radius={[0, 6, 6, 0]} fill={SERIES_COLOR} animationDuration={800}>
-                  <LabelList dataKey="میانگین" position="right" formatter={(v) => (v == null ? "" : faNum(Number(v)))} style={{ fontSize: 12, fill: "#374151", fontFamily: "Vazirmatn, Tahoma, sans-serif" }} />
+                  {/* direction:ltr روی برچسب: تحت dir="rtl" صفحه، text-anchor="start" که
+                      Recharts برای position="right" می‌سازد معکوس تفسیر می‌شود و عدد به‌جای
+                      فاصله از میله، داخل خودِ میله می‌افتد (تقریباً نامرئی). */}
+                  <LabelList dataKey="میانگین" position="right" formatter={(v) => (v == null ? "" : faNum(Number(v)))} style={{ fontSize: 12, fill: "#374151", fontFamily: "Vazirmatn, Tahoma, sans-serif", direction: "ltr" }} />
                 </Bar>
               </BarChart>
             </ResponsiveContainer>
@@ -366,7 +369,7 @@ export function ReportsSection() {
                 <YAxis type="category" dataKey="name" tick={{ ...TICK_STYLE, fontSize: 11 }} tickLine={false} axisLine={false} width={150} />
                 <Tooltip contentStyle={TOOLTIP_STYLE} formatter={faNum} cursor={{ fill: "rgba(107,114,128,0.06)" }} />
                 <Bar dataKey="میانگین" radius={[0, 6, 6, 0]} fill={SERIES_COLOR} animationDuration={800}>
-                  <LabelList dataKey="میانگین" position="right" formatter={(v) => (v == null ? "" : faNum(Number(v)))} style={{ fontSize: 11, fill: "#374151", fontFamily: "Vazirmatn, Tahoma, sans-serif" }} />
+                  <LabelList dataKey="میانگین" position="right" formatter={(v) => (v == null ? "" : faNum(Number(v)))} style={{ fontSize: 11, fill: "#374151", fontFamily: "Vazirmatn, Tahoma, sans-serif", direction: "ltr" }} />
                 </Bar>
               </BarChart>
             </ResponsiveContainer>
@@ -417,7 +420,7 @@ export function ReportsSection() {
                   <YAxis type="category" dataKey="name" tick={{ ...TICK_STYLE, fontSize: 12 }} tickLine={false} axisLine={false} width={130} />
                   <Tooltip contentStyle={TOOLTIP_STYLE} formatter={faNum} cursor={{ fill: "rgba(107,114,128,0.06)" }} />
                   <Bar dataKey="میانگین" radius={[0, 6, 6, 0]} fill={SERIES_COLOR} animationDuration={800}>
-                    <LabelList dataKey="میانگین" position="right" formatter={(v) => (v == null ? "" : faNum(Number(v)))} style={{ fontSize: 12, fill: "#374151", fontFamily: "Vazirmatn, Tahoma, sans-serif" }} />
+                    <LabelList dataKey="میانگین" position="right" formatter={(v) => (v == null ? "" : faNum(Number(v)))} style={{ fontSize: 12, fill: "#374151", fontFamily: "Vazirmatn, Tahoma, sans-serif", direction: "ltr" }} />
                   </Bar>
                 </BarChart>
               </ResponsiveContainer>

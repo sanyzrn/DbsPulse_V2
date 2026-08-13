@@ -61,6 +61,7 @@ export interface EvaluationListParams {
   min_final_pct?: number;
   max_final_pct?: number;
   subject_personnel_id?: number;
+  was_returned?: boolean;
   limit: number;
   offset: number;
 }
@@ -177,6 +178,11 @@ export function useAuditLog(params: {
   event_type?: string;
   created_from?: string;
   created_to?: string;
+  actor_user_id?: number;
+  personnel_id?: number;
+  org_unit?: string;
+  contract_end_from?: string;
+  contract_end_to?: string;
   limit: number;
   offset: number;
 }) {

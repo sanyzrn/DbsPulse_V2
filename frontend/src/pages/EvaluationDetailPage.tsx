@@ -189,8 +189,17 @@ export function EvaluationDetailPage() {
           </div>
           <div className="text-end text-sm">
             <p className="font-medium text-gray-800">{evaluation.evaluation_code}</p>
-            <p className="text-gray-500">
+            <p className="flex flex-wrap items-center justify-end gap-1.5 text-gray-500">
               <StatusBadge status={evaluation.status} /> · {STAGE_LABELS[evaluation.stage]}
+              {evaluation.was_returned && (
+                <span
+                  className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-[11px] font-medium text-amber-700"
+                  title="این پرونده در طول رسیدگی دست‌کم یک‌بار برگشت خورده است؛ کامنت‌های پایین صفحه را ببینید"
+                >
+                  <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-amber-500" />
+                  برگشتی
+                </span>
+              )}
             </p>
             <p className="mt-1 text-xs text-gray-400">
               شروع: {formatDateTime(evaluation.created_at)}

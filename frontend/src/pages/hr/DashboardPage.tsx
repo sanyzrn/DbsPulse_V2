@@ -428,7 +428,11 @@ function BarByOrgUnitCard({ data }: { data: { org_unit: string; avg_final_pct: n
                 dataKey="میانگین"
                 position="right"
                 formatter={(v) => (v == null ? "" : Number(v).toLocaleString("fa-IR"))}
-                style={{ fontSize: 11, fill: "#6b7280", fontFamily: "Vazirmatn, Tahoma, sans-serif" }}
+                // باگ RTL: text-anchor="start" که Recharts برای position="right" تولید می‌کند،
+                // با جهت ارثی rtl صفحه (html dir="rtl") به‌جای «شروع از x و ادامه به راست»
+                // به «پایان در x» تفسیر می‌شود؛ برچسب به‌جای فاصله از میله، داخل خودِ میله
+                // می‌افتد. direction:ltr فقط روی همین برچسب، بدون اثر روی برچسب‌های محور.
+                style={{ fontSize: 11, fill: "#6b7280", fontFamily: "Vazirmatn, Tahoma, sans-serif", direction: "ltr" }}
               />
             </Bar>
           </BarChart>

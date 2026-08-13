@@ -31,6 +31,8 @@ interface AdvancedFilters {
   dateTo: string;
   minPct: string;
   maxPct: string;
+  /** "" = همه، "true" = فقط برگشتی، "false" = بدون سابقهٔ برگشت */
+  returned: "" | "true" | "false";
 }
 
 const EMPTY_FILTERS: AdvancedFilters = {
@@ -39,6 +41,7 @@ const EMPTY_FILTERS: AdvancedFilters = {
   dateTo: "",
   minPct: "",
   maxPct: "",
+  returned: "",
 };
 
 /** فیلترها → پارامترهای درخواست (فقط مقادیر پرشده). */
@@ -49,6 +52,7 @@ function filtersToParams(filters: AdvancedFilters) {
     created_to: filters.dateTo || undefined,
     min_final_pct: filters.minPct !== "" ? Number(filters.minPct) : undefined,
     max_final_pct: filters.maxPct !== "" ? Number(filters.maxPct) : undefined,
+    was_returned: filters.returned === "" ? undefined : filters.returned === "true",
   };
 }
 
@@ -161,7 +165,19 @@ export function EvaluationList({
             transition={{ duration: 0.2, ease: EASE_SOFT }}
             className="overflow-hidden"
           >
-            <div className="mb-4 grid grid-cols-1 gap-3 rounded-xl border border-gray-100 bg-gray-50/70 p-3 text-sm sm:grid-cols-2 lg:grid-cols-5">
+            <div className="mb-4 grid grid-cols-1 gap-3 rounded-xl border border-gray-100 bg-gray-50/70 p-3 text-sm sm:grid-cols-2 lg:grid-cols-6">
+              <label className="flex flex-col gap-1 text-xs font-medium text-gray-600">
+                سابقهٔ برگشت
+                <select
+                  className={filterInputClass}
+                  value={filters.returned}
+                  onChange={(e) => patchFilters({ returned: e.target.value as AdvancedFilters["returned"] })}
+                >
+                  <option value="">همهٔ پرونده‌ها</option>
+                  <option value="true">فقط برگشتی</option>
+                  <option value="false">بدون سابقهٔ برگشت</option>
+                </select>
+              </label>
               <label className="flex flex-col gap-1 text-xs font-medium text-gray-600">
                 واحد سازمانی
                 <select
@@ -220,7 +236,7 @@ export function EvaluationList({
                 />
               </label>
               {activeFilterCount > 0 && (
-                <div className="flex items-end sm:col-span-2 lg:col-span-5">
+                <div className="flex items-end sm:col-span-2 lg:col-span-6">
                   <button
                     type="button"
                     onClick={() => {

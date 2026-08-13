@@ -150,14 +150,15 @@ export const STAGE_LABELS: Record<EvaluationStage, string> = {
 
 export interface UnitStat {
   org_unit: string;
-  avg_final_pct: number;
+  // null = سرکوب‌شده: جمعیت این واحد کمتر از آستانهٔ کوهورت است (P1-08)
+  avg_final_pct: number | null;
   count: number;
 }
 
 export interface EvaluatorStat {
   evaluator_user_id: number;
   username: string;
-  avg_final_pct: number;
+  avg_final_pct: number | null;
   subordinate_count: number;
   evaluation_count: number;
 }
@@ -165,7 +166,7 @@ export interface EvaluatorStat {
 export interface IndicatorStat {
   indicator_id: number;
   category: string;
-  avg_score: number;
+  avg_score: number | null;
 }
 
 export interface PersonStat {
@@ -208,7 +209,7 @@ export interface IndicatorReportStat {
   category: string;
   description: string;
   section: IndicatorSection;
-  avg_score: number;
+  avg_score: number | null;
   count: number;
 }
 
@@ -221,7 +222,7 @@ export interface ReportSummary {
 
 export interface UnitIndicatorStat {
   org_unit: string;
-  avg_score: number;
+  avg_score: number | null;
   count: number;
 }
 

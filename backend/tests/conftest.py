@@ -57,6 +57,23 @@ def _reset_rate_limiter():
 
 
 @pytest.fixture()
+def no_cohort_suppression():
+    """سرکوب کوهورت حداقلی (P1-08) را برای این تست خاموش می‌کند.
+
+    تست‌هایی که *ریاضیِ* تجمیع را می‌سنجند با دو-سه رکورد کار می‌کنند، یعنی زیر آستانه
+    می‌افتند و میانگینشان درست و حسابی سرکوب می‌شود. آن‌ها به عدد نیاز دارند، نه به
+    رفتار سرکوب — رفتار سرکوب خودش در test_cohort_suppression.py تست می‌شود.
+    عمداً autouse نیست: پیش‌فرض باید همان رفتار واقعی بماند.
+    """
+    from app.core.config import settings
+
+    original = settings.min_cohort_size
+    settings.min_cohort_size = 1
+    yield
+    settings.min_cohort_size = original
+
+
+@pytest.fixture()
 def client(db_session):
     from app.db.session import get_db
     from app.main import app

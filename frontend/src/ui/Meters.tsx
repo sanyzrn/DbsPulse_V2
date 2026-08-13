@@ -183,3 +183,22 @@ export function ScoreRing({
     </div>
   );
 }
+
+/** مقدارِ سرکوب‌شده به دلیل کوهورت حداقلی (P1-08).
+ *
+ * عمداً با «داده نداریم» فرق دارد: داده هست، ولی جمعیتش آن‌قدر کوچک است که نمایش
+ * میانگین عملاً افشای امتیاز یک نفر می‌شود. سلول خالی این تفاوت را پنهان می‌کرد. */
+export function SuppressedValue() {
+  return (
+    <span
+      className="inline-flex items-center gap-1 text-xs text-gray-400"
+      title="برای حفظ حریم خصوصی نمایش داده نمی‌شود: تعداد افراد این گروه کمتر از حد لازم برای یک میانگین بی‌نام است."
+    >
+      <svg viewBox="0 0 20 20" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round">
+        <path d="M3 10s2.5-4.5 7-4.5 7 4.5 7 4.5-2.5 4.5-7 4.5S3 10 3 10z" />
+        <path d="M4 4l12 12" />
+      </svg>
+      محرمانه
+    </span>
+  );
+}

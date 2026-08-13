@@ -32,7 +32,7 @@ import { StatusBadge } from "../../components/StatusBadge";
 import { useToast } from "../../components/Toast";
 import { ReportsSection } from "./ReportsSection";
 import { PageHeader } from "../../ui/Card";
-import { CountUp, PctBadge, ScoreRing } from "../../ui/Meters";
+import { CountUp, PctBadge, ScoreRing, SuppressedValue } from "../../ui/Meters";
 import { TAB_TRANSITION } from "../../ui/motion";
 import { Table } from "../../ui/Table";
 import { formatDate } from "../../utils/dates";
@@ -363,7 +363,9 @@ function tooltipNumber(value: unknown): string {
 }
 
 /** نمایش امتیاز ۰ تا ۵ به‌صورت نوار کوچک تک‌رنگ + عدد. */
-function ScoreOutOfFive({ value }: { value: number }) {
+function ScoreOutOfFive({ value }: { value: number | null }) {
+  // null = سرکوب کوهورت حداقلی (P1-08): داده هست، ولی جمعیتش برای نمایشِ بی‌نام کم است
+  if (value === null) return <SuppressedValue />;
   const pct = Math.max(0, Math.min(100, (value / 5) * 100));
   const color = pct >= 70 ? "bg-green-500" : pct >= 50 ? "bg-amber-500" : "bg-red-500";
   return (
@@ -406,17 +408,32 @@ function DashboardSkeleton() {
 
 /** جدول مدرن با هدر گرادیانت و هاور. */
 /** نمودار میله‌ای میانگین به تفکیک واحد. */
-function BarByOrgUnitCard({ data }: { data: { org_unit: string; avg_final_pct: number; count: number }[] }) {
+function BarByOrgUnitCard({
+  data,
+}: {
+  data: { org_unit: string; avg_final_pct: number | null; count: number }[];
+}) {
   if (data.length === 0) return null;
-  const chartData = data.map((u) => ({
+  // واحدهای سرکوب‌شده از نمودار کنار گذاشته می‌شوند: میله نمی‌تواند بگوید «پنهان»،
+  // و صفر نشان‌دادنشان دروغ است. تعدادشان زیر نمودار اعلام می‌شود.
+  const visible = data.filter((u) => u.avg_final_pct !== null);
+  const hiddenCount = data.length - visible.length;
+  if (visible.length === 0) return null;
+  const chartData = visible.map((u) => ({
     name: u.org_unit,
-    میانگین: Math.round(u.avg_final_pct),
+    میانگین: Math.round(u.avg_final_pct!),
   }));
 
   return (
     <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-card">
-      <h2 className="mb-3 text-base font-bold text-gray-900">میانگین امتیاز به تفکیک واحد</h2>
-      <div style={{ height: Math.max(220, data.length * 48) }}>
+      <h2 className="mb-1 text-base font-bold text-gray-900">میانگین امتیاز به تفکیک واحد</h2>
+      {hiddenCount > 0 && (
+        <p className="mb-3 text-xs text-gray-500">
+          {hiddenCount.toLocaleString("fa-IR")} واحد به دلیل تعداد کم افراد نمایش داده نشده است
+          (میانگینشان عملاً امتیاز فرد است).
+        </p>
+      )}
+      <div style={{ height: Math.max(220, visible.length * 48) }}>
         <ResponsiveContainer>
           <BarChart data={chartData} layout="vertical" margin={{ top: 4, right: 24, bottom: 4, left: 8 }}>
             <CartesianGrid strokeDasharray="4 4" stroke={GRID_STROKE} horizontal={false} />

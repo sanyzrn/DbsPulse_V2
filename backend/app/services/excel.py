@@ -240,20 +240,26 @@ def build_audit_log_workbook(
     return _to_bytes(wb)
 
 
+# مقدارِ سرکوب‌شده (P1-08) در فایل هم باید صریح باشد: سلول خالی شبیه «داده نداریم»
+# است، در حالی که واقعیت «داده هست ولی جمعیتش برای نمایش بی‌نام کوچک است».
+_SUPPRESSED = "— (جمعیت کمتر از حد نمایش)"
+
+
+def _cell_or_suppressed(value: float | None) -> float | str:
+    return _SUPPRESSED if value is None else float(value)
+
+
 def build_report_workbook(
     *,
     total: int,
     avg_final_pct: float | None,
-    by_org_unit: list[tuple[str, float, int]],
-    by_indicator: list[tuple[str, str, float, int]],
+    by_org_unit: list[tuple[str, float | None, int]],
+    by_indicator: list[tuple[str, str, float | None, int]],
 ) -> bytes:
     """گزارش ترکیبی HR در یک فایل با سه برگه: خلاصه، به‌تفکیک واحد، به‌تفکیک شاخص."""
     wb, summary_ws = _new_sheet("خلاصه", ["شاخص", "مقدار"])
     summary_ws.append(["تعداد ارزیابی‌های نهایی‌شده (فیلترشده)", total])
-    summary_ws.append([
-        "میانگین امتیاز نهایی (٪)",
-        float(avg_final_pct) if avg_final_pct is not None else "—",
-    ])
+    summary_ws.append(["میانگین امتیاز نهایی (٪)", _cell_or_suppressed(avg_final_pct)])
 
     unit_ws = _extra_sheet(
         wb,
@@ -262,7 +268,7 @@ def build_report_workbook(
         min_width=16,
     )
     for org_unit, avg, count in by_org_unit:
-        unit_ws.append([org_unit, float(avg), count])
+        unit_ws.append([org_unit, _cell_or_suppressed(avg), count])
 
     indicator_ws = _extra_sheet(
         wb,
@@ -271,7 +277,7 @@ def build_report_workbook(
         min_width=18,
     )
     for category, description, avg, count in by_indicator:
-        indicator_ws.append([category, description, float(avg), count])
+        indicator_ws.append([category, description, _cell_or_suppressed(avg), count])
 
     return _to_bytes(wb)
 

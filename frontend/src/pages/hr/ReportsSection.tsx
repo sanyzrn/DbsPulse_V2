@@ -100,18 +100,17 @@ export function ReportsSection() {
 
   const activeFilterCount = Object.values(filters).filter((v) => v !== undefined && v !== "").length;
 
-  const unitChartData = (summary?.by_org_unit ?? []).map((u) => ({
-    name: u.org_unit,
-    میانگین: Math.round(u.avg_final_pct),
-  }));
-  const indicatorChartData = (summary?.by_indicator ?? []).map((i) => ({
-    name: i.category,
-    میانگین: Number(i.avg_score.toFixed(2)),
-  }));
-  const indicatorUnitData = (indicatorBreakdown?.by_org_unit ?? []).map((u) => ({
-    name: u.org_unit,
-    میانگین: Number(u.avg_score.toFixed(2)),
-  }));
+  // ردیف‌های سرکوب‌شده (P1-08) از نمودارها کنار گذاشته می‌شوند: میله نمی‌تواند
+  // «پنهان» را نشان دهد و صفر نشان‌دادنشان دروغ است. جدول‌ها نشانِ «محرمانه» دارند.
+  const unitChartData = (summary?.by_org_unit ?? [])
+    .filter((u) => u.avg_final_pct !== null)
+    .map((u) => ({ name: u.org_unit, میانگین: Math.round(u.avg_final_pct!) }));
+  const indicatorChartData = (summary?.by_indicator ?? [])
+    .filter((i) => i.avg_score !== null)
+    .map((i) => ({ name: i.category, میانگین: Number(i.avg_score!.toFixed(2)) }));
+  const indicatorUnitData = (indicatorBreakdown?.by_org_unit ?? [])
+    .filter((u) => u.avg_score !== null)
+    .map((u) => ({ name: u.org_unit, میانگین: Number(u.avg_score!.toFixed(2)) }));
   const empComparisonData =
     empVsUnit && (empVsUnit.employee_avg !== null || empVsUnit.unit_avg !== null)
       ? [

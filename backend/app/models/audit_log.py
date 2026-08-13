@@ -19,3 +19,9 @@ class AuditLog(Base):
     old_value: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
     new_value: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    # زنجیرهٔ تمپر-اویدنت (P1-09): هر ردیف هشِ محتوای خودش را نگه می‌دارد، به‌علاوهٔ
+    # هشِ ردیف قبلی. دست‌بردن در یک ردیفِ میانی همهٔ حلقه‌های بعدی را می‌شکند، پس
+    # ویرایشِ نامرئی یعنی بازمحاسبهٔ کل دنبالهٔ بعد از آن.
+    prev_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    entry_hash: Mapped[str] = mapped_column(String(64), nullable=False)

@@ -28,6 +28,7 @@ from app.schemas.dashboard import (
     UnitIndicatorStat,
     UnitStat,
 )
+from app.services.audit import log_event
 from app.services.excel import build_report_workbook
 from app.services.privacy import suppressed_avg
 
@@ -332,6 +333,18 @@ def export_report_excel(
             (i.category, i.description, i.avg_score, i.count) for i in summary.by_indicator
         ],
     )
+    # تنها مسیر خروج دادهٔ سامانه که ردی نمی‌گذاشت. فیلترها و تعداد ردیف ثبت
+    # می‌شوند تا بعداً بشود گفت *چه چیزی* استخراج شد، نه فقط این‌که استخراج شد.
+    log_event(
+        db,
+        actor_user_id=current_user.id,
+        event_type="report_excel_exported",
+        new_value={
+            "filters": {k: str(v) for k, v in vars(filters).items() if v is not None},
+            "row_count": summary.total_evaluations,
+        },
+    )
+    db.commit()
     return Response(
         content=content,
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",

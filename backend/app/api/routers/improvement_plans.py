@@ -370,6 +370,14 @@ def add_goal(
         plan_id=plan.id, description=payload.description, display_order=next_order
     )
     db.add(goal)
+    db.flush()
+    log_event(
+        db,
+        actor_user_id=current_user.id,
+        event_type="improvement_goal_added",
+        evaluation_record_id=plan.evaluation_record_id,
+        new_value={"plan_id": plan.id, "goal_id": goal.id, "description": goal.description},
+    )
     db.commit()
     db.refresh(goal)
     return goal
@@ -386,10 +394,20 @@ def update_goal(
     goal = db.get(ImprovementPlanGoal, goal_id)
     if goal is None or goal.plan_id != plan_id:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="هدف یافت نشد")
-    _ensure_plan_open(_get_plan_or_404(db, plan_id))
+    plan = _get_plan_or_404(db, plan_id)
+    _ensure_plan_open(plan)
     updates = payload.model_dump(exclude_unset=True)
+    before = {"description": goal.description, "is_done": goal.is_done}
     for field, value in updates.items():
         setattr(goal, field, value)
+    log_event(
+        db,
+        actor_user_id=current_user.id,
+        event_type="improvement_goal_updated",
+        evaluation_record_id=plan.evaluation_record_id,
+        old_value=before,
+        new_value={"plan_id": plan.id, "goal_id": goal.id, **updates},
+    )
     db.commit()
     db.refresh(goal)
     return goal
@@ -405,6 +423,20 @@ def delete_goal(
     goal = db.get(ImprovementPlanGoal, goal_id)
     if goal is None or goal.plan_id != plan_id:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="هدف یافت نشد")
-    _ensure_plan_open(_get_plan_or_404(db, plan_id))
+    plan = _get_plan_or_404(db, plan_id)
+    _ensure_plan_open(plan)
+    # مقدار پیشین پیش از حذف ثبت می‌شود، وگرنه از هدفِ حذف‌شده هیچ نمی‌ماند
+    log_event(
+        db,
+        actor_user_id=current_user.id,
+        event_type="improvement_goal_deleted",
+        evaluation_record_id=plan.evaluation_record_id,
+        old_value={
+            "plan_id": plan.id,
+            "goal_id": goal.id,
+            "description": goal.description,
+            "is_done": goal.is_done,
+        },
+    )
     db.delete(goal)
     db.commit()

@@ -12,8 +12,9 @@ from app.models.enums import UserRole
 from app.models.evaluation import EvaluationRecord
 from app.models.personnel import Personnel
 from app.models.user import User
-from app.schemas.audit_log import AuditLogPage, AuditLogRead
+from app.schemas.audit_log import AuditIntegrityRead, AuditLogPage, AuditLogRead
 from app.schemas.auth import CurrentUser
+from app.services.audit import verify_chain
 from app.services.excel import build_audit_log_workbook
 
 router = APIRouter(prefix="/api/audit-log", tags=["audit-log"])
@@ -175,6 +176,24 @@ def list_audit_log(
         for row, username, evaluation_code in rows
     ]
     return AuditLogPage(total=total, items=items)
+
+
+@router.get("/integrity", response_model=AuditIntegrityRead)
+def audit_integrity(
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(require_roles(UserRole.hr)),
+) -> AuditIntegrityRead:
+    """راستی‌آزمایی زنجیرهٔ هش لاگ حسابرسی.
+
+    زنجیره از ابتدا بازمحاسبه و با آن‌چه ذخیره شده مقایسه می‌شود. یک لاگ حسابرسی
+    فقط وقتی «مدرک» است که بشود نشان داد دست‌کاری نشده؛ بدون این endpoint، خودِ
+    زنجیره هم چیزی جز چند ستون بی‌استفاده نبود.
+
+    محدودیت آگاهانه: این کشف می‌کند که ردیفی ویرایش یا حذف شده، ولی کسی که هم
+    دیتابیس و هم کد را در اختیار دارد می‌تواند کل زنجیره را از نو بسازد. کشفِ قطعی
+    به نسخه‌ای بیرون از کنترل همین برنامه نیاز دارد (بخش «خارج از محدوده» در README).
+    """
+    return AuditIntegrityRead(**verify_chain(db))
 
 
 @router.get("/export.xlsx")

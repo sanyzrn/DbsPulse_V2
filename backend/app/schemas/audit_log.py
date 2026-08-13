@@ -18,3 +18,16 @@ class AuditLogRead(BaseModel):
 class AuditLogPage(BaseModel):
     total: int
     items: list[AuditLogRead]
+
+
+class AuditIntegrityRead(BaseModel):
+    """نتیجهٔ راستی‌آزمایی زنجیرهٔ هش لاگ حسابرسی.
+
+    broken_at_id عمداً فقط *اولین* ردیف ناسازگار است: از نقطهٔ شکست به بعد همهٔ
+    حلقه‌ها می‌شکنند، پس فهرست‌کردن همه‌شان نویز است و آن‌چه باید بررسی شود همان اولی.
+    """
+
+    ok: bool
+    checked: int
+    broken_at_id: int | None
+    reason: str | None

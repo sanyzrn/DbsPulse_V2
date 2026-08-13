@@ -87,10 +87,15 @@ def committed_draft():
     }
 
     with make_session() as teardown:
+        # audit_log از P1-09 به بعد append-only است و تریگر دیتابیس DELETE را رد
+        # می‌کند. این fixture داده‌ای می‌سازد که واقعاً commit شده، پس پاک‌کردنش نقش
+        # یک DBA است نه برنامه — همان مسیر ممتازی که تریگر برایش باز گذاشته شده.
+        teardown.execute(text("ALTER TABLE audit_log DISABLE TRIGGER trg_audit_log_append_only"))
         teardown.execute(
             text("DELETE FROM audit_log WHERE evaluation_record_id = :r OR actor_user_id = ANY(:u)"),
             {"r": record_id, "u": [sup_id, dep_id, ceo_id]},
         )
+        teardown.execute(text("ALTER TABLE audit_log ENABLE TRIGGER trg_audit_log_append_only"))
         teardown.execute(
             text("DELETE FROM notifications WHERE evaluation_record_id = :r"), {"r": record_id}
         )

@@ -8,6 +8,7 @@ import {
   usePersonnelList,
   useUsersList,
 } from "../../api/queries";
+import { AuditIntegrityBadge } from "../../components/AuditIntegrityBadge";
 import { ExcelExportButton } from "../../components/ExcelExportButton";
 import { PaginationControls } from "../../components/PaginationControls";
 import { Card, TableSkeleton } from "../../ui/Card";
@@ -117,6 +118,7 @@ export function AuditLogPage() {
       title="گزارش رویدادها (Audit Log)"
       actions={
         <div className="flex flex-wrap items-center gap-2">
+          <AuditIntegrityBadge />
           <ExcelExportButton url="/audit-log/export.xlsx" filename="audit-log.xlsx" params={requestParams} />
           <button
             type="button"

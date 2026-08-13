@@ -342,6 +342,18 @@ export const AUDIT_EVENT_LABELS: Record<string, string> = {
   login_succeeded: "ورود موفق",
   login_failed: "ورود ناموفق",
   password_changed_self: "تغییر رمز توسط خود کاربر",
+  account_locked: "قفل حساب پس از تلاش‌های ناموفق",
+  hr_case_claimed: "برداشتن پرونده توسط منابع انسانی",
+  hr_case_handed_over: "واگذاری مسئولیت منابع انسانی",
+  evaluation_cancelled: "لغو پرونده",
+  stage_owner_reassigned: "تغییر مسئول مرحله",
+  self_assessment_submitted: "ثبت خودارزیابی کارمند",
+  evaluation_objection_filed: "ثبت اعتراض کارمند",
+  evaluation_objection_resolved: "پاسخ به اعتراض کارمند",
+  improvement_goal_added: "افزودن هدف برنامه بهبود",
+  improvement_goal_updated: "ویرایش هدف برنامه بهبود",
+  improvement_goal_deleted: "حذف هدف برنامه بهبود",
+  report_excel_exported: "خروجی اکسل گزارش تحلیلی",
 };
 
 export const STATUS_LABELS: Record<EvaluationStatus, string> = {

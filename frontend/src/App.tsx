@@ -108,6 +108,12 @@ function App() {
             <Route path="/" element={<HomeRedirect />} />
             <Route path="/change-password" element={<ChangePasswordPage />} />
             <Route path="/evaluations/:id" element={<EvaluationDetailPage />} />
+            {/* برنامه‌های بهبود پشت گاردِ hr نیستند چون «مسئول پیگیری» هم باید
+                بتواند برنامهٔ سپرده‌شده به خودش را باز کند — زمان‌بند دقیقاً همین
+                لینک را برایش می‌فرستد (P1-10). محدودیت واقعی سمت سرور است: غیرِ
+                HR فقط برنامه‌های خودش را می‌بیند و فقط اهداف را تیک می‌زند. */}
+            <Route path="/hr/improvement-plans" element={<ImprovementPlansPage />} />
+            <Route path="/hr/improvement-plans/:id" element={<ImprovementPlanDetailPage />} />
 
             <Route element={<ProtectedRoute allowedRoles={["hr"]} />}>
               <Route path="/hr/personnel" element={<PersonnelPage />} />
@@ -120,8 +126,6 @@ function App() {
                   FEATURE_PERIODS_ENABLED ? <PeriodsPage /> : <DisabledFeature title="دوره‌های ارزیابی" />
                 }
               />
-              <Route path="/hr/improvement-plans" element={<ImprovementPlansPage />} />
-              <Route path="/hr/improvement-plans/:id" element={<ImprovementPlanDetailPage />} />
               <Route path="/hr/dashboard" element={<DashboardPage />} />
               <Route path="/hr/audit-log" element={<AuditLogPage />} />
             </Route>

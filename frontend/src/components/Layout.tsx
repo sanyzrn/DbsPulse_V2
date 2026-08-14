@@ -25,8 +25,17 @@ const NAV_BY_ROLE: Record<string, { to: string; label: string }[]> = {
     { to: "/hr/improvement-plans", label: "برنامه‌های بهبود" },
     { to: "/hr/audit-log", label: "گزارش رویدادها" },
   ],
-  unit_supervisor: [{ to: "/supervisor", label: "افراد زیرمجموعه" }],
-  deputy: [{ to: "/deputy", label: "پرونده‌های در انتظار" }],
+  // مسئول واحد و معاونت ممکن است «مسئول پیگیریِ» یک برنامهٔ بهبود باشند (P1-10).
+  // سرور فهرست را به برنامه‌های خودشان محدود می‌کند؛ بدون این لینک، تنها راه
+  // رسیدن به آن، کلیک روی اعلان بود.
+  unit_supervisor: [
+    { to: "/supervisor", label: "افراد زیرمجموعه" },
+    { to: "/hr/improvement-plans", label: "برنامه‌های بهبود" },
+  ],
+  deputy: [
+    { to: "/deputy", label: "پرونده‌های در انتظار" },
+    { to: "/hr/improvement-plans", label: "برنامه‌های بهبود" },
+  ],
   ceo: [{ to: "/ceo", label: "پرونده‌های در انتظار" }],
   employee: [{ to: "/me", label: "کارنامه من" }],
 };

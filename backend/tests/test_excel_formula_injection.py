@@ -100,3 +100,98 @@ def test_numbers_in_the_report_stay_numeric():
     unit_sheet = workbook["میانگین به‌تفکیک واحد"]
     assert unit_sheet.cell(row=2, column=2).value == 72.5
     assert unit_sheet.cell(row=2, column=3).value == 3
+
+
+def test_a_payload_imported_from_excel_comes_back_out_neutralised(client, db_session):
+    """ورود دسته‌ای، یک مسیر ورودیِ *تازه* برای همین حمله است.
+
+    P2-02 وقتی نوشته شد که تنها راه ورود متن آزاد، فرم‌های خود برنامه بود. حالا
+    HR می‌تواند فایل اکسل بارگذاری کند — و فایل اکسل دقیقاً همان جایی است که این
+    payloadها زندگی می‌کنند. این تست کل زنجیره را می‌سنجد: ورود → ذخیره → خروجی.
+    """
+    from openpyxl import Workbook
+
+    from app.services.personnel_import import COLUMNS
+    from tests.helpers import auth_header, make_user
+
+    hr = make_user(db_session, "hr")
+    db_session.commit()
+
+    payload = "=cmd|'/c calc'!A1"
+    workbook = Workbook()
+    sheet = workbook.active
+    sheet.append(COLUMNS)
+    sheet.append(
+        ["P-INJ-1", "جای‌نگه‌دار", "کارشناس", "واحد تست", "خیر", "فعال", "۱۴۰۵/۰۱/۰۱", "۱۴۰۶/۰۱/۰۱", ""]
+    )
+    # نام را به‌صورت *متن* می‌نویسیم، نه فرمول. مهاجم واقعی هم همین کار را می‌کند:
+    # اگر سلول واقعاً فرمول باشد، خواندن با data_only=True مقدار کش‌شده را می‌خواهد
+    # که در فایلِ هرگز-بازنشده None است و ردیف همان‌جا رد می‌شود (تست بعدی). خطر
+    # واقعی متنی است که *بعداً* هنگام خروجی‌گرفتن به فرمول تبدیل شود.
+    name_cell = sheet.cell(row=2, column=2)
+    name_cell.value = payload
+    name_cell.data_type = "s"
+    buffer = BytesIO()
+    workbook.save(buffer)
+
+    imported = client.post(
+        "/api/personnel/import",
+        files={
+            "file": (
+                "attack.xlsx",
+                buffer.getvalue(),
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            )
+        },
+        headers=auth_header(hr),
+    )
+    assert imported.status_code == 200
+    assert imported.json()["created_personnel"] == 1
+
+    exported = client.get("/api/personnel/export.xlsx", headers=auth_header(hr))
+    assert exported.status_code == 200
+    out = load_workbook(BytesIO(exported.content)).active
+    cells = [value for row in out.iter_rows(values_only=True) for value in row]
+
+    # مقدار خام هرگز نباید در فایل باشد؛ فقط نسخهٔ خنثی‌شده با آپاستروف
+    assert payload not in cells
+    assert "'" + payload in cells
+
+
+def test_a_real_formula_cell_is_rejected_rather_than_imported_as_something_odd(
+    client, db_session
+):
+    """اگر سلول *واقعاً* فرمول باشد، خواندن با data_only مقدار کش‌شده را می‌خواهد که
+    در فایلِ هرگز-بازنشده وجود ندارد. نتیجه باید یک ردِ روشن باشد، نه ردیفی با نام
+    خالی یا مقداری که کاربر ننوشته."""
+    from openpyxl import Workbook
+
+    from app.services.personnel_import import COLUMNS
+    from tests.helpers import auth_header, make_user
+
+    hr = make_user(db_session, "hr")
+    db_session.commit()
+
+    workbook = Workbook()
+    sheet = workbook.active
+    sheet.append(COLUMNS)
+    sheet.append(
+        ["P-INJ-2", "=SUM(A1:A9)", "کارشناس", "واحد", "خیر", "فعال", "۱۴۰۵/۰۱/۰۱", "۱۴۰۶/۰۱/۰۱", ""]
+    )
+    buffer = BytesIO()
+    workbook.save(buffer)
+
+    preview = client.post(
+        "/api/personnel/import/preview",
+        files={
+            "file": (
+                "formula.xlsx",
+                buffer.getvalue(),
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            )
+        },
+        headers=auth_header(hr),
+    ).json()
+
+    assert preview["valid_count"] == 0
+    assert any("نام و نام خانوادگی" in error for error in preview["rows"][0]["errors"])

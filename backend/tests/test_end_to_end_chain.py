@@ -219,7 +219,7 @@ def test_a_returned_file_re_enters_the_chain_at_the_right_stage(client, db_sessi
 
 def test_an_inactive_evaluator_cannot_act_even_at_their_own_stage(client, db_session, cast):
     """غیرفعال‌شدن کاربر باید بلافاصله در زنجیره اثر کند، نه فقط جلوی ورود تازه را بگیرد."""
-    hr, sup = cast["hr"], cast["sup"]
+    sup = cast["sup"]
     scores = {"scores": full_valid_scores(active_indicators(db_session))}
 
     evaluation_id = client.post(

@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
 from fastapi.responses import Response as FastAPIResponse
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
@@ -13,17 +13,26 @@ from app.models.personnel import Personnel
 from app.models.user import User
 from app.schemas.auth import CurrentUser
 from app.schemas.personnel import (
+    CreatedAccount,
+    ImportRowIssue,
     PersonnelCreate,
     PersonnelCreated,
+    PersonnelImportPreview,
+    PersonnelImportResult,
     PersonnelPage,
     PersonnelRead,
     PersonnelUpdate,
 )
 from app.services.audit import log_event
 from app.services.excel import build_personnel_workbook
+from app.services.personnel_import import ImportPreview, build_template, parse_workbook
+from app.services.security_tokens import generate_temp_password
 from app.services.workflow import IS_OPEN_RECORD
 
 router = APIRouter(prefix="/api/personnel", tags=["personnel"])
+
+# سقف حجم فایل ورودی. بدون آن، یک فایل چندصدمگابایتی کل حافظهٔ فرایند را می‌گیرد.
+MAX_IMPORT_BYTES = 5 * 1024 * 1024
 
 # ستون‌های مجاز برای مرتب‌سازی فهرست پرسنل — با نگاشت صریح تا کاربر نتواند نام
 # ستون دلخواه تزریق کند.
@@ -253,6 +262,177 @@ def create_personnel(
     )
 
 
+# ───────────────────────────── ورود دسته‌ای از Excel
+
+
+def _to_preview(preview: ImportPreview) -> PersonnelImportPreview:
+    return PersonnelImportPreview(
+        total_rows=len(preview.rows),
+        valid_count=len(preview.valid),
+        invalid_count=len(preview.invalid),
+        accounts_to_create=sum(1 for r in preview.valid if r.username),
+        rows=[
+            ImportRowIssue(
+                row_number=r.row_number,
+                personnel_code=r.personnel_code,
+                full_name=r.full_name,
+                username=r.username,
+                errors=r.errors,
+            )
+            for r in preview.rows
+        ],
+        file_errors=preview.file_errors,
+    )
+
+
+async def _read_upload(file: UploadFile) -> bytes:
+    if not (file.filename or "").lower().endswith((".xlsx", ".xlsm")):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="فقط فایل Excel با پسوند .xlsx پذیرفته می‌شود",
+        )
+    content = await file.read()
+    if len(content) > MAX_IMPORT_BYTES:
+        raise HTTPException(
+            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            detail="حجم فایل بیش از حد مجاز است (حداکثر ۵ مگابایت)",
+        )
+    return content
+
+
+@router.get("/import-template.xlsx")
+def download_import_template(
+    current_user: CurrentUser = Depends(require_roles(UserRole.hr)),
+) -> FastAPIResponse:
+    """فایل نمونهٔ خالی — تا کاربر مجبور نباشد نام ستون‌ها را حدس بزند."""
+    return FastAPIResponse(
+        content=build_template(),
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": 'attachment; filename="personnel-import-template.xlsx"'},
+    )
+
+
+@router.post("/import/preview", response_model=PersonnelImportPreview)
+async def preview_personnel_import(
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(require_roles(UserRole.hr)),
+) -> PersonnelImportPreview:
+    """فقط اعتبارسنجی — هیچ چیزی نوشته نمی‌شود.
+
+    «۲۰۰ ردیف وارد شد و ۳تایش اشتباه بود» را نمی‌شود به‌سادگی برگرداند، پس
+    کاربر اول می‌بیند چه اتفاقی *قرار است* بیفتد و بعد تصمیم می‌گیرد.
+    """
+    return _to_preview(parse_workbook(await _read_upload(file), db))
+
+
+@router.post("/import", response_model=PersonnelImportResult)
+async def commit_personnel_import(
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(require_roles(UserRole.hr)),
+) -> PersonnelImportResult:
+    """درج ردیف‌های معتبر، همه در یک تراکنش.
+
+    فایل دوباره از صفر اعتبارسنجی می‌شود و نتیجهٔ همین اعتبارسنجی ملاک است، نه
+    آن‌چه در پیش‌نمایش دیده شد: بین دو درخواست ممکن است کد پرسنلی یا نام کاربری
+    را کس دیگری ثبت کرده باشد.
+
+    ردیف‌های خطادار رد می‌شوند و بقیه درج — نه «همه یا هیچ». دلیلش این است که
+    یک غلط تایپی در ردیف ۱۹۰ نباید ۱۸۹ ردیف درستِ قبلی را دور بریزد؛ گزارش
+    خروجی صریح می‌گوید چند ردیف رد شد.
+    """
+    preview = parse_workbook(await _read_upload(file), db)
+    if preview.file_errors:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail=preview.file_errors[0]
+        )
+
+    accounts: list[CreatedAccount] = []
+    created_personnel = 0
+
+    for row in preview.valid:
+        personnel = Personnel(
+            personnel_code=row.personnel_code,
+            full_name=row.full_name,
+            job_title=row.job_title,
+            org_unit=row.org_unit,
+            is_manager=row.is_manager,
+            status=row.status,
+            contract_start_date=row.contract_start_date,
+            contract_end_date=row.contract_end_date,
+            created_by_user_id=current_user.id,
+        )
+        db.add(personnel)
+        db.flush()
+        created_personnel += 1
+        log_event(
+            db,
+            actor_user_id=current_user.id,
+            event_type="personnel_created",
+            new_value={
+                "id": personnel.id,
+                "personnel_code": personnel.personnel_code,
+                "full_name": personnel.full_name,
+                "imported": True,
+            },
+        )
+
+        if row.username:
+            password = generate_temp_password()
+            user = User(
+                username=row.username,
+                password_hash=hash_password(password),
+                role=UserRole.employee,
+                personnel_id=personnel.id,
+                is_active=True,
+                must_change_password=True,
+            )
+            db.add(user)
+            db.flush()
+            # رمز عمداً در لاگ ممیزی نیست: لاگ ماندگار است و رمز نباید ماندگار شود.
+            log_event(
+                db,
+                actor_user_id=current_user.id,
+                event_type="user_created",
+                new_value={
+                    "id": user.id,
+                    "username": user.username,
+                    "role": user.role.value,
+                    "created_with_personnel": personnel.id,
+                    "imported": True,
+                },
+            )
+            accounts.append(
+                CreatedAccount(
+                    personnel_code=personnel.personnel_code,
+                    full_name=personnel.full_name,
+                    username=user.username,
+                    temporary_password=password,
+                )
+            )
+
+    log_event(
+        db,
+        actor_user_id=current_user.id,
+        event_type="personnel_imported",
+        new_value={
+            "created_personnel": created_personnel,
+            "created_accounts": len(accounts),
+            "skipped_rows": len(preview.invalid),
+        },
+    )
+    db.commit()
+
+    return PersonnelImportResult(
+        created_personnel=created_personnel,
+        created_accounts=len(accounts),
+        skipped_rows=len(preview.invalid),
+        accounts=accounts,
+    )
+
+
+
 @router.get("/{personnel_id}", response_model=PersonnelRead)
 def get_personnel(
     personnel_id: int,
@@ -353,3 +533,4 @@ def update_personnel(
     db.commit()
     db.refresh(personnel)
     return personnel
+

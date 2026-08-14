@@ -9,6 +9,7 @@ import {
 } from "../../api/queries";
 import { EmployeeProfileModal } from "../../components/EmployeeProfileModal";
 import { ExcelExportButton } from "../../components/ExcelExportButton";
+import { PersonnelImportDialog } from "../../components/PersonnelImportDialog";
 import { PaginationControls } from "../../components/PaginationControls";
 import { useToast } from "../../components/Toast";
 import { generatePassword } from "../../utils/password";
@@ -248,6 +249,7 @@ export function PersonnelPage() {
   const [account, setAccount] = useState<AccountDraft>(emptyAccount);
   const [error, setError] = useState<string | null>(null);
   const [showAddPersonnel, setShowAddPersonnel] = useState(false);
+  const [showImport, setShowImport] = useState(false);
   const [profilePerson, setProfilePerson] = useState<Personnel | null>(null);
   const [editingPersonnel, setEditingPersonnel] = useState<Personnel | null>(null);
   const [search, setSearch] = useState("");
@@ -328,6 +330,13 @@ export function PersonnelPage() {
     <div className="space-y-4">
       <PageHeader title="پرسنل" subtitle="ثبت پرسنل جدید و مدیریت دسترسی زنجیره ارزیابی هر فرد" />
       <div className="space-y-4">
+        {showImport && (
+          <PersonnelImportDialog
+            onClose={() => setShowImport(false)}
+            onImported={() => queryClient.invalidateQueries({ queryKey: ["personnel"] })}
+          />
+        )}
+
         {showAddPersonnel && (
           <Modal
             title="افزودن پرسنل"
@@ -457,6 +466,16 @@ export function PersonnelPage() {
                 filename="personnel.xlsx"
                 params={listParams}
               />
+              <button
+                type="button"
+                onClick={() => setShowImport(true)}
+                className="inline-flex items-center gap-1.5 rounded-xl border border-gray-200 bg-white px-3 py-1.5 text-sm font-medium text-gray-600 shadow-sm transition-colors hover:bg-gray-50"
+              >
+                <svg viewBox="0 0 20 20" className="h-4 w-4 text-pulse-600" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                  <path d="M10 14V4m0 0L6.5 7.5M10 4l3.5 3.5M4 15v1a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1v-1" />
+                </svg>
+                ورودی Excel
+              </button>
               <div className="relative">
                 <svg viewBox="0 0 20 20" className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
                   <circle cx="9" cy="9" r="6" />

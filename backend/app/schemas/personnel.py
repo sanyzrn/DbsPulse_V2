@@ -90,3 +90,45 @@ class PersonnelCreated(PersonnelRead):
 class PersonnelPage(BaseModel):
     total: int
     items: list[PersonnelRead]
+
+
+# ───────────────────────────── ورود دسته‌ای از Excel
+
+
+class ImportRowIssue(BaseModel):
+    """یک ردیف فایل به‌همراه وضعیتش — چه سالم چه خطادار.
+
+    ردیف‌های خطادار هم برگردانده می‌شوند، نه فقط شمارششان: کاربر باید بداند کدام
+    ردیف و دقیقاً چرا، وگرنه باید کل فایل را خودش بگردد.
+    """
+
+    row_number: int
+    personnel_code: str
+    full_name: str
+    username: str | None = None
+    errors: list[str] = []
+
+
+class PersonnelImportPreview(BaseModel):
+    total_rows: int
+    valid_count: int
+    invalid_count: int
+    accounts_to_create: int
+    rows: list[ImportRowIssue]
+    file_errors: list[str] = []
+
+
+class CreatedAccount(BaseModel):
+    """رمز موقت فقط همین یک بار برگردانده می‌شود؛ ذخیره نمی‌شود و در لاگ نمی‌رود."""
+
+    personnel_code: str
+    full_name: str
+    username: str
+    temporary_password: str
+
+
+class PersonnelImportResult(BaseModel):
+    created_personnel: int
+    created_accounts: int
+    skipped_rows: int
+    accounts: list[CreatedAccount] = []

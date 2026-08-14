@@ -1,3 +1,26 @@
+# پروتکل مؤثر: اگر پروکسی بالادستی (لودبالانسر/CDN) هدر X-Forwarded-Proto فرستاده
+# باشد همان ملاک است، وگرنه اسکیم خودِ این اتصال. بدون این تفکیک، در استقراری که
+# TLS را لایهٔ جلوتر تمام می‌کند، $scheme همیشه http است و HSTS هرگز فرستاده نمی‌شود.
+map $http_x_forwarded_proto $dbspulse_effective_scheme {
+    default $scheme;
+    ""      $scheme;
+    https   https;
+    http    http;
+}
+
+# HSTS فقط روی HTTPS. فرستادنش روی HTTP بی‌اثر نیست — خطرناک است: مرورگر همان
+# نام میزبان را برای یک سال به HTTPS سنجاق می‌کند، و یک استقرار توسعه/داخلی که
+# عمداً HTTP است از دسترس خارج می‌شود. nginx هدر با مقدار خالی را اصلاً اضافه نمی‌کند.
+#
+# includeSubDomains عمداً هست: استقرار این محصول تک‌مستأجر و روی نام میزبان
+# اختصاصی است. اگر روی همان دامنه زیردامنه‌ای دارید که باید HTTP بماند، این بخش
+# را بردارید. `preload` عمداً نیست — ثبت در فهرست preload یک تصمیم برگشت‌ناپذیر
+# است و باید آگاهانه و دستی انجام شود.
+map $dbspulse_effective_scheme $dbspulse_hsts {
+    default "";
+    https   "max-age=31536000; includeSubDomains";
+}
+
 server {
     listen ${PORT};
     server_name _;
@@ -12,12 +35,16 @@ server {
     add_header X-Frame-Options "DENY" always;
     add_header X-Content-Type-Options "nosniff" always;
     add_header Referrer-Policy "same-origin" always;
+    add_header Strict-Transport-Security $dbspulse_hsts always;
 
     # فایل‌های استاتیک با کش طولانی (نام‌گذاری هش‌شده توسط Vite)
     location /assets/ {
         expires 1y;
         add_header Cache-Control "public, immutable";
         add_header X-Content-Type-Options "nosniff" always;
+        # اگر نخستین درخواست کاربر مستقیماً به یک asset باشد، بدون این خط سیاست
+        # HSTS را در آن پاسخ نمی‌گرفت (add_header سطح server ارث نمی‌رسد).
+        add_header Strict-Transport-Security $dbspulse_hsts always;
     }
 
     # پروکسی درخواست‌های API به سرویس بک‌اند.

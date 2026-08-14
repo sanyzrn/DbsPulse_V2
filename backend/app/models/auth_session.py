@@ -23,3 +23,15 @@ class AuthSession(Base):
     rotated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     replaced_by_jti: Mapped[str | None] = mapped_column(String(64), nullable=True)
     revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+    # ── شناسایی نشست برای خودِ کاربر (P2-06)
+    #
+    # «شما سه نشست فعال دارید» بی‌فایده است اگر کاربر نتواند بگوید کدام‌یک خودش
+    # است. این سه ستون فقط برای همین‌اند: تشخیص «این لپ‌تاپ خودم است» از «این را
+    # نمی‌شناسم». عمداً user-agent خام ذخیره می‌شود نه تحلیل‌شده — تحلیلش کارِ
+    # نمایش است و رشتهٔ خام بعداً هم قابل بازخوانی است.
+    user_agent: Mapped[str | None] = mapped_column(String(400), nullable=True)
+    ip: Mapped[str | None] = mapped_column(String(45), nullable=True)  # جا برای IPv6
+    # با هر چرخش به‌روز می‌شود؛ «آخرین فعالیت» چیزی است که کاربر با آن نشستِ
+    # فراموش‌شده را از نشست جاری تشخیص می‌دهد.
+    last_used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)

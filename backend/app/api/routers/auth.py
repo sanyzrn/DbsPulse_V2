@@ -1,4 +1,5 @@
 import secrets
+from datetime import UTC, datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from sqlalchemy import select
@@ -16,6 +17,7 @@ from app.core.security import (
     verify_password,
 )
 from app.db.session import get_db
+from app.models.auth_session import AuthSession
 from app.models.user import User
 from app.schemas.auth import (
     AccessTokenResponse,
@@ -23,6 +25,7 @@ from app.schemas.auth import (
     CurrentUser,
     LoginRequest,
     LoginResponse,
+    SessionRead,
 )
 from app.services.audit import log_event
 from app.services.login_guard import (
@@ -33,6 +36,7 @@ from app.services.login_guard import (
 )
 from app.services.sessions import (
     RefreshReuseError,
+    active_sessions,
     create_session,
     revoke_all_for_user,
     revoke_session,
@@ -46,6 +50,26 @@ REFRESH_COOKIE = "dbspulse_refresh"
 # برای کاربر ناموجود هم یک verify واقعی انجام می‌دهیم تا از روی زمان پاسخ نتوان
 # نام‌های کاربری معتبر را حدس زد (timing attack).
 _DUMMY_PASSWORD_HASH = hash_password(secrets.token_hex(16))
+
+
+def _client_identity(request: Request) -> tuple[str | None, str | None]:
+    """(user-agent، آدرس) برای اینکه کاربر بعداً نشستش را بشناسد."""
+    return request.headers.get("user-agent"), (request.client.host if request.client else None)
+
+
+def _current_refresh_jti(request: Request) -> str | None:
+    """jti نشستی که این درخواست با آن آمده — برای علامت‌زدن «نشست جاری».
+
+    از کوکی refresh خوانده می‌شود نه توکن دسترسی: توکن دسترسی stateless است و
+    اصلاً نمی‌داند به کدام ردیف نشست تعلق دارد.
+    """
+    token = request.cookies.get(REFRESH_COOKIE)
+    if not token:
+        return None
+    data = decode_token(token)
+    if data is None or data.get("type") != "refresh":
+        return None
+    return data.get("jti")
 
 
 def _set_refresh_cookie(response: Response, refresh_token: str) -> None:
@@ -62,8 +86,15 @@ def _set_refresh_cookie(response: Response, refresh_token: str) -> None:
     )
 
 
-def _issue_login_response(response: Response, db: Session, user: User) -> LoginResponse:
-    jti = create_session(db, user.id)
+def _issue_login_response(
+    response: Response,
+    db: Session,
+    user: User,
+    *,
+    user_agent: str | None = None,
+    ip: str | None = None,
+) -> LoginResponse:
+    jti = create_session(db, user.id, user_agent=user_agent, ip=ip)
     db.commit()
     _set_refresh_cookie(
         response, create_refresh_token(user.id, user.role.value, user.token_version, jti)
@@ -143,7 +174,8 @@ def login(
         event_type="login_succeeded",
         new_value={"ip": client_ip},
     )
-    return _issue_login_response(response, db, user)
+    user_agent, ip = _client_identity(request)
+    return _issue_login_response(response, db, user, user_agent=user_agent, ip=ip)
 
 
 @router.post("/refresh", response_model=AccessTokenResponse)
@@ -170,7 +202,10 @@ def refresh(
         raise unauthorized
 
     try:
-        new_jti = rotate_session(db, user.id, data["jti"])
+        rotate_user_agent, rotate_ip = _client_identity(request)
+        new_jti = rotate_session(
+            db, user.id, data["jti"], user_agent=rotate_user_agent, ip=rotate_ip
+        )
         db.commit()
     except RefreshReuseError:
         # استفاده دوباره از توکن چرخیده/باطل = نشانه سرقت؛ همه نشست‌ها باطل شدند
@@ -200,6 +235,7 @@ def logout(request: Request, response: Response, db: Session = Depends(get_db)) 
 
 @router.post("/change-password", response_model=LoginResponse)
 def change_password(
+    request: Request,
     payload: ChangePasswordRequest,
     response: Response,
     db: Session = Depends(get_db),
@@ -230,9 +266,58 @@ def change_password(
     user.must_change_password = False
     revoke_all_for_user(db, user.id)
     log_event(db, actor_user_id=user.id, event_type="password_changed_self")
-    return _issue_login_response(response, db, user)
+    changed_user_agent, changed_ip = _client_identity(request)
+    return _issue_login_response(
+        response, db, user, user_agent=changed_user_agent, ip=changed_ip
+    )
 
 
 @router.get("/me", response_model=CurrentUser)
 def me(current_user: CurrentUser = Depends(get_current_user)) -> CurrentUser:
     return current_user
+
+
+@router.get("/sessions", response_model=list[SessionRead])
+def list_my_sessions(
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(get_current_user),
+) -> list[SessionRead]:
+    """نشست‌های فعال خودِ کاربر (P2-06).
+
+    تا امروز، ابطال نشست فقط «همه‌جا خارج شو» بود — که یعنی برای بستن یک دستگاهِ
+    گم‌شده باید همهٔ دستگاه‌های دیگر را هم از دست می‌دادی. اول باید بشود دید چه
+    چیزی باز است.
+    """
+    current_jti = _current_refresh_jti(request)
+    return [
+        SessionRead.model_validate(session).model_copy(
+            update={"is_current": session.jti == current_jti}
+        )
+        for session in active_sessions(db, current_user.id)
+    ]
+
+
+@router.delete("/sessions/{session_id}", status_code=status.HTTP_204_NO_CONTENT)
+def revoke_my_session(
+    session_id: int,
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(get_current_user),
+) -> None:
+    """بستن یک نشست مشخص.
+
+    شناسه با user_id خودِ کاربر تطبیق داده می‌شود، وگرنه هر کسی می‌توانست با حدس
+    زدن یک عدد، نشستِ کاربر دیگری را ببندد — یک انکار سرویسِ ساده و بی‌سروصدا.
+    """
+    session = db.get(AuthSession, session_id)
+    if session is None or session.user_id != current_user.id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="نشست یافت نشد")
+    if session.revoked_at is None:
+        session.revoked_at = datetime.now(UTC)
+        log_event(
+            db,
+            actor_user_id=current_user.id,
+            event_type="session_revoked",
+            new_value={"session_id": session.id},
+        )
+    db.commit()

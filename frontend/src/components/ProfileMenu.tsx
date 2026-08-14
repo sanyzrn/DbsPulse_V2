@@ -86,6 +86,19 @@ export function ProfileMenu({ user, onLogout }: { user: CurrentUser; onLogout: (
                 </span>
                 تغییر رمز عبور
               </NavLink>
+              <NavLink
+                to="/sessions"
+                onClick={() => setOpen(false)}
+                className="group flex items-center gap-2.5 rounded-xl px-2.5 py-2 text-sm text-gray-700 transition-colors hover:bg-gray-50"
+              >
+                <span className="flex h-8 w-8 flex-none items-center justify-center rounded-lg bg-gray-100 text-gray-600 transition-colors group-hover:bg-charcoal-900 group-hover:text-white">
+                  <svg viewBox="0 0 20 20" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <rect x="2.5" y="4" width="15" height="9" rx="1.5" />
+                    <path d="M7 16h6" />
+                  </svg>
+                </span>
+                نشست‌های فعال
+              </NavLink>
               <button
                 onClick={() => {
                   setOpen(false);

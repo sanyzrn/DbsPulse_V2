@@ -13,6 +13,9 @@ const VerifyPage = lazy(() => import("./pages/VerifyPage").then((m) => ({ defaul
 const ChangePasswordPage = lazy(() =>
   import("./pages/ChangePasswordPage").then((m) => ({ default: m.ChangePasswordPage }))
 );
+const SessionsPage = lazy(() =>
+  import("./pages/SessionsPage").then((m) => ({ default: m.SessionsPage }))
+);
 const EvaluationDetailPage = lazy(() =>
   import("./pages/EvaluationDetailPage").then((m) => ({ default: m.EvaluationDetailPage }))
 );
@@ -107,6 +110,7 @@ function App() {
           <Route element={<Layout />}>
             <Route path="/" element={<HomeRedirect />} />
             <Route path="/change-password" element={<ChangePasswordPage />} />
+            <Route path="/sessions" element={<SessionsPage />} />
             <Route path="/evaluations/:id" element={<EvaluationDetailPage />} />
             {/* برنامه‌های بهبود پشت گاردِ hr نیستند چون «مسئول پیگیری» هم باید
                 بتواند برنامهٔ سپرده‌شده به خودش را باز کند — زمان‌بند دقیقاً همین

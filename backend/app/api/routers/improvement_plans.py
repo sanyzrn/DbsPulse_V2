@@ -224,7 +224,7 @@ def create_plan(
                 "به شما به‌عنوان مسئول پیگیری سپرده شد"
             ),
             evaluation_record_id=record.id,
-            link=f"/hr/improvement-plans/{plan.id}",
+            link=f"/improvement-plans/{plan.id}",
         )
     db.commit()
     db.refresh(plan)
@@ -325,7 +325,7 @@ def update_plan(
                 "به شما به‌عنوان مسئول پیگیری سپرده شد"
             ),
             evaluation_record_id=plan.evaluation_record_id,
-            link=f"/hr/improvement-plans/{plan.id}",
+            link=f"/improvement-plans/{plan.id}",
         )
     log_event(
         db,

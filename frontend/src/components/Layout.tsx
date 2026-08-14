@@ -22,7 +22,7 @@ const NAV_BY_ROLE: Record<string, { to: string; label: string }[]> = {
     ...(FEATURE_PERIODS_ENABLED
       ? [{ to: "/hr/periods", label: "دوره‌های ارزیابی" }]
       : []),
-    { to: "/hr/improvement-plans", label: "برنامه‌های بهبود" },
+    { to: "/improvement-plans", label: "برنامه‌های بهبود" },
     { to: "/hr/audit-log", label: "گزارش رویدادها" },
   ],
   // مسئول واحد و معاونت ممکن است «مسئول پیگیریِ» یک برنامهٔ بهبود باشند (P1-10).
@@ -30,11 +30,11 @@ const NAV_BY_ROLE: Record<string, { to: string; label: string }[]> = {
   // رسیدن به آن، کلیک روی اعلان بود.
   unit_supervisor: [
     { to: "/supervisor", label: "افراد زیرمجموعه" },
-    { to: "/hr/improvement-plans", label: "برنامه‌های بهبود" },
+    { to: "/improvement-plans", label: "برنامه‌های بهبود" },
   ],
   deputy: [
     { to: "/deputy", label: "پرونده‌های در انتظار" },
-    { to: "/hr/improvement-plans", label: "برنامه‌های بهبود" },
+    { to: "/improvement-plans", label: "برنامه‌های بهبود" },
   ],
   ceo: [{ to: "/ceo", label: "پرونده‌های در انتظار" }],
   employee: [{ to: "/me", label: "کارنامه من" }],

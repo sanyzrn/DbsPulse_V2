@@ -207,7 +207,7 @@ def run_improvement_review_sweep(db: Session) -> int:
                 message=message,
                 dedup_key=f"improvement_review:{plan.id}:{plan.review_date.isoformat()}",
                 within_days=settings.notification_dedup_days,
-                link=f"/hr/improvement-plans/{plan.id}",
+                link=f"/improvement-plans/{plan.id}",
             ):
                 created += 1
     return created

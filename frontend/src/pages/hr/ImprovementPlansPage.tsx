@@ -295,7 +295,7 @@ export function ImprovementPlansPage() {
                 <span aria-hidden className={`h-1.5 w-1.5 rounded-full ${STATUS_DOT[p.status]}`} />
                 {IMPROVEMENT_PLAN_STATUS_LABELS[p.status]}
               </span>,
-              <Link key="details" to={`/hr/improvement-plans/${p.id}`} className="inline-flex items-center gap-1 text-sm font-medium text-pulse-600 hover:text-pulse-700">
+              <Link key="details" to={`/improvement-plans/${p.id}`} className="inline-flex items-center gap-1 text-sm font-medium text-pulse-600 hover:text-pulse-700">
                 جزئیات
                 <svg viewBox="0 0 20 20" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M7 5l5 5-5 5" />

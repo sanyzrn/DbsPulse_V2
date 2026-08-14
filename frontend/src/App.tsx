@@ -1,5 +1,5 @@
 import { lazy, Suspense } from "react";
-import { Navigate, Route, Routes } from "react-router-dom";
+import { Navigate, Route, Routes, useParams } from "react-router-dom";
 import { FEATURE_PERIODS_ENABLED } from "./appInfo";
 import { useAuth } from "./auth/AuthContext";
 import { ProtectedRoute } from "./auth/ProtectedRoute";
@@ -83,6 +83,12 @@ function DisabledFeature({ title }: { title: string }) {
   );
 }
 
+/** نشانی قدیمیِ جزئیات برنامهٔ بهبود، با حفظ شناسه. */
+export function LegacyImprovementPlanRedirect() {
+  const { id } = useParams();
+  return <Navigate to={`/improvement-plans/${id}`} replace />;
+}
+
 function HomeRedirect() {
   const { user } = useAuth();
   if (!user) return <Navigate to="/login" replace />;
@@ -115,9 +121,17 @@ function App() {
             {/* برنامه‌های بهبود پشت گاردِ hr نیستند چون «مسئول پیگیری» هم باید
                 بتواند برنامهٔ سپرده‌شده به خودش را باز کند — زمان‌بند دقیقاً همین
                 لینک را برایش می‌فرستد (P1-10). محدودیت واقعی سمت سرور است: غیرِ
-                HR فقط برنامه‌های خودش را می‌بیند و فقط اهداف را تیک می‌زند. */}
-            <Route path="/hr/improvement-plans" element={<ImprovementPlansPage />} />
-            <Route path="/hr/improvement-plans/:id" element={<ImprovementPlanDetailPage />} />
+                HR فقط برنامه‌های خودش را می‌بیند و فقط اهداف را تیک می‌زند.
+                به همین دلیل مسیر هم زیر /hr/ نیست: نشانیِ صفحه‌ای که مسئول واحد و
+                معاونت هر روز باز می‌کنند نباید بگوید مالِ منابع انسانی است. */}
+            <Route path="/improvement-plans" element={<ImprovementPlansPage />} />
+            <Route path="/improvement-plans/:id" element={<ImprovementPlanDetailPage />} />
+            {/* نشانی قدیمی: اعلان‌های ارسال‌شده و بوکمارک‌های موجود نباید بشکنند */}
+            <Route path="/hr/improvement-plans" element={<Navigate to="/improvement-plans" replace />} />
+            <Route
+              path="/hr/improvement-plans/:id"
+              element={<LegacyImprovementPlanRedirect />}
+            />
 
             <Route element={<ProtectedRoute allowedRoles={["hr"]} />}>
               <Route path="/hr/personnel" element={<PersonnelPage />} />

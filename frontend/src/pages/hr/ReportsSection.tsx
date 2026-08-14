@@ -1,15 +1,5 @@
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import {
-  Area,
-  AreaChart,
-  CartesianGrid,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from "recharts";
-import {
-  useEmployeeVsUnit,
   useIndicatorBreakdown,
   useIndicators,
   useOrgUnits,
@@ -17,28 +7,13 @@ import {
   useReportSummary,
 } from "../../api/queries";
 import { ChartDownloadCard } from "../../components/ChartDownloadCard";
-import { PersonPicker } from "../../components/PersonPicker";
 import { ExcelExportButton } from "../../components/ExcelExportButton";
 import { Card, EmptyState, FilterSelect, PageHeader, TableSkeleton } from "../../ui/Card";
 import { IndicatorScorePanel, type IndicatorSort } from "../../ui/IndicatorScorePanel";
-import { DotPlot, Dumbbell, fa1 } from "../../ui/plot";
+import { DotPlot, fa1 } from "../../ui/plot";
 import { CountUp, ScoreRing } from "../../ui/Meters";
 import { JalaliDatePicker } from "../../ui/JalaliDatePicker";
 import type { ReportFilters } from "../../types";
-
-const SERIES_COLOR = "#b61615";
-const GRID_STROKE = "#eef0f4";
-const AXIS_STROKE = "#e5e7eb";
-const TICK_STYLE = { fontSize: 11, fill: "#6b7280", fontFamily: "Vazirmatn, Tahoma, sans-serif" };
-const TOOLTIP_STYLE = {
-  direction: "rtl" as const,
-  fontFamily: "Vazirmatn, Tahoma, sans-serif",
-  fontSize: 12,
-  borderRadius: 12,
-  border: "1px solid #eef0f4",
-  boxShadow: "0 12px 40px rgba(0,0,0,0.12)",
-  background: "rgba(255,255,255,0.97)",
-};
 
 function faNum(value: unknown): string {
   return typeof value === "number" ? value.toLocaleString("fa-IR") : String(value);
@@ -59,7 +34,12 @@ const inputClass =
   "w-full rounded-xl border border-gray-200 bg-gray-100 px-3 py-1.5 text-sm text-gray-700 outline-none transition-colors duration-150 focus:border-pulse-500 focus:bg-white";
 
 /** بخش گزارش‌های تحلیلی فیلترشونده — جدا از کارت‌های خلاصهٔ همیشگیِ بالای داشبورد.
- * همهٔ فیلترها ترکیب‌پذیرند و روی همهٔ نمودارها/خروجی‌های این بخش اعمال می‌شوند. */
+ * همهٔ فیلترها ترکیب‌پذیرند و روی همهٔ نمودارها/خروجی‌های این بخش اعمال می‌شوند.
+ *
+ * این بخش عمداً هیچ فیلتر «یک فردِ مشخص» ندارد: هرچه دربارهٔ یک نفر است در زیرتب
+ * «کارنامهٔ فرد» جمع شده (PersonScorecard). فیلتر پرسنل این‌جا دو مشکل داشت —
+ * دومین انتخابگرِ فرد در صفحه بود که با انتخابگر آن تب هماهنگ نمی‌شد، و
+ * محدودکردن یک گزارشِ *سازمانی* به یک نفر، سرکوب کوهورت را هم بی‌اثر می‌کرد. */
 export function ReportsSection() {
   const [filters, setFilters] = useState<ReportFilters>({});
   const [selectedIndicatorId, setSelectedIndicatorId] = useState<number | null>(null);
@@ -84,17 +64,6 @@ export function ReportsSection() {
     selectedIndicatorId,
     filters
   );
-  const employeeFilters = useMemo(
-    () => ({
-      period_id: filters.period_id,
-      created_from: filters.created_from,
-      created_to: filters.created_to,
-    }),
-    [filters.period_id, filters.created_from, filters.created_to]
-  );
-  const { data: empVsUnit } = useEmployeeVsUnit(filters.personnel_id ?? null, employeeFilters);
-
-  const selectedPersonName = empVsUnit?.full_name ?? null;
 
   function patch(next: Partial<ReportFilters>) {
     setFilters((prev) => ({ ...prev, ...next }));
@@ -129,9 +98,6 @@ export function ReportsSection() {
       value: u.avg_score!,
       note: `${faNum(u.count)} نمره`,
     }));
-  // یکی از دو طرف کافی است؛ Dumbbell خودش طرفِ نبود را «—» نشان می‌دهد.
-  const hasComparison =
-    empVsUnit != null && (empVsUnit.employee_avg !== null || empVsUnit.unit_avg !== null);
 
   return (
     <div className="space-y-4">
@@ -208,18 +174,6 @@ export function ReportsSection() {
               <option value="inactive">فقط غیرفعال</option>
             </FilterSelect>
           </label>
-
-          {/* یک کنترل به‌جای «input جست‌وجو + select» — جست‌وجو سمت سرور است، پس
-              طول فهرست پرسنل مهم نیست. */}
-          <div className="flex flex-col gap-1 text-xs font-medium text-gray-600">
-            پرسنل مشخص
-            <PersonPicker
-              value={filters.personnel_id ?? null}
-              onChange={(id) => patch({ personnel_id: id ?? undefined })}
-              placeholder="همهٔ پرسنل"
-              aria-label="انتخاب پرسنل"
-            />
-          </div>
 
           <label className="flex flex-col gap-1 text-xs font-medium text-gray-600">
             از تاریخ شروع ارزیابی
@@ -426,55 +380,6 @@ export function ReportsSection() {
         )}
       </ChartDownloadCard>
 
-      {/* ── مقایسهٔ فرد با میانگین واحد ── */}
-      <ChartDownloadCard
-        title="مقایسهٔ امتیاز فرد با میانگین واحد سازمانی"
-        subtitle="یک «پرسنل مشخص» از فیلترهای بالا انتخاب کنید تا امتیاز او در برابر میانگین واحدش دیده شود."
-        filename="employee-vs-unit.png"
-      >
-        {!filters.personnel_id ? (
-          <EmptyState>برای مقایسه، از نوار فیلتر یک «پرسنل مشخص» انتخاب کنید.</EmptyState>
-        ) : !hasComparison ? (
-          <EmptyState>برای این فرد و فیلترها نتیجهٔ نهایی‌شده‌ای وجود ندارد.</EmptyState>
-        ) : (
-          <>
-            {/* دو میلهٔ جدا، خواننده را وادار می‌کرد ارتفاع‌ها را با چشم تفریق کند؛
-                سؤال واقعی «چقدر فاصله؟» است، پس فاصله خودش نشانهٔ اصلی شد. */}
-            <Dumbbell
-              a={{
-                label: selectedPersonName ?? "این فرد",
-                value: empVsUnit?.employee_avg ?? null,
-                note: `${faNum(empVsUnit?.evaluation_count ?? 0)} ارزیابی`,
-              }}
-              b={{
-                label: `میانگین واحد «${empVsUnit?.org_unit}»`,
-                value: empVsUnit?.unit_avg ?? null,
-                note: `${faNum(empVsUnit?.unit_evaluation_count ?? 0)} ارزیابی`,
-              }}
-              ariaLabel="مقایسهٔ امتیاز فرد با میانگین واحد سازمانی"
-            />
-            {(empVsUnit?.per_evaluation.length ?? 0) > 1 && (
-              <div className="mt-4">
-                <h4 className="mb-2 text-sm font-semibold text-gray-600">روند امتیاز نهایی این فرد</h4>
-                <div style={{ height: 200 }}>
-                  <ResponsiveContainer>
-                    <AreaChart
-                      data={empVsUnit?.per_evaluation.map((p) => ({ name: p.evaluation_code, مقدار: p.final_weighted_pct }))}
-                      margin={{ top: 8, right: 16, bottom: 8, left: 0 }}
-                    >
-                      <CartesianGrid strokeDasharray="4 4" stroke={GRID_STROKE} vertical={false} />
-                      <XAxis dataKey="name" tick={TICK_STYLE} tickLine={false} axisLine={{ stroke: AXIS_STROKE }} />
-                      <YAxis domain={[0, 100]} tick={TICK_STYLE} tickLine={false} axisLine={false} width={36} />
-                      <Tooltip contentStyle={TOOLTIP_STYLE} formatter={faNum} />
-                      <Area type="monotone" dataKey="مقدار" stroke={SERIES_COLOR} strokeWidth={2.5} fill="rgba(182,22,21,0.12)" dot={{ r: 4, fill: "#fff", strokeWidth: 2.5, stroke: SERIES_COLOR }} />
-                    </AreaChart>
-                  </ResponsiveContainer>
-                </div>
-              </div>
-            )}
-          </>
-        )}
-      </ChartDownloadCard>
     </div>
   );
 }

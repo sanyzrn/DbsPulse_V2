@@ -2,18 +2,11 @@ import { useState } from "react";
 import { motion } from "motion/react";
 import { useQueryClient } from "@tanstack/react-query";
 import { apiClient, extractErrorMessage } from "../../api/client";
-import {
-  useDashboardOverview,
-  useExpiringContracts,
-  usePipeline,
-  usePersonRadar,
-  usePersonTrend,
-} from "../../api/queries";
+import { useDashboardOverview, useExpiringContracts, usePipeline } from "../../api/queries";
 import { RoleOverviewCards } from "../../components/RoleOverviewCards";
 import { StatusBadge } from "../../components/StatusBadge";
 import { useToast } from "../../components/Toast";
-import { CompetencyRadar, ScoreTrend } from "../../components/PersonCharts";
-import { PersonPicker } from "../../components/PersonPicker";
+import { PersonScorecard } from "./PersonScorecard";
 import { ReportsSection } from "./ReportsSection";
 import { PageHeader } from "../../ui/Card";
 import { CountUp, PctBadge, ScoreRing, SuppressedValue } from "../../ui/Meters";
@@ -41,14 +34,10 @@ const ANALYSIS_SUBTABS = [
 ];
 
 export function DashboardPage() {
-  const [selectedPersonId, setSelectedPersonId] = useState<number | null>(null);
   const [tab, setTab] = useState<"overview" | "analysis">("overview");
   const [analysisTab, setAnalysisTab] = useState<"org" | "reports" | "person">("org");
 
   const { data: overview, error: overviewError } = useDashboardOverview();
-  // React Query خودش پاسخ‌های کهنه (تعویض سریع فرد انتخاب‌شده) را کنار می‌گذارد
-  const { data: radar = [] } = usePersonRadar(selectedPersonId);
-  const { data: trend = [] } = usePersonTrend(selectedPersonId);
 
   if (overviewError != null)
     return <p className="p-6 text-center text-sm text-red-600">{extractErrorMessage(overviewError)}</p>;
@@ -223,32 +212,8 @@ export function DashboardPage() {
       </div>
       )}
 
-      {/* ── کارت رادار + روند فرد ── */}
-      {analysisTab === "person" && (
-      <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-card">
-        <h2 className="mb-3 text-base font-bold text-gray-900">نمودار رادار شایستگی و روند فرد</h2>
-        <div className="mb-4 sm:max-w-sm">
-          <PersonPicker
-            value={selectedPersonId}
-            onChange={setSelectedPersonId}
-            placeholder="— انتخاب فرد —"
-          />
-        </div>
-
-        {selectedPersonId && (
-          <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-            <div>
-              <h3 className="mb-3 text-sm font-semibold text-gray-600">میانگین امتیاز هر شاخص (از ۵)</h3>
-              <CompetencyRadar data={radar} gradientId="radar-fill" />
-            </div>
-            <div>
-              <h3 className="mb-3 text-sm font-semibold text-gray-600">روند امتیاز نهایی (٪)</h3>
-              <ScoreTrend data={trend} gradientId="trend-fill" />
-            </div>
-          </div>
-        )}
-      </div>
-      )}
+      {/* ── کارنامهٔ یک فرد: مقایسه با واحد + رادار + روند، با یک انتخابگر ── */}
+      {analysisTab === "person" && <PersonScorecard />}
 
       {/* ── گزارش‌های تحلیلی فیلترشونده ── */}
       {analysisTab === "reports" && <ReportsSection />}

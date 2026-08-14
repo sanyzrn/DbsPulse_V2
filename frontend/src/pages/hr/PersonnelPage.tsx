@@ -11,6 +11,7 @@ import { EmployeeProfileModal } from "../../components/EmployeeProfileModal";
 import { ExcelExportButton } from "../../components/ExcelExportButton";
 import { PaginationControls } from "../../components/PaginationControls";
 import { useToast } from "../../components/Toast";
+import { generatePassword } from "../../utils/password";
 import { Button } from "../../ui/Button";
 import { FilterSelect, PageHeader, TableSkeleton } from "../../ui/Card";
 import { Modal } from "../../ui/Modal";
@@ -58,11 +59,6 @@ function suggestUsername(personnelCode: string): string {
 }
 
 /** رمز موقتِ قوی. HR باید آن را به فرد بدهد، پس باید بتواند ببیندش. */
-function generatePassword(): string {
-  const alphabet = "abcdefghijkmnopqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-  const bytes = crypto.getRandomValues(new Uint32Array(14));
-  return Array.from(bytes, (n) => alphabet[n % alphabet.length]).join("");
-}
 
 /** کلاس استاندارد فیلد ورودی مدرن. */
 const inputClass =

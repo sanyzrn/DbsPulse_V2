@@ -212,6 +212,15 @@ def change_password(
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST, detail="رمز عبور جدید نباید با رمز فعلی یکسان باشد"
         )
+    # نام کاربری داخل رمز، رمز را عملاً حدس‌زدنی می‌کند و اولین چیزی است که هر
+    # فهرست حملهٔ آماده امتحان می‌کند. فرم هم همین را نشان می‌دهد؛ اگر فقط سمت
+    # کلاینت بررسی می‌شد، یک درخواست مستقیم دورش می‌زد و رابط کاربری دربارهٔ
+    # قانون دروغ گفته بود.
+    if len(user.username) >= 3 and user.username.lower() in payload.new_password.lower():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="رمز عبور جدید نباید شامل نام کاربری باشد",
+        )
 
     user.password_hash = hash_password(payload.new_password)
     # تمام نشست‌ها و توکن‌های قبلی (همه دستگاه‌ها) باطل می‌شوند

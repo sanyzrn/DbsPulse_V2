@@ -120,3 +120,52 @@ def test_change_password_rotates_credentials_and_clears_flag(client, db_session)
     )
     assert r.status_code == 200
     assert r.json()["must_change_password"] is False
+
+
+def test_new_password_may_not_contain_the_username(client, db_session):
+    """قاعده‌ای که فرم نشان می‌دهد باید سمت سرور هم اعمال شود.
+
+    اگر فقط در کلاینت بررسی می‌شد، یک درخواست مستقیم دورش می‌زد — و آن‌وقت رابط
+    کاربری دربارهٔ قانون دروغ گفته بود. نام کاربری داخل رمز، اولین چیزی است که
+    هر فهرست حملهٔ آماده امتحان می‌کند.
+    """
+    user = make_user(db_session, "hr", username="karbar_hr")
+    db_session.commit()
+
+    r = client.post(
+        "/api/auth/change-password",
+        json={"current_password": "Test1234!", "new_password": "Karbar_HR-2026!"},
+        headers=auth_header(user),
+    )
+
+    assert r.status_code == 400
+    assert "نام کاربری" in r.json()["detail"]
+
+
+def test_a_password_without_the_username_is_accepted(client, db_session):
+    """گارد نباید مسیر عادی را ببندد."""
+    user = make_user(db_session, "hr", username="karbar_hr")
+    db_session.commit()
+
+    r = client.post(
+        "/api/auth/change-password",
+        json={"current_password": "Test1234!", "new_password": "Correct-Horse-9!"},
+        headers=auth_header(user),
+    )
+
+    assert r.status_code == 200
+
+
+def test_a_short_username_does_not_block_every_password(client, db_session):
+    """با نام کاربری دو-حرفی، تقریباً هر عبارتی جایی آن دو حرف را دارد؛ گارد باید
+    زیر سه نویسه غیرفعال باشد وگرنه کاربر عملاً نمی‌تواند رمز عوض کند."""
+    user = make_user(db_session, "hr", username="ab")
+    db_session.commit()
+
+    r = client.post(
+        "/api/auth/change-password",
+        json={"current_password": "Test1234!", "new_password": "Fabulous-Thing-9!"},
+        headers=auth_header(user),
+    )
+
+    assert r.status_code == 200

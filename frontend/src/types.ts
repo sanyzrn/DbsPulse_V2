@@ -508,5 +508,9 @@ export interface PeriodProgress {
   eligible: number;
   started: number;
   finalized: number;
+  /** شروع‌شده ولی نهایی‌نشده — نقطهٔ تصمیمِ بستن دوره */
+  in_progress: number;
+  /** کل شروع‌نشده‌ها؛ `not_started` ممکن است بریده شده باشد */
+  not_started_total: number;
   not_started: NotStartedPersonnel[];
 }

@@ -29,6 +29,8 @@ export function PeriodsPage() {
 
   const { data: periods = [], error: loadError } = usePeriods();
   const openPeriod = periods.find((p) => p.status === "open") ?? null;
+  // برای پیام تأیید بستن: چند پرونده هنوز وسط گردش‌کار است
+  const { data: openProgress } = usePeriodProgress(openPeriod?.id ?? null);
 
   async function invalidate() {
     await queryClient.invalidateQueries({ queryKey: ["periods"] });
@@ -50,9 +52,26 @@ export function PeriodsPage() {
   }
 
   async function closePeriod(period: EvaluationPeriod) {
+    // بستن دوره‌ای که ده پرونده وسط گردش‌کار دارد، اشتباهی است که باید *پیش* از
+    // انجامش دیده شود. پرونده‌های باز از بین نمی‌روند و برچسب همین دوره را نگه
+    // می‌دارند، ولی HR باید بداند دارد روی چه چیزی خط می‌کشد.
+    const stillOpen = openProgress?.in_progress ?? 0;
+    const notStarted = openProgress?.not_started_total ?? 0;
+    const warnings = [
+      stillOpen > 0
+        ? `${stillOpen.toLocaleString("fa-IR")} پرونده هنوز وسط گردش‌کار است (باز می‌مانند و برچسب همین دوره را نگه می‌دارند).`
+        : null,
+      notStarted > 0
+        ? `برای ${notStarted.toLocaleString("fa-IR")} نفر هیچ ارزیابی‌ای شروع نشده است.`
+        : null,
+    ].filter(Boolean);
+
     const ok = await confirm({
       title: `بستن دوره «${period.name}»؟`,
-      description: "پس از بستن، ارزیابی‌های جدید دیگر به این دوره برچسب نمی‌خورند.",
+      description: [
+        "پس از بستن، ارزیابی‌های جدید دیگر به این دوره برچسب نمی‌خورند.",
+        ...warnings,
+      ].join(" "),
       confirmLabel: "بستن دوره",
     });
     if (!ok) return;
@@ -158,6 +177,8 @@ function OpenPeriodCard({ period, onClose }: { period: EvaluationPeriod; onClose
   const eligible = progress?.eligible ?? 0;
   const started = progress?.started ?? 0;
   const finalized = progress?.finalized ?? 0;
+  const inProgress = progress?.in_progress ?? 0;
+  const notStartedTotal = progress?.not_started_total ?? 0;
   const pct = (value: number) => (eligible ? Math.round((value / eligible) * 100) : 0);
 
   return (
@@ -190,7 +211,7 @@ function OpenPeriodCard({ period, onClose }: { period: EvaluationPeriod; onClose
 
       {progress && (
         <>
-          <div className="mb-4 grid grid-cols-1 gap-3 text-center text-sm sm:grid-cols-3">
+          <div className="mb-4 grid grid-cols-1 gap-3 text-center text-sm sm:grid-cols-2 lg:grid-cols-4">
             <div className="rounded-2xl bg-gray-50 p-4">
               <p className="text-xs text-gray-500">واجدان ارزیابی</p>
               <p className="mt-1 text-2xl font-extrabold tabular-nums text-gray-900">
@@ -207,6 +228,15 @@ function OpenPeriodCard({ period, onClose }: { period: EvaluationPeriod; onClose
               </p>
               <PctBar value={pct(started)} tone="green" className="mt-2" />
             </div>
+            <div className="rounded-2xl bg-amber-50 p-4">
+              <p className="text-xs text-amber-700">در جریان</p>
+              <p className="mt-1 text-2xl font-extrabold tabular-nums text-amber-800">
+                <CountUp value={inProgress} format="plain" />
+              </p>
+              <p className="mt-2 text-[11px] text-amber-700">
+                {inProgress > 0 ? "پیش از بستن دوره تعیین تکلیف شوند" : "پرونده‌ای باز نمانده"}
+              </p>
+            </div>
             <div className="rounded-2xl bg-green-50 p-4">
               <p className="text-xs text-green-600">نهایی شده</p>
               <p className="mt-1 text-2xl font-extrabold tabular-nums text-green-700">
@@ -222,8 +252,8 @@ function OpenPeriodCard({ period, onClose }: { period: EvaluationPeriod; onClose
           {progress.not_started.length > 0 && (
             <div>
               <h3 className="mb-2 flex items-center gap-2 text-sm font-bold text-amber-700">
-                <span className="flex h-5 w-5 items-center justify-center rounded-md bg-amber-100 text-[10px]">
-                  {progress.not_started.length.toLocaleString("fa-IR")}
+                <span className="flex h-5 min-w-5 items-center justify-center rounded-md bg-amber-100 px-1 text-[10px]">
+                  {notStartedTotal.toLocaleString("fa-IR")}
                 </span>
                 هنوز آغاز نشده
               </h3>
@@ -245,6 +275,12 @@ function OpenPeriodCard({ period, onClose }: { period: EvaluationPeriod; onClose
                   </tbody>
                 </table>
               </div>
+              {notStartedTotal > progress.not_started.length && (
+                <p className="mt-2 text-xs text-gray-400">
+                  {progress.not_started.length.toLocaleString("fa-IR")} نفر نخست نمایش داده
+                  شده‌اند؛ مجموع {notStartedTotal.toLocaleString("fa-IR")} نفر است.
+                </p>
+              )}
             </div>
           )}
           {progress.not_started.length === 0 && (

@@ -17,8 +17,13 @@ from app.schemas.auth import CurrentUser
 from app.schemas.period import NotStartedPersonnel, PeriodCreate, PeriodProgress, PeriodRead
 from app.services.audit import log_event
 from app.services.notifications import notify
+from app.services.workflow import IS_OPEN_RECORD
 
 router = APIRouter(prefix="/api/periods", tags=["periods"])
+
+# سقف فهرست «شروع‌نشده‌ها». تعداد کل جداگانه برگردانده می‌شود، پس بریدن فهرست
+# چیزی را پنهان نمی‌کند — فقط جلوی پاسخِ چندهزارردیفی را می‌گیرد.
+NOT_STARTED_LIMIT = 200
 
 
 def _get_period_or_404(db: Session, period_id: int) -> EvaluationPeriod:
@@ -156,6 +161,18 @@ def period_progress(
         or 0
     )
 
+    # پرونده‌های همین دوره که هنوز وسط گردش‌کارند. عمداً «started - finalized»
+    # حساب نمی‌شود: پرونده‌های لغوشده نه بازند نه نهایی، و آن تفریق آن‌ها را هم
+    # «در جریان» نشان می‌داد.
+    in_progress = (
+        db.scalar(
+            select(func.count())
+            .select_from(EvaluationRecord)
+            .where(EvaluationRecord.period_id == period_id, IS_OPEN_RECORD)
+        )
+        or 0
+    )
+
     has_period_evaluation = (
         select(EvaluationRecord.id)
         .where(
@@ -164,11 +181,16 @@ def period_progress(
         )
         .exists()
     )
-    not_started_rows = db.execute(
+    not_started_query = (
         select(Personnel.id, Personnel.full_name, Personnel.org_unit)
         .join(EvaluationAccess, EvaluationAccess.personnel_id == Personnel.id)
         .where(Personnel.status == PersonnelStatus.active, ~has_period_evaluation)
-        .order_by(Personnel.full_name)
+    )
+    not_started_total = (
+        db.scalar(select(func.count()).select_from(not_started_query.subquery())) or 0
+    )
+    not_started_rows = db.execute(
+        not_started_query.order_by(Personnel.full_name).limit(NOT_STARTED_LIMIT)
     ).all()
 
     return PeriodProgress(
@@ -176,6 +198,8 @@ def period_progress(
         eligible=eligible,
         started=started,
         finalized=finalized,
+        in_progress=in_progress,
+        not_started_total=not_started_total,
         not_started=[
             NotStartedPersonnel(personnel_id=pid, full_name=name, org_unit=unit)
             for pid, name, unit in not_started_rows

@@ -19,6 +19,7 @@ from datetime import UTC, datetime
 from sqlalchemy import select, text
 from sqlalchemy.orm import Session
 
+from app.core.metrics import sweep_runs
 from app.models.scheduler_run import SchedulerRun
 
 logger = logging.getLogger("dbspulse.scheduler")
@@ -46,6 +47,7 @@ def run_sweeps_once(
     """
     if not _acquire_leader_lock(db):
         logger.info("sweep skipped: another instance holds the leader lock")
+        sweep_runs.labels(outcome="skipped_locked").inc()
         run = SchedulerRun(status="skipped_locked", trigger=trigger, finished_at=datetime.now(UTC))
         db.add(run)
         db.commit()
@@ -57,12 +59,14 @@ def run_sweeps_once(
     try:
         summary = runner(db)
         run.status = "succeeded"
+        sweep_runs.labels(outcome="succeeded").inc()
         run.summary = summary
         if any(summary.values()):
             logger.info("sweep created notifications: %s", summary)
     except Exception as exc:
         db.rollback()
         # ردیف اجرا باید حتی وقتی کار شکست خورده باقی بماند، وگرنه شکست بی‌صدا می‌شود.
+        sweep_runs.labels(outcome="failed").inc()
         run = SchedulerRun(status="failed", trigger=trigger, error=str(exc)[:2000])
         db.add(run)
         logger.exception("scheduled sweep failed")

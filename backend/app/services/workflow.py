@@ -14,6 +14,7 @@ from fastapi import status as http_status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.core.metrics import workflow_transitions
 from app.models.enums import EvaluationStatus, UserRole
 from app.models.evaluation import EvaluationRecord, EvaluationScore
 from app.models.indicator import Indicator
@@ -199,6 +200,8 @@ def apply_transition(
         old_value={"status": old_status.value},
         new_value={"status": record.status.value},
     )
+    # «چند پرونده امروز به هر مرحله رفت» — افت ناگهانی یعنی جایی گیر کرده است
+    workflow_transitions.labels(to_status=record.status.value).inc()
     # نفر بعدی زنجیره در همان تراکنش اعلان می‌گیرد (import محلی برای پرهیز از حلقه import)
     from app.services.notifications import notify_for_workflow_action
 

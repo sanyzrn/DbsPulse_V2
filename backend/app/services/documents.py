@@ -5,6 +5,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
+from app.core.metrics import pdf_renders
 from app.models.evaluation import EvaluationRecord
 from app.models.evaluation_document import EvaluationDocument
 from app.services.pdf import render_evaluation_summary_pdf, weasyprint_available
@@ -37,6 +38,7 @@ def archive_final_pdf(db: Session, record: EvaluationRecord) -> EvaluationDocume
         return existing
 
     if not weasyprint_available():
+        pdf_renders.labels(outcome="skipped_no_weasyprint").inc()
         logger.warning(
             "Skipping PDF archival for evaluation %s: WeasyPrint native libraries "
             "are not installed. The evaluation will still be finalized successfully.",
@@ -51,6 +53,7 @@ def archive_final_pdf(db: Session, record: EvaluationRecord) -> EvaluationDocume
     try:
         pdf_bytes = render_evaluation_summary_pdf(record.final_snapshot, verify_url=verify_url)
     except RuntimeError:
+        pdf_renders.labels(outcome="failed").inc()
         logger.warning(
             "PDF generation failed for evaluation %s; skipping archival. "
             "The evaluation will still be finalized.",
@@ -59,6 +62,7 @@ def archive_final_pdf(db: Session, record: EvaluationRecord) -> EvaluationDocume
         )
         return None
 
+    pdf_renders.labels(outcome="succeeded").inc()
     sha256 = hashlib.sha256(pdf_bytes).hexdigest()
     document = EvaluationDocument(
         evaluation_record_id=record.id, pdf_bytes=pdf_bytes, sha256=sha256

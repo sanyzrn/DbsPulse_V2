@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user
 from app.core.config import settings
+from app.core.metrics import auth_failures
 from app.core.rate_limit import limiter
 from app.core.security import (
     create_access_token,
@@ -103,6 +104,7 @@ def login(
 
     def _fail(user_id: int | None) -> None:
         """شکست را می‌شمارد و در صورت رسیدن به آستانه قفل می‌کند + به HR خبر می‌دهد."""
+        auth_failures.labels(reason="bad_credentials").inc()
         locked = record_failure(db, payload.username)
         if user_id is not None:
             log_event(

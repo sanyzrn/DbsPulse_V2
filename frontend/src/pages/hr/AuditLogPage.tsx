@@ -3,9 +3,7 @@ import { AnimatePresence, motion } from "motion/react";
 import { extractErrorMessage } from "../../api/client";
 import {
   useAuditLog,
-  useDebouncedValue,
   useOrgUnits,
-  usePersonnelList,
   useUsersList,
 } from "../../api/queries";
 import { AuditIntegrityBadge } from "../../components/AuditIntegrityBadge";
@@ -16,7 +14,9 @@ import { JalaliDatePicker } from "../../ui/JalaliDatePicker";
 import { Table } from "../../ui/Table";
 import { EASE_SOFT } from "../../ui/motion";
 import { formatDateTime } from "../../utils/dates";
-import { AUDIT_EVENT_LABELS, ROLE_LABELS, type AuditLogEntry } from "../../types";
+import { AUDIT_EVENT_LABELS, ROLE_LABELS } from "../../types";
+import { AuditDetails } from "../../components/AuditDetails";
+import { PersonPicker } from "../../components/PersonPicker";
 
 const PAGE_SIZE = 20;
 
@@ -25,12 +25,6 @@ const EVENT_TYPES = Object.keys(AUDIT_EVENT_LABELS);
 const filterInputClass =
   "w-full appearance-none rounded-xl border border-gray-200 bg-gray-100 px-3 py-1.5 text-sm text-gray-700 outline-none transition-colors duration-150 focus:border-pulse-500 focus:bg-white";
 
-function formatDetails(entry: AuditLogEntry): string {
-  const parts: string[] = [];
-  if (entry.old_value) parts.push(`قبل: ${JSON.stringify(entry.old_value)}`);
-  if (entry.new_value) parts.push(`بعد: ${JSON.stringify(entry.new_value)}`);
-  return parts.join(" — ");
-}
 
 interface Filters {
   eventType: string;
@@ -63,21 +57,12 @@ function todayIso(): string {
  * را دقیق و جدا مرور کند، نه فقط اسکرول کل رویدادها. */
 export function AuditLogPage() {
   const [filters, setFilters] = useState<Filters>(EMPTY_FILTERS);
-  const [personnelSearch, setPersonnelSearch] = useState("");
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [page, setPage] = useState(0);
-  const debouncedPersonnelSearch = useDebouncedValue(personnelSearch);
 
   const { data: orgUnits = [] } = useOrgUnits(true);
   const { data: usersPage } = useUsersList({ limit: 200 });
   const users = usersPage?.items ?? [];
-  const { data: personnelResults } = usePersonnelList({
-    q: debouncedPersonnelSearch,
-    limit: 30,
-    offset: 0,
-  });
-  const personnelOptions = personnelResults?.items ?? [];
-  const selectedPersonName = personnelOptions.find((p) => p.id === filters.personnelId)?.full_name;
 
   const requestParams = {
     event_type: filters.eventType || undefined,
@@ -109,7 +94,6 @@ export function AuditLogPage() {
   }
   function resetFilters() {
     setFilters(EMPTY_FILTERS);
-    setPersonnelSearch("");
     setPage(0);
   }
 
@@ -205,28 +189,12 @@ export function AuditLogPage() {
 
               <div className="flex flex-col gap-1 text-xs font-medium text-gray-600">
                 پرسنل مشخص
-                <input
-                  className={filterInputClass}
-                  placeholder="جست‌وجوی نام…"
-                  value={personnelSearch}
-                  onChange={(e) => setPersonnelSearch(e.target.value)}
-                />
-                <select
+                <PersonPicker
+                  value={filters.personnelId || null}
+                  onChange={(id) => patch({ personnelId: id ?? "" })}
+                  placeholder="همهٔ پرسنل"
                   aria-label="انتخاب پرسنل"
-                  className={filterInputClass}
-                  value={filters.personnelId}
-                  onChange={(e) => patch({ personnelId: e.target.value ? Number(e.target.value) : "" })}
-                >
-                  <option value="">همهٔ پرسنل</option>
-                  {filters.personnelId && selectedPersonName && !personnelOptions.some((p) => p.id === filters.personnelId) && (
-                    <option value={filters.personnelId}>{selectedPersonName}</option>
-                  )}
-                  {personnelOptions.map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.full_name} ({p.org_unit})
-                    </option>
-                  ))}
-                </select>
+                />
               </div>
 
               <label className="flex flex-col gap-1 text-xs font-medium text-gray-600">
@@ -334,9 +302,9 @@ export function AuditLogPage() {
                 <span key="code" className="text-gray-500">
                   {entry.evaluation_code ?? "—"}
                 </span>,
-                <span key="details" className="block max-w-md break-words text-xs text-gray-500">
-                  {formatDetails(entry)}
-                </span>,
+                <div key="details" className="max-w-md break-words">
+                  <AuditDetails oldValue={entry.old_value} newValue={entry.new_value} />
+                </div>,
               ])}
             />
           )}

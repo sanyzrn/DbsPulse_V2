@@ -1,18 +1,4 @@
 import { useState } from "react";
-import {
-  Radar,
-  RadarChart,
-  PolarGrid,
-  PolarAngleAxis,
-  PolarRadiusAxis,
-  Area,
-  AreaChart,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-} from "recharts";
 import { motion } from "motion/react";
 import { useQueryClient } from "@tanstack/react-query";
 import { apiClient, extractErrorMessage } from "../../api/client";
@@ -22,11 +8,12 @@ import {
   usePipeline,
   usePersonRadar,
   usePersonTrend,
-  usePersonnelList,
 } from "../../api/queries";
 import { RoleOverviewCards } from "../../components/RoleOverviewCards";
 import { StatusBadge } from "../../components/StatusBadge";
 import { useToast } from "../../components/Toast";
+import { CompetencyRadar, ScoreTrend } from "../../components/PersonCharts";
+import { PersonPicker } from "../../components/PersonPicker";
 import { ReportsSection } from "./ReportsSection";
 import { PageHeader } from "../../ui/Card";
 import { CountUp, PctBadge, ScoreRing, SuppressedValue } from "../../ui/Meters";
@@ -40,21 +27,6 @@ import type { EvaluationStatus } from "../../types";
    نمودارهای این صفحه تک‌سری‌اند (بزرگی/magnitude) — یک هیو واحد به‌جای گرادیانت
    دورنگهٔ قبلی (قرمز به طوسی تیره) که کدر و شلوغ به‌نظر می‌رسید
    ═══════════════════════════════════════════════════════════════════════ */
-const SERIES_COLOR = "#b61615"; // pulse-600
-const GRID_STROKE = "#eef0f4";
-const AXIS_STROKE = "#e5e7eb";
-
-const TICK_STYLE = { fontSize: 11, fill: "#6b7280", fontFamily: "Vazirmatn, Tahoma, sans-serif" };
-const TOOLTIP_STYLE = {
-  direction: "rtl" as const,
-  fontFamily: "Vazirmatn, Tahoma, sans-serif",
-  fontSize: 12,
-  borderRadius: 12,
-  border: "1px solid #eef0f4",
-  boxShadow: "0 12px 40px rgba(0,0,0,0.12)",
-  background: "rgba(255,255,255,0.95)",
-  backdropFilter: "blur(8px)",
-};
 
 const DASHBOARD_TABS = [
   { key: "overview" as const, label: "نمای کلی" },
@@ -74,11 +46,9 @@ export function DashboardPage() {
   const [analysisTab, setAnalysisTab] = useState<"org" | "reports" | "person">("org");
 
   const { data: overview, error: overviewError } = useDashboardOverview();
-  const { data: personnelPage } = usePersonnelList({ limit: 1000, offset: 0 });
   // React Query خودش پاسخ‌های کهنه (تعویض سریع فرد انتخاب‌شده) را کنار می‌گذارد
   const { data: radar = [] } = usePersonRadar(selectedPersonId);
   const { data: trend = [] } = usePersonTrend(selectedPersonId);
-  const personnel = personnelPage?.items ?? [];
 
   if (overviewError != null)
     return <p className="p-6 text-center text-sm text-red-600">{extractErrorMessage(overviewError)}</p>;
@@ -257,90 +227,23 @@ export function DashboardPage() {
       {analysisTab === "person" && (
       <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-card">
         <h2 className="mb-3 text-base font-bold text-gray-900">نمودار رادار شایستگی و روند فرد</h2>
-        <div className="relative mb-4">
-          <select
-            className="w-full appearance-none rounded-xl border border-gray-200 bg-gray-100 px-4 py-2.5 pl-10 text-sm text-gray-700 outline-none transition-colors duration-150 focus:border-pulse-500 focus:bg-white sm:w-80"
-            value={selectedPersonId ?? ""}
-            onChange={(e) => setSelectedPersonId(e.target.value ? Number(e.target.value) : null)}
-          >
-            <option value="">— انتخاب فرد —</option>
-            {personnel.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.full_name}
-              </option>
-            ))}
-          </select>
-          <svg viewBox="0 0 20 20" className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" fill="none" stroke="currentColor" strokeWidth="2">
-            <path d="M6 8l4 4 4-4" />
-          </svg>
+        <div className="mb-4 sm:max-w-sm">
+          <PersonPicker
+            value={selectedPersonId}
+            onChange={setSelectedPersonId}
+            placeholder="— انتخاب فرد —"
+          />
         </div>
 
         {selectedPersonId && (
           <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
             <div>
               <h3 className="mb-3 text-sm font-semibold text-gray-600">میانگین امتیاز هر شاخص (از ۵)</h3>
-              <div style={{ height: 320 }}>
-                {radar.length === 0 ? (
-                  <p className="pt-20 text-center text-sm text-gray-400">داده‌ای برای این فرد یافت نشد.</p>
-                ) : (
-                  <ResponsiveContainer>
-                    <RadarChart data={radar} margin={{ top: 12, right: 24, bottom: 12, left: 24 }}>
-                      <defs>
-                        <linearGradient id="radar-fill" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="0%" stopColor={SERIES_COLOR} stopOpacity={0.28} />
-                          <stop offset="100%" stopColor={SERIES_COLOR} stopOpacity={0.06} />
-                        </linearGradient>
-                      </defs>
-                      <PolarGrid stroke={GRID_STROKE} />
-                      <PolarAngleAxis dataKey="category" tick={{ ...TICK_STYLE, fontSize: 10 }} />
-                      <PolarRadiusAxis domain={[0, 5]} tickCount={6} tick={TICK_STYLE} stroke={GRID_STROKE} axisLine={false} />
-                      <Radar
-                        dataKey="avg_score"
-                        name="میانگین امتیاز"
-                        stroke={SERIES_COLOR}
-                        strokeWidth={2}
-                        fill="url(#radar-fill)"
-                        dot={{ r: 3.5, fill: SERIES_COLOR, strokeWidth: 0 }}
-                      />
-                      <Tooltip contentStyle={TOOLTIP_STYLE} formatter={tooltipNumber} />
-                    </RadarChart>
-                  </ResponsiveContainer>
-                )}
-              </div>
+              <CompetencyRadar data={radar} gradientId="radar-fill" />
             </div>
             <div>
               <h3 className="mb-3 text-sm font-semibold text-gray-600">روند امتیاز نهایی (٪)</h3>
-              <div style={{ height: 320 }}>
-                {trend.length === 0 ? (
-                  <p className="pt-20 text-center text-sm text-gray-400">روندی برای این فرد ثبت نشده است.</p>
-                ) : (
-                  <ResponsiveContainer>
-                    <AreaChart data={trend} margin={{ top: 12, right: 16, bottom: 12, left: 0 }}>
-                      <defs>
-                        <linearGradient id="trend-fill" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="0%" stopColor={SERIES_COLOR} stopOpacity={0.22} />
-                          <stop offset="100%" stopColor={SERIES_COLOR} stopOpacity={0.02} />
-                        </linearGradient>
-                      </defs>
-                      <CartesianGrid strokeDasharray="4 4" stroke={GRID_STROKE} vertical={false} />
-                      <XAxis dataKey="evaluation_code" tick={TICK_STYLE} tickLine={false} axisLine={{ stroke: AXIS_STROKE }} />
-                      <YAxis domain={[0, 100]} tick={TICK_STYLE} tickLine={false} axisLine={false} width={36} />
-                      <Tooltip contentStyle={TOOLTIP_STYLE} formatter={tooltipNumber} />
-                      <Area
-                        type="monotone"
-                        dataKey="final_weighted_pct"
-                        name="امتیاز نهایی"
-                        stroke={SERIES_COLOR}
-                        strokeWidth={2.5}
-                        fill="url(#trend-fill)"
-                        dot={{ r: 4, fill: "#fff", strokeWidth: 2.5, stroke: SERIES_COLOR }}
-                        activeDot={{ r: 6, fill: SERIES_COLOR, strokeWidth: 2, stroke: "#fff" }}
-                        animationDuration={1200}
-                      />
-                    </AreaChart>
-                  </ResponsiveContainer>
-                )}
-              </div>
+              <ScoreTrend data={trend} gradientId="trend-fill" />
             </div>
           </div>
         )}
@@ -356,9 +259,6 @@ export function DashboardPage() {
   );
 }
 
-function tooltipNumber(value: unknown): string {
-  return typeof value === "number" ? value.toLocaleString("fa-IR") : String(value);
-}
 
 /** نمایش امتیاز ۰ تا ۵ به‌صورت نوار کوچک تک‌رنگ + عدد. */
 function ScoreOutOfFive({ value }: { value: number | null }) {

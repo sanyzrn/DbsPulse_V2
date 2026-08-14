@@ -9,16 +9,15 @@ import {
   YAxis,
 } from "recharts";
 import {
-  useDebouncedValue,
   useEmployeeVsUnit,
   useIndicatorBreakdown,
   useIndicators,
   useOrgUnits,
   usePeriods,
-  usePersonnelList,
   useReportSummary,
 } from "../../api/queries";
 import { ChartDownloadCard } from "../../components/ChartDownloadCard";
+import { PersonPicker } from "../../components/PersonPicker";
 import { ExcelExportButton } from "../../components/ExcelExportButton";
 import { Card, EmptyState, FilterSelect, PageHeader, TableSkeleton } from "../../ui/Card";
 import { IndicatorScorePanel, type IndicatorSort } from "../../ui/IndicatorScorePanel";
@@ -63,8 +62,6 @@ const inputClass =
  * همهٔ فیلترها ترکیب‌پذیرند و روی همهٔ نمودارها/خروجی‌های این بخش اعمال می‌شوند. */
 export function ReportsSection() {
   const [filters, setFilters] = useState<ReportFilters>({});
-  const [personnelSearch, setPersonnelSearch] = useState("");
-  const debouncedPersonnelSearch = useDebouncedValue(personnelSearch);
   const [selectedIndicatorId, setSelectedIndicatorId] = useState<number | null>(null);
   const [indicatorSort, setIndicatorSort] = useState<IndicatorSort>("form");
 
@@ -82,13 +79,6 @@ export function ReportsSection() {
       }, new Map<string, typeof indicators>())
       .entries(),
   );
-  const { data: personnelResults } = usePersonnelList({
-    q: debouncedPersonnelSearch,
-    limit: 30,
-    offset: 0,
-  });
-  const personnelOptions = personnelResults?.items ?? [];
-
   const { data: summary, isPending: summaryPending } = useReportSummary(filters);
   const { data: indicatorBreakdown, isPending: indicatorPending } = useIndicatorBreakdown(
     selectedIndicatorId,
@@ -104,17 +94,13 @@ export function ReportsSection() {
   );
   const { data: empVsUnit } = useEmployeeVsUnit(filters.personnel_id ?? null, employeeFilters);
 
-  const selectedPersonName =
-    personnelOptions.find((p) => p.id === filters.personnel_id)?.full_name ??
-    empVsUnit?.full_name ??
-    null;
+  const selectedPersonName = empVsUnit?.full_name ?? null;
 
   function patch(next: Partial<ReportFilters>) {
     setFilters((prev) => ({ ...prev, ...next }));
   }
   function reset() {
     setFilters({});
-    setPersonnelSearch("");
     setSelectedIndicatorId(null);
   }
 
@@ -223,30 +209,16 @@ export function ReportsSection() {
             </FilterSelect>
           </label>
 
-          {/* دراپ‌داون جست‌وجوی پرسنل */}
+          {/* یک کنترل به‌جای «input جست‌وجو + select» — جست‌وجو سمت سرور است، پس
+              طول فهرست پرسنل مهم نیست. */}
           <div className="flex flex-col gap-1 text-xs font-medium text-gray-600">
             پرسنل مشخص
-            <input
-              className={inputClass}
-              placeholder="جست‌وجوی نام برای فیلتر…"
-              value={personnelSearch}
-              onChange={(e) => setPersonnelSearch(e.target.value)}
-            />
-            <FilterSelect
+            <PersonPicker
+              value={filters.personnel_id ?? null}
+              onChange={(id) => patch({ personnel_id: id ?? undefined })}
+              placeholder="همهٔ پرسنل"
               aria-label="انتخاب پرسنل"
-              value={filters.personnel_id ? String(filters.personnel_id) : ""}
-              onChange={(v) => patch({ personnel_id: v ? Number(v) : undefined })}
-            >
-              <option value="">همهٔ پرسنل</option>
-              {filters.personnel_id && selectedPersonName && !personnelOptions.some((p) => p.id === filters.personnel_id) && (
-                <option value={filters.personnel_id}>{selectedPersonName}</option>
-              )}
-              {personnelOptions.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.full_name} ({p.org_unit})
-                </option>
-              ))}
-            </FilterSelect>
+            />
           </div>
 
           <label className="flex flex-col gap-1 text-xs font-medium text-gray-600">

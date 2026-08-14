@@ -4,6 +4,7 @@ import time
 import uuid
 
 from fastapi import Depends, FastAPI, HTTPException, Request, Response, status
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
@@ -34,12 +35,14 @@ from app.core.metrics import (
     REGISTRY,
     rate_limit_rejections,
     record_request,
+    refresh_pool_metrics,
     sweep_last_success_timestamp,
 )
 from app.core.rate_limit import limiter
 from app.core.readiness import last_successful_sweep, migration_state
 from app.core.scheduler import lifespan
-from app.db.session import get_db
+from app.core.validation_errors import validation_exception_handler
+from app.db.session import get_db, pool_stats
 
 logging.basicConfig(
     level=logging.INFO,
@@ -60,6 +63,10 @@ app = FastAPI(
 )
 
 app.state.limiter = limiter
+
+# خطای اعتبارسنجی به یک جملهٔ فارسی تبدیل می‌شود؛ بدون این، سقف‌های طولِ P2-05
+# روی صفحه فقط «خطایی غیرمنتظره رخ داد» می‌شدند (رجوع به core/validation_errors.py).
+app.add_exception_handler(RequestValidationError, validation_exception_handler)
 
 
 @app.exception_handler(RateLimitExceeded)
@@ -180,6 +187,10 @@ def ready(response: Response, db: Session = Depends(get_db)) -> dict:
     if expected is not None and applied != expected:
         healthy = False
 
+    # اشباع استخر readiness را نمی‌شکند (برنامه سالم است، فقط شلوغ) ولی باید
+    # دیده شود: «کند شدن» بدون این عدد به گردن دیتابیس انداخته می‌شود.
+    checks["db_pool"] = pool_stats()
+
     last_success = last_successful_sweep(db)
     checks["last_successful_sweep"] = last_success.isoformat() if last_success else None
     if last_success is not None:
@@ -206,4 +217,6 @@ def metrics(request: Request) -> Response:
     # مقایسهٔ ثابت‌زمان: مقایسهٔ معمولی رشته، طول پیشوند مشترک را از روی زمان لو می‌دهد
     if not secrets.compare_digest(provided, expected):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Unauthorized")
+    # وضعیت استخر یک حالت است نه رویداد؛ درست پیش از scrape خوانده می‌شود.
+    refresh_pool_metrics()
     return Response(content=generate_latest(REGISTRY), media_type=CONTENT_TYPE_LATEST)

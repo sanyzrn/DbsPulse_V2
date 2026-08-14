@@ -70,3 +70,31 @@ def archive_final_pdf(db: Session, record: EvaluationRecord) -> EvaluationDocume
     db.add(document)
     db.flush()
     return document
+
+
+def archive_final_pdf_detached(record_id: int) -> None:
+    """همان کار، ولی در یک session مستقل — برای اجرای پس از ارسال پاسخ (P2-05).
+
+    WeasyPrint یک کتابخانهٔ بومیِ سنگین است و تا امروز *داخل* درخواستِ نهایی‌سازی
+    مدیرعامل اجرا می‌شد: یعنی کندشدن رندر، به شکستِ مهم‌ترین اقدام سامانه ترجمه
+    می‌شد. حالا پرونده اول نهایی و commit می‌شود، بعد سند ساخته می‌شود.
+
+    session خودش را می‌سازد چون session درخواست، هنگام اجرای این تابع بسته شده
+    است. خطاها بلعیده می‌شوند و فقط لاگ می‌گیرند: این کار پس‌زمینه است و شکستش
+    نباید هیچ اثری روی پروندهٔ نهایی‌شده بگذارد — جاروی زمان‌بند
+    (run_document_backfill_sweep) بعداً دوباره تلاش می‌کند.
+    """
+    from app.db.session import SessionLocal
+
+    db = SessionLocal()
+    try:
+        record = db.get(EvaluationRecord, record_id)
+        if record is None:
+            return
+        archive_final_pdf(db, record)
+        db.commit()
+    except Exception:  # noqa: BLE001 — کار پس‌زمینه نباید هیچ‌چیزی را بشکند
+        db.rollback()
+        logger.warning("Background PDF archival failed for record %s", record_id, exc_info=True)
+    finally:
+        db.close()

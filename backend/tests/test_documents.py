@@ -41,8 +41,19 @@ def _finalize(client, db_session):
     return hr, sup, dep, ceo, evaluation_id, code
 
 
-def test_finalize_archives_pdf_with_hash(client, db_session):
+def test_the_archived_pdf_is_hashed_and_is_a_real_pdf(client, db_session):
+    """سند آرشیوی دیگر *داخل* درخواستِ نهایی‌سازی ساخته نمی‌شود (P2-05): رندر
+    WeasyPrint از مسیر تأخیر بیرون رفته و پس از ارسال پاسخ انجام می‌شود. پس این
+    تست از مسیرِ ساختِ سند می‌گذرد (اولین دانلود؛ همان مسیری که برای رکوردهای
+    قدیمی هم کار می‌کند) و بعد خودِ سند را می‌سنجد."""
     hr, sup, dep, ceo, evaluation_id, code = _finalize(client, db_session)
+
+    assert (
+        client.get(
+            f"/api/evaluations/{evaluation_id}/summary.pdf", headers=auth_header(hr)
+        ).status_code
+        == 200
+    )
 
     doc = db_session.scalar(
         select(EvaluationDocument).where(
@@ -84,7 +95,17 @@ def test_public_verify_returns_authenticity_for_finalized(client, db_session):
     assert body["subject_full_name"] == "سند رسمی"
     assert body["org_unit"] == "واحد اسناد"
     assert body["final_weighted_pct"] is not None
-    assert len(body["sha256"]) == 64
+
+    # پیش از ساخته‌شدن سند، صفحهٔ تأیید باید *بگوید* که هش هنوز آماده نیست.
+    # هشِ خالیِ بی‌توضیح روی صفحهٔ اصالت، از «سند دستکاری‌شده» قابل تشخیص نیست.
+    assert body["document_ready"] is False
+    assert body["sha256"] == ""
+
+    # و به‌محض آماده‌شدن سند، هش واقعی برمی‌گردد
+    client.get(f"/api/evaluations/{evaluation_id}/summary.pdf", headers=auth_header(hr))
+    ready = client.get(f"/api/verify/{token}").json()
+    assert ready["document_ready"] is True
+    assert len(ready["sha256"]) == 64
 
 
 def test_verify_by_sequential_evaluation_code_is_rejected(client, db_session):

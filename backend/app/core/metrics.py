@@ -79,6 +79,38 @@ sweep_last_success_timestamp = Gauge(
 )
 
 
+db_pool_connections = Gauge(
+    "dbspulse_db_pool_connections",
+    "اتصال‌های استخر دیتابیس به تفکیک وضعیت (P2-05)",
+    ["state"],
+    registry=REGISTRY,
+)
+
+db_pool_capacity = Gauge(
+    "dbspulse_db_pool_capacity",
+    "سقف مطلق اتصال‌های این کارگر (pool_size + max_overflow)",
+    registry=REGISTRY,
+)
+
+
+def refresh_pool_metrics() -> None:
+    """وضعیت استخر را درست پیش از scrape می‌خواند.
+
+    برخلاف بقیهٔ سنجه‌ها این یکی رویداد نیست، حالت است — شمردنش هنگام هر درخواست
+    هم گران است و هم بی‌معنا. اشباع استخر از بیرون شبیه «دیتابیس کند شده» دیده
+    می‌شود؛ این عدد همان چیزی است که این دو را از هم جدا می‌کند.
+    """
+    # وارداتِ داخل تابع: db.session موتور را در زمان import می‌سازد و ماژول
+    # سنجه‌ها نباید این کار را به هر کسی که واردش می‌کند تحمیل کند.
+    from app.db.session import pool_stats
+
+    stats = pool_stats()
+    db_pool_connections.labels(state="checked_out").set(stats["checked_out"])
+    db_pool_connections.labels(state="available").set(stats["available"])
+    db_pool_connections.labels(state="overflow").set(max(0, stats["overflow"]))
+    db_pool_capacity.set(stats["capacity"])
+
+
 def record_request(method: str, path_template: str, status_code: int, duration_seconds: float) -> None:
     http_requests.labels(method=method, path=path_template, status=str(status_code)).inc()
     http_duration.labels(method=method, path=path_template).observe(duration_seconds)

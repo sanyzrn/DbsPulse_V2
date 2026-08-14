@@ -46,4 +46,5 @@ def verify_document(
         recommendation=record.recommendation,
         finalized_at=record.finalized_at,
         sha256=document.sha256 if document else "",
+        document_ready=document is not None,
     )

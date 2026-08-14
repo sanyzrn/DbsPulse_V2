@@ -3,6 +3,15 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, computed_field
 
+from app.core.text_limits import (
+    COMMENT_MAX,
+    EVALUATOR_COMMENT_MAX,
+    EVIDENCE_MAX,
+    OBJECTION_MAX,
+    REASON_MAX,
+    SELF_ASSESSMENT_NOTE_MAX,
+    SELF_ASSESSMENT_SUMMARY_MAX,
+)
 from app.models.enums import CommentStage, EvaluationStage, EvaluationStatus
 
 # مرحله نمایشی از وضعیت مشتق می‌شود؛ ستون جداگانه‌ای در دیتابیس ندارد (G1 در PROJECT_AUDIT).
@@ -33,7 +42,7 @@ class EvaluationCreate(BaseModel):
 class ScoreInput(BaseModel):
     indicator_id: int
     score: int = Field(ge=1, le=5)
-    evidence_text: str | None = None
+    evidence_text: str | None = Field(default=None, max_length=EVIDENCE_MAX)
 
 
 class ScoresUpsert(BaseModel):
@@ -52,7 +61,7 @@ class ScoreRead(BaseModel):
 class CommentCreate(BaseModel):
     model_config = ConfigDict(str_strip_whitespace=True)
 
-    comment_text: str = Field(min_length=1)
+    comment_text: str = Field(min_length=1, max_length=COMMENT_MAX)
     # اگر مقدار داشته باشد، این یک پاسخ threaded به یک کامنتِ سطح‌بالاست (فقط یک سطح عمق).
     parent_comment_id: int | None = None
 
@@ -72,7 +81,7 @@ class CommentRead(BaseModel):
 class ReturnRequest(BaseModel):
     model_config = ConfigDict(str_strip_whitespace=True)
 
-    reason: str = Field(min_length=1)
+    reason: str = Field(min_length=1, max_length=REASON_MAX)
 
 
 class CancelRequest(BaseModel):
@@ -80,7 +89,7 @@ class CancelRequest(BaseModel):
 
     model_config = ConfigDict(str_strip_whitespace=True)
 
-    reason: str = Field(min_length=1, max_length=1000)
+    reason: str = Field(min_length=1, max_length=REASON_MAX)
 
 
 class HrHandover(BaseModel):
@@ -89,7 +98,7 @@ class HrHandover(BaseModel):
     model_config = ConfigDict(str_strip_whitespace=True)
 
     new_hr_user_id: int
-    reason: str = Field(min_length=1, max_length=1000)
+    reason: str = Field(min_length=1, max_length=REASON_MAX)
 
 
 class StageOwnerReassign(BaseModel):
@@ -99,7 +108,7 @@ class StageOwnerReassign(BaseModel):
 
     stage_field: Literal["unit_supervisor_user_id", "deputy_user_id", "ceo_user_id"]
     new_user_id: int
-    reason: str = Field(min_length=1, max_length=1000)
+    reason: str = Field(min_length=1, max_length=REASON_MAX)
 
 
 class EvaluationRead(BaseModel):
@@ -155,7 +164,9 @@ class EvaluationPage(BaseModel):
 
 
 class EvaluatorCommentUpdate(BaseModel):
-    evaluator_comment: str
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+    evaluator_comment: str = Field(max_length=EVALUATOR_COMMENT_MAX)
 
 
 class MyEvaluationRead(BaseModel):
@@ -212,7 +223,7 @@ class MyOpenEvaluation(BaseModel):
 class SelfAssessmentInput(BaseModel):
     indicator_id: int
     score: int = Field(ge=1, le=5)
-    note: str | None = Field(default=None, max_length=1000)
+    note: str | None = Field(default=None, max_length=SELF_ASSESSMENT_NOTE_MAX)
 
 
 class SelfAssessmentSubmit(BaseModel):
@@ -225,7 +236,7 @@ class SelfAssessmentSubmit(BaseModel):
     model_config = ConfigDict(str_strip_whitespace=True)
 
     scores: list[SelfAssessmentInput]
-    note: str | None = Field(default=None, max_length=2000)
+    note: str | None = Field(default=None, max_length=SELF_ASSESSMENT_SUMMARY_MAX)
 
 
 class SelfAssessmentScoreRead(BaseModel):
@@ -249,7 +260,7 @@ class ObjectionRequest(BaseModel):
 
     model_config = ConfigDict(str_strip_whitespace=True)
 
-    reason: str = Field(min_length=1, max_length=2000)
+    reason: str = Field(min_length=1, max_length=OBJECTION_MAX)
 
 
 class ObjectionResolution(BaseModel):
@@ -257,4 +268,4 @@ class ObjectionResolution(BaseModel):
 
     model_config = ConfigDict(str_strip_whitespace=True)
 
-    resolution: str = Field(min_length=1, max_length=2000)
+    resolution: str = Field(min_length=1, max_length=OBJECTION_MAX)

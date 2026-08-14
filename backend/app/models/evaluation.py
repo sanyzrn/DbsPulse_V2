@@ -14,6 +14,13 @@ from sqlalchemy import (
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
+from app.core.text_limits import (
+    COMMENT_MAX,
+    EVALUATOR_COMMENT_MAX,
+    EVIDENCE_MAX,
+    OBJECTION_MAX,
+    SELF_ASSESSMENT_SUMMARY_MAX,
+)
 from app.db.base import Base
 from app.models.enums import CommentStage, EvaluationStatus
 from app.models.personnel import Personnel  # noqa: TC001  (relationship target)
@@ -51,7 +58,7 @@ class EvaluationRecord(Base):
     specialized_score_pct: Mapped[float | None] = mapped_column(Numeric(5, 2), nullable=True)
     final_weighted_pct: Mapped[float | None] = mapped_column(Numeric(5, 2), nullable=True)
     recommendation: Mapped[str | None] = mapped_column(Text, nullable=True)
-    evaluator_comment: Mapped[str | None] = mapped_column(Text, nullable=True)
+    evaluator_comment: Mapped[str | None] = mapped_column(String(EVALUATOR_COMMENT_MAX), nullable=True)
     final_snapshot: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     # لحظهٔ ورود به وضعیت فعلی. جاروی SLA پیش از این از created_at استفاده می‌کرد،
@@ -71,17 +78,17 @@ class EvaluationRecord(Base):
     self_assessment_submitted_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
-    self_assessment_note: Mapped[str | None] = mapped_column(Text, nullable=True)
+    self_assessment_note: Mapped[str | None] = mapped_column(String(SELF_ASSESSMENT_SUMMARY_MAX), nullable=True)
 
     # اعتراض رسمی کارمند به نتیجه. «رؤیت» فقط ثبت می‌کند که فرد نتیجه را *دید*، نه
     # این‌که با آن موافق است — بدون مسیر اعتراض، سامانه هیچ جایی برای مخالفت او ندارد
     # و در هر بازبینی حقوقی، پاسخ «کارمند چه گفت؟» می‌شود «هیچ‌چیز ثبت نشده».
     objection_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
-    objection_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
+    objection_reason: Mapped[str | None] = mapped_column(String(OBJECTION_MAX), nullable=True)
     objection_resolved_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
-    objection_resolution: Mapped[str | None] = mapped_column(Text, nullable=True)
+    objection_resolution: Mapped[str | None] = mapped_column(String(OBJECTION_MAX), nullable=True)
     objection_resolved_by_user_id: Mapped[int | None] = mapped_column(
         ForeignKey("users.id"), nullable=True
     )
@@ -117,7 +124,7 @@ class EvaluationScore(Base):
     )
     indicator_id: Mapped[int] = mapped_column(ForeignKey("indicators.id"), nullable=False)
     score: Mapped[int] = mapped_column(Integer, nullable=False)
-    evidence_text: Mapped[str | None] = mapped_column(Text, nullable=True)
+    evidence_text: Mapped[str | None] = mapped_column(String(EVIDENCE_MAX), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     evaluation_record: Mapped["EvaluationRecord"] = relationship(back_populates="scores")
@@ -141,7 +148,7 @@ class EvaluationComment(Base):
         Enum(CommentStage, name="comment_stage", values_callable=lambda e: [m.value for m in e]),
         nullable=False,
     )
-    comment_text: Mapped[str] = mapped_column(Text, nullable=False)
+    comment_text: Mapped[str] = mapped_column(String(COMMENT_MAX), nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     evaluation_record: Mapped["EvaluationRecord"] = relationship(back_populates="comments")

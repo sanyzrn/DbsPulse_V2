@@ -1,8 +1,9 @@
 from datetime import date, datetime
 
-from sqlalchemy import Boolean, Date, DateTime, Enum, ForeignKey, Integer, String, Text, func
+from sqlalchemy import Boolean, Date, DateTime, Enum, ForeignKey, Integer, String, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
+from app.core.text_limits import PLAN_GOAL_MAX, PLAN_SUMMARY_MAX
 from app.db.base import Base
 from app.models.enums import ImprovementPlanStatus
 from app.models.personnel import Personnel  # noqa: TC001  (relationship target)
@@ -35,7 +36,7 @@ class ImprovementPlan(Base):
         nullable=False,
     )
     review_date: Mapped[date] = mapped_column(Date, nullable=False)
-    summary: Mapped[str | None] = mapped_column(Text, nullable=True)
+    summary: Mapped[str | None] = mapped_column(String(PLAN_SUMMARY_MAX), nullable=True)
     # ارزیابی پیگیری که بعداً برای سنجش نتیجه برنامه انجام می‌شود؛ تا آن زمان NULL
     follow_up_evaluation_id: Mapped[int | None] = mapped_column(
         ForeignKey("evaluation_records.id"), nullable=True
@@ -65,7 +66,7 @@ class ImprovementPlanGoal(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     plan_id: Mapped[int] = mapped_column(ForeignKey("improvement_plans.id"), nullable=False)
-    description: Mapped[str] = mapped_column(Text, nullable=False)
+    description: Mapped[str] = mapped_column(String(PLAN_GOAL_MAX), nullable=False)
     is_done: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     display_order: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

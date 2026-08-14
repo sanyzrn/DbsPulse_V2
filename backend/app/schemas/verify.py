@@ -15,3 +15,8 @@ class VerificationResult(BaseModel):
     recommendation: str | None
     finalized_at: datetime | None
     sha256: str
+    # از وقتی رندر PDF از مسیر درخواستِ نهایی‌سازی بیرون رفته (P2-05)، یک پنجرهٔ
+    # کوتاه هست که پرونده نهایی شده ولی سند هنوز ساخته نشده. در آن پنجره sha256
+    # خالی است — و «هشِ خالی» روی یک صفحهٔ *تأیید اصالت* از «سند دستکاری شده»
+    # قابل تشخیص نیست. این پرچم آن دو را از هم جدا می‌کند.
+    document_ready: bool = True

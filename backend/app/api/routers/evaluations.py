@@ -1,7 +1,7 @@
 import secrets
 from datetime import UTC, date, datetime, timedelta
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, status
 from fastapi.responses import Response
 from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
@@ -43,7 +43,7 @@ from app.schemas.evaluation import (
     StageOwnerReassign,
 )
 from app.services.audit import log_event
-from app.services.documents import archive_final_pdf
+from app.services.documents import archive_final_pdf, archive_final_pdf_detached
 from app.services.evaluation import next_evaluation_code
 from app.services.excel import build_evaluations_workbook
 from app.services.notifications import notify, notify_stage_owner_reassigned
@@ -647,6 +647,7 @@ def deputy_approve(
 @router.post("/{evaluation_id}/ceo-finalize", response_model=EvaluationRead)
 def ceo_finalize(
     evaluation_id: int,
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
     current_user: CurrentUser = Depends(require_roles(UserRole.ceo)),
 ) -> EvaluationRead:
@@ -660,12 +661,15 @@ def ceo_finalize(
         record.verify_token = secrets.token_urlsafe(24)
 
     apply_transition(db, record, "ceo_finalize", current_user, before=_before)
-    # سند PDF نهایی همین‌جا یک‌بار تولید، هش و آرشیو می‌شود تا از این پس همان بایت‌ها
-    # سرو شوند (سند حقوقی byte-stable) و QR تأیید اصالت داشته باشد.
-    db.flush()
-    archive_final_pdf(db, record)
     db.commit()
     db.refresh(record)
+    # سند PDF *پس از* ارسال پاسخ ساخته می‌شود (P2-05). قبلاً همین‌جا و به‌صورت
+    # همزمان رندر می‌شد، یعنی WeasyPrint — یک کتابخانهٔ بومیِ CPU-محور — روی مسیر
+    # تأخیرِ مهم‌ترین اقدام سامانه بود و کندشدنِ رندر به «نهایی‌سازی ناموفق» ترجمه
+    # می‌شد. حالا نهایی‌سازی قطعی است و سند دنبالش می‌آید؛ اگر این کار پس‌زمینه هم
+    # شکست بخورد (ری‌استارت پروسه، نبودِ کتابخانه)، جاروی زمان‌بند آن را می‌گیرد و
+    # مسیر دانلود هم در لحظه می‌سازدش. آرشیو idempotent است، پس تکرار بی‌خطر است.
+    background_tasks.add_task(archive_final_pdf_detached, record.id)
     return _to_read(db, record)
 
 

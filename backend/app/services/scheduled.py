@@ -20,11 +20,14 @@ from app.models.enums import (
     UserRole,
 )
 from app.models.evaluation import EvaluationRecord
+from app.models.evaluation_document import EvaluationDocument
 from app.models.improvement_plan import ImprovementPlan
 from app.models.personnel import Personnel
 from app.models.user import User
+from app.services.documents import archive_final_pdf
 from app.services.login_guard import purge_stale
 from app.services.notifications import notify_once
+from app.services.pdf import weasyprint_available
 from app.services.workflow import IS_OPEN_RECORD
 
 
@@ -213,6 +216,50 @@ def run_improvement_review_sweep(db: Session) -> int:
     return created
 
 
+#: چند سند در هر جارو ساخته شود. رندر PDF گران است و جارو هر پنج دقیقه اجرا
+#: می‌شود؛ بدون سقف، یک backlog بزرگ (مثلاً سروری که تازه WeasyPrint گرفته) کل
+#: پنجرهٔ جارو را می‌بلعد و بقیهٔ یادآوری‌ها را عقب می‌اندازد. با این سقف، backlog
+#: در چند دور تخلیه می‌شود.
+_DOCUMENT_BACKFILL_BATCH = 20
+
+
+def run_document_backfill_sweep(db: Session) -> int:
+    """پرونده‌های نهایی‌شده‌ای که هنوز PDF آرشیوی ندارند را می‌سازد (P2-05).
+
+    از وقتی رندر PDF از مسیر درخواستِ نهایی‌سازی بیرون رفته، ساخت سند یک کار
+    پس‌زمینه است — و کار پس‌زمینه ممکن است اصلاً اجرا نشود: پروسه ری‌استارت شود،
+    کتابخانهٔ بومی نصب نباشد، یا رندر خطا بدهد. این جارو همان تضمینِ «بالاخره
+    ساخته می‌شود» است که وعده‌اش را داده‌ایم.
+
+    نهایی‌شده‌هایی که snapshot ندارند رد می‌شوند: سندی که از روی snapshot ساخته
+    نشود، سندِ همان لحظه نیست و ادعای byte-stable بودن را باطل می‌کند.
+    """
+    if not weasyprint_available():
+        return 0
+
+    has_document = (
+        select(EvaluationDocument.id)
+        .where(EvaluationDocument.evaluation_record_id == EvaluationRecord.id)
+        .exists()
+    )
+    pending = db.scalars(
+        select(EvaluationRecord)
+        .where(
+            EvaluationRecord.status == EvaluationStatus.finalized,
+            EvaluationRecord.final_snapshot.is_not(None),
+            ~has_document,
+        )
+        .order_by(EvaluationRecord.finalized_at)
+        .limit(_DOCUMENT_BACKFILL_BATCH)
+    ).all()
+
+    created = 0
+    for record in pending:
+        if archive_final_pdf(db, record) is not None:
+            created += 1
+    return created
+
+
 def run_all_sweeps(db: Session) -> dict[str, int]:
     """همه sweep ها را اجرا و commit می‌کند؛ نقطه ورود زمان‌بند و endpoint دستی."""
     summary = {
@@ -220,6 +267,8 @@ def run_all_sweeps(db: Session) -> dict[str, int]:
         "sla_reminder": run_sla_sweep(db),
         "orphaned_case": run_orphaned_case_sweep(db),
         "improvement_review": run_improvement_review_sweep(db),
+        # سندهای جامانده — تضمین «بالاخره ساخته می‌شود» برای رندرِ پس‌زمینه‌ای
+        "documents_archived": run_document_backfill_sweep(db),
         # نگهداری، نه اعلان: ردیف‌های منقضیِ شمارش تلاش ورود را پاک می‌کند تا جدول
         # با نام‌های کاربریِ تصادفیِ یک حملهٔ enumeration باد نکند.
         "stale_login_attempts_purged": purge_stale(db),

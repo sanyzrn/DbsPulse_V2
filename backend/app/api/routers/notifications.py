@@ -6,9 +6,17 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user
 from app.db.session import get_db
+from app.models.enums import DeliveryChannel
 from app.models.notification import Notification
+from app.models.user import User
 from app.schemas.auth import CurrentUser
-from app.schemas.notification import NotificationPage, NotificationRead
+from app.schemas.notification import (
+    NotificationPage,
+    NotificationPreferences,
+    NotificationPreferencesRead,
+    NotificationRead,
+)
+from app.services import channels
 
 router = APIRouter(prefix="/api/notifications", tags=["notifications"])
 
@@ -69,3 +77,55 @@ def mark_all_read(
         .values(read_at=datetime.now(UTC))
     )
     db.commit()
+
+
+@router.get("/preferences", response_model=NotificationPreferencesRead)
+def get_preferences(
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(get_current_user),
+) -> NotificationPreferencesRead:
+    """ارجحیت تماس کاربر، به‌علاوهٔ اینکه سازمان کدام کانال را اصلاً تنظیم کرده."""
+    user = db.get(User, current_user.id)
+    configured = {channel.kind for channel in channels.available()}
+    return NotificationPreferencesRead(
+        email=user.email,
+        phone=user.phone,
+        notify_by_email=user.notify_by_email,
+        notify_by_sms=user.notify_by_sms,
+        email_available=DeliveryChannel.email in configured,
+        sms_available=DeliveryChannel.sms in configured,
+    )
+
+
+@router.put("/preferences", response_model=NotificationPreferencesRead)
+def update_preferences(
+    payload: NotificationPreferences,
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(get_current_user),
+) -> NotificationPreferencesRead:
+    """هر کاربر فقط ارجحیت خودش را تعیین می‌کند.
+
+    روشن‌کردن کانالی که نشانی‌اش خالی است رد می‌شود: تیکی که هیچ اثری ندارد،
+    کاربر را منتظر پیامی می‌گذارد که هرگز نمی‌آید.
+    """
+    user = db.get(User, current_user.id)
+    email = payload.email or None
+    phone = payload.phone or None
+
+    if payload.notify_by_email and not email:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="برای دریافت ایمیل، ابتدا نشانی ایمیل خود را وارد کنید",
+        )
+    if payload.notify_by_sms and not phone:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="برای دریافت پیامک، ابتدا شمارهٔ همراه خود را وارد کنید",
+        )
+
+    user.email = email
+    user.phone = phone
+    user.notify_by_email = payload.notify_by_email
+    user.notify_by_sms = payload.notify_by_sms
+    db.commit()
+    return get_preferences(db=db, current_user=current_user)

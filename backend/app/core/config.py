@@ -88,6 +88,40 @@ class Settings(BaseSettings):
     # پنجره‌ای که در آن یک اعلانِ تکراری (همان کلید) دوباره ساخته نمی‌شود
     notification_dedup_days: int = 7
 
+    # --- تحویل بیرونی اعلان‌ها (P1-03) ----------------------------------------
+    # همه‌چیز پیش‌فرض خاموش است و باید بماند: اولین باری که کانالی روشن شود، کل
+    # سازمان پیام می‌گیرد. این باید یک تصمیم آگاهانه باشد، نه اثر جانبی استقرار.
+    #
+    # ایمیل — SMTP استاندارد، پس با میل‌سرور داخلی و هر سرویس تراکنشی کار می‌کند.
+    smtp_host: str = ""
+    smtp_port: int = 587
+    smtp_username: str = ""
+    smtp_password: str = ""
+    smtp_from: str = ""
+    smtp_use_starttls: bool = True
+    smtp_use_ssl: bool = False
+    smtp_timeout_seconds: int = 15
+
+    # پیامک — شکل درخواست از همین‌جا می‌آید، پس وصل‌کردن یک سرویس تازه بدون
+    # تغییر کد ممکن است. راهنمای کامل در services/channels/http_sms.py.
+    sms_url: str = ""
+    sms_method: str = "POST"
+    sms_headers: str = ""
+    sms_body: str = ""
+    sms_api_key: str = ""
+    #: اگر سرویس روی خطا هم ۲۰۰ می‌دهد، این رشته باید در بدنهٔ پاسخِ موفق باشد
+    sms_success_contains: str = ""
+    sms_timeout_seconds: int = 15
+
+    # حالت توسعه: به‌جای ارسال واقعی، پیام‌ها در لاگ نوشته می‌شوند. کل زنجیره
+    # (صف، تلاش مجدد، ارجحیت کاربر) بدون هیچ سرویس بیرونی قابل آزمودن می‌شود.
+    notification_channel_console: bool = False
+
+    delivery_batch_size: int = 50
+    delivery_max_attempts: int = 5
+    #: پایهٔ عقب‌نشینی نمایی؛ تلاش دوم پس از این، سومی دو برابر، و همین‌طور
+    delivery_retry_base_minutes: int = 5
+
     @property
     def cors_origins_list(self) -> list[str]:
         return [origin.strip() for origin in self.cors_origins.split(",") if origin.strip()]

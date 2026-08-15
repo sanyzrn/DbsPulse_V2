@@ -24,6 +24,16 @@ class User(Base):
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     must_change_password: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     token_version: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+
+    # --- تماس و ارجحیت اعلان (P1-03) --------------------------------------
+    # هر دو خالی‌پذیرند: سامانه بدون هیچ نشانی تماسی هم کاملاً کار می‌کند و فقط
+    # اعلان درون‌برنامه‌ای می‌دهد — همان رفتار امروز.
+    email: Mapped[str | None] = mapped_column(String(320), nullable=True)
+    phone: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    # پیش‌فرض هر دو خاموش است، و این عمدی است: اولین باری که کانالی روشن شود،
+    # نباید کل سازمان بی‌خبر پیام بگیرد. هرکس خودش انتخاب می‌کند.
+    notify_by_email: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    notify_by_sms: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     # ایندکس‌ها در مایگریشن‌ها ساخته شده‌اند و تا امروز روی مدل اعلام نشده بودند،

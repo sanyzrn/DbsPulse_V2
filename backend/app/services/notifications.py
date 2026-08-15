@@ -14,6 +14,23 @@ from app.models.evaluation import EvaluationRecord
 from app.models.notification import Notification
 
 
+def _queue_outbound(db: Session, notification: Notification) -> None:
+    """ردیف صندوق خروجی را در همان تراکنش می‌سازد (P1-03).
+
+    وارداتِ داخل تابع عمدی است: delivery به کانال‌ها و کانال‌ها به تنظیمات وابسته‌اند،
+    و این ماژول در همه‌جای گردش‌کار وارد می‌شود. نگه‌داشتن آن زنجیره بیرون از
+    زمانِ import، وابستگی چرخه‌ای را از ابتدا ناممکن می‌کند.
+
+    فقط *ثبت* می‌شود؛ هیچ ارسالی این‌جا رخ نمی‌دهد. اگر ارسال روی مسیر درخواست
+    بود، کندی سرویس پیامک به شکست «تأیید پرونده» ترجمه می‌شد.
+    """
+    from app.services.delivery import enqueue_for
+
+    # شناسه لازم است تا ردیف تحویل به آن ارجاع دهد
+    db.flush()
+    enqueue_for(db, notification)
+
+
 def notify(
     db: Session,
     user_ids: Iterable[int],
@@ -23,15 +40,15 @@ def notify(
     link: str | None = None,
 ) -> None:
     for user_id in set(user_ids):
-        db.add(
-            Notification(
-                user_id=user_id,
-                type=type_,
-                message=message,
-                link=link,
-                evaluation_record_id=evaluation_record_id,
-            )
+        notification = Notification(
+            user_id=user_id,
+            type=type_,
+            message=message,
+            link=link,
+            evaluation_record_id=evaluation_record_id,
         )
+        db.add(notification)
+        _queue_outbound(db, notification)
 
 
 def notify_once(
@@ -58,16 +75,16 @@ def notify_once(
     )
     if exists:
         return False
-    db.add(
-        Notification(
-            user_id=user_id,
-            type=type_,
-            message=message,
-            link=link,
-            evaluation_record_id=evaluation_record_id,
-            dedup_key=dedup_key,
-        )
+    notification = Notification(
+        user_id=user_id,
+        type=type_,
+        message=message,
+        link=link,
+        evaluation_record_id=evaluation_record_id,
+        dedup_key=dedup_key,
     )
+    db.add(notification)
+    _queue_outbound(db, notification)
     return True
 
 

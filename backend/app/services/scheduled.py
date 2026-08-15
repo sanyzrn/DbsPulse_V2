@@ -24,6 +24,7 @@ from app.models.evaluation_document import EvaluationDocument
 from app.models.improvement_plan import ImprovementPlan
 from app.models.personnel import Personnel
 from app.models.user import User
+from app.services.delivery import run_delivery_sweep
 from app.services.documents import archive_final_pdf
 from app.services.login_guard import purge_stale
 from app.services.notifications import notify_once
@@ -273,5 +274,10 @@ def run_all_sweeps(db: Session) -> dict[str, int]:
         # با نام‌های کاربریِ تصادفیِ یک حملهٔ enumeration باد نکند.
         "stale_login_attempts_purged": purge_stale(db),
     }
+    # تحویل بیرونی *بعد* از بقیه می‌آید: جاروهای بالا ممکن است همین حالا اعلان
+    # تازه ساخته باشند، و بی‌معناست که تا اجرای بعدی معطل بمانند.
+    summary.update(
+        {f"delivery_{key}": value for key, value in run_delivery_sweep(db).items()}
+    )
     db.commit()
     return summary

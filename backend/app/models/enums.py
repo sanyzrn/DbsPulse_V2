@@ -66,3 +66,24 @@ class SchemeStatus(str, enum.Enum):
     draft = "draft"
     active = "active"
     retired = "retired"
+
+
+class DeliveryChannel(str, enum.Enum):
+    """کانال‌های تحویل بیرونی (P1-03)."""
+
+    email = "email"
+    sms = "sms"
+
+
+class DeliveryStatus(str, enum.Enum):
+    """وضعیت یک ارسال در صندوق خروجی.
+
+    `failed` و `abandoned` عمداً جدا هستند: اولی یعنی «دوباره تلاش می‌شود»،
+    دومی یعنی «دیگر تلاش نمی‌شود و کسی باید نگاهش کند». یکی‌کردنشان یعنی صف پر
+    از ردیف‌هایی می‌شود که هرگز نمی‌روند و هیچ‌کس خبردار نمی‌شود.
+    """
+
+    pending = "pending"
+    sent = "sent"
+    failed = "failed"
+    abandoned = "abandoned"

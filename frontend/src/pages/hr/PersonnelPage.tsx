@@ -20,7 +20,8 @@ import { Table } from "../../ui/Table";
 import { JalaliDatePicker } from "../../ui/JalaliDatePicker";
 import type { AppUser, Personnel } from "../../types";
 
-const PAGE_SIZE = 10;
+/** پیش‌فرض تعداد در هر صفحه؛ کاربر می‌تواند از نوار پایین عوضش کند. */
+const DEFAULT_PAGE_SIZE = 10;
 
 const emptyForm = {
   personnel_code: "",
@@ -257,6 +258,7 @@ export function PersonnelPage() {
   const [orgUnitFilter, setOrgUnitFilter] = useState("");
   const [managerFilter, setManagerFilter] = useState<"" | "true" | "false">("");
   const [page, setPage] = useState(0);
+  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
   const debouncedSearch = useDebouncedValue(search);
 
   const listParams = {
@@ -268,8 +270,8 @@ export function PersonnelPage() {
 
   const { data, error: loadError, isPending } = usePersonnelList({
     ...listParams,
-    limit: PAGE_SIZE,
-    offset: page * PAGE_SIZE,
+    limit: pageSize,
+    offset: page * pageSize,
   });
   const { data: usersPage } = useUsersList({ limit: 1000 });
   const users = usersPage?.items ?? [];
@@ -285,7 +287,7 @@ export function PersonnelPage() {
   }
 
   const total = data?.total ?? 0;
-  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  const totalPages = Math.max(1, Math.ceil(total / pageSize));
 
   async function createPersonnel() {
     setError(null);
@@ -563,10 +565,17 @@ export function PersonnelPage() {
                 >
                   {p.full_name}
                 </button>,
-                <span key="job" className="text-gray-600">
-                  {p.job_title}
+                // نشان «مدیر» با فاصلهٔ flex از عنوان جدا می‌شود، نه با حاشیهٔ
+                // ۶ پیکسلی. «مدیر» عنوان شغلی نیست — یک نشانهٔ ساختاری است که
+                // مسیر ارزیابی را عوض می‌کند — و چسبیده به عنوان، «کارشناس فروش
+                // مدیر» خوانده می‌شد، انگار بخشی از خودِ عنوان باشد.
+                <span key="job" className="flex flex-wrap items-center gap-x-2 gap-y-1 text-gray-600">
+                  <span>{p.job_title}</span>
                   {p.is_manager && (
-                    <span className="mr-1.5 rounded-full bg-amber-50 px-2 py-0.5 text-[11px] font-medium text-amber-700">
+                    <span
+                      className="shrink-0 rounded-full bg-amber-50 px-2 py-0.5 text-[11px] font-medium text-amber-700 ring-1 ring-amber-100"
+                      title="ارزیابی این فرد مستقیماً توسط معاونت انجام می‌شود"
+                    >
                       مدیر
                     </span>
                   )}
@@ -604,7 +613,11 @@ export function PersonnelPage() {
             page={page}
             totalPages={totalPages}
             totalCount={total}
-            pageSize={PAGE_SIZE}
+            pageSize={pageSize}
+            onPageSizeChange={(size) => {
+              setPageSize(size);
+              setPage(0);
+            }}
             onPageChange={setPage}
           />
         </div>

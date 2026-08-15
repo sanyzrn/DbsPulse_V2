@@ -25,7 +25,8 @@ import {
   type ImprovementPlanStatus,
 } from "../../types";
 
-const PAGE_SIZE = 10;
+/** پیش‌فرض تعداد در هر صفحه؛ کاربر می‌تواند از نوار پایین عوضش کند. */
+const DEFAULT_PAGE_SIZE = 10;
 const STATUS_BADGE: Record<ImprovementPlanStatus, string> = {
   open: "bg-pulse-50 text-pulse-700",
   completed: "bg-green-50 text-green-700",
@@ -149,6 +150,7 @@ export function ImprovementPlansPage() {
   const [statusFilter, setStatusFilter] = useState<ImprovementPlanStatus | "">("");
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(0);
+  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
   const [profilePerson, setProfilePerson] = useState<{ id: number; name: string } | null>(null);
   const debouncedSearch = useDebouncedValue(search);
 
@@ -160,11 +162,11 @@ export function ImprovementPlansPage() {
   const { data, error, isPending } = useImprovementPlans({
     status: statusFilter || undefined,
     q: debouncedSearch || undefined,
-    limit: PAGE_SIZE,
-    offset: page * PAGE_SIZE,
+    limit: pageSize,
+    offset: page * pageSize,
   });
   const total = data?.total ?? 0;
-  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  const totalPages = Math.max(1, Math.ceil(total / pageSize));
 
   function refreshAll() {
     queryClient.invalidateQueries({ queryKey: ["improvement-plans"] });
@@ -309,7 +311,11 @@ export function ImprovementPlansPage() {
           page={page}
           totalPages={totalPages}
           totalCount={total}
-          pageSize={PAGE_SIZE}
+          pageSize={pageSize}
+          onPageSizeChange={(size) => {
+            setPageSize(size);
+            setPage(0);
+          }}
           onPageChange={setPage}
         />
       </Card>

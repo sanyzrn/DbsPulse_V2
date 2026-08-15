@@ -18,7 +18,8 @@ import { AUDIT_EVENT_LABELS, ROLE_LABELS } from "../../types";
 import { AuditDetails } from "../../components/AuditDetails";
 import { PersonPicker } from "../../components/PersonPicker";
 
-const PAGE_SIZE = 20;
+/** پیش‌فرض تعداد در هر صفحه؛ کاربر می‌تواند از نوار پایین عوضش کند. */
+const DEFAULT_PAGE_SIZE = 20;
 
 const EVENT_TYPES = Object.keys(AUDIT_EVENT_LABELS);
 
@@ -59,6 +60,7 @@ export function AuditLogPage() {
   const [filters, setFilters] = useState<Filters>(EMPTY_FILTERS);
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [page, setPage] = useState(0);
+  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
 
   const { data: orgUnits = [] } = useOrgUnits(true);
   const { data: usersPage } = useUsersList({ limit: 200 });
@@ -77,13 +79,13 @@ export function AuditLogPage() {
 
   const { data, error: queryError, isPending } = useAuditLog({
     ...requestParams,
-    limit: PAGE_SIZE,
-    offset: page * PAGE_SIZE,
+    limit: pageSize,
+    offset: page * pageSize,
   });
   const error = queryError != null ? extractErrorMessage(queryError) : null;
 
   const total = data?.total ?? 0;
-  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  const totalPages = Math.max(1, Math.ceil(total / pageSize));
   const items = data?.items ?? [];
 
   const activeFilterCount = Object.values(filters).filter((v) => v !== "").length;
@@ -318,7 +320,11 @@ export function AuditLogPage() {
             page={page}
             totalPages={totalPages}
             totalCount={total}
-            pageSize={PAGE_SIZE}
+            pageSize={pageSize}
+            onPageSizeChange={(size) => {
+              setPageSize(size);
+              setPage(0);
+            }}
             onPageChange={setPage}
           />
         </>

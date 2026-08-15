@@ -14,7 +14,8 @@ import { Table } from "../../ui/Table";
 import { ROLE_LABELS, type AppUser, type Personnel, type UserRole } from "../../types";
 
 const ROLES: UserRole[] = ["unit_supervisor", "hr", "deputy", "ceo", "employee"];
-const PAGE_SIZE = 10;
+/** پیش‌فرض تعداد در هر صفحه؛ کاربر می‌تواند از نوار پایین عوضش کند. */
+const DEFAULT_PAGE_SIZE = 10;
 
 const inputClass =
   "w-full rounded-xl border border-gray-200 bg-gray-100 px-3 py-2 text-sm text-gray-900 outline-none transition-colors duration-150 focus:border-pulse-500 focus:bg-white";
@@ -31,6 +32,7 @@ export function UsersPage() {
   const [roleFilter, setRoleFilter] = useState<UserRole | "">("");
   const [activeFilter, setActiveFilter] = useState<"" | "true" | "false">("");
   const [page, setPage] = useState(0);
+  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
   const [showAddUser, setShowAddUser] = useState(false);
   const [editingUser, setEditingUser] = useState<AppUser | null>(null);
   const debouncedSearch = useDebouncedValue(search);
@@ -46,11 +48,11 @@ export function UsersPage() {
 
   const { data, error: loadError, isPending } = useUsersList({
     ...listParams,
-    limit: PAGE_SIZE,
-    offset: page * PAGE_SIZE,
+    limit: pageSize,
+    offset: page * pageSize,
   });
   const total = data?.total ?? 0;
-  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  const totalPages = Math.max(1, Math.ceil(total / pageSize));
   const hasActiveFilter = Boolean(search || roleFilter || activeFilter);
 
   function resetFilters() {
@@ -299,7 +301,11 @@ export function UsersPage() {
           page={page}
           totalPages={totalPages}
           totalCount={total}
-          pageSize={PAGE_SIZE}
+          pageSize={pageSize}
+          onPageSizeChange={(size) => {
+            setPageSize(size);
+            setPage(0);
+          }}
           onPageChange={setPage}
         />
       </div>

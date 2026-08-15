@@ -12,7 +12,8 @@ import { EmptyState } from "../ui/Card";
 import { JalaliDatePicker } from "../ui/JalaliDatePicker";
 import { EASE_SOFT, TAB_TRANSITION } from "../ui/motion";
 
-const PAGE_SIZE = 10;
+/** پیش‌فرض تعداد در هر صفحه؛ کاربر می‌تواند از نوار پایین عوضش کند. */
+const DEFAULT_PAGE_SIZE = 10;
 
 const filterInputClass =
   "w-full rounded-xl border border-gray-200 bg-gray-100 px-3 py-1.5 text-sm text-gray-700 outline-none transition-colors duration-150 focus:border-pulse-500 focus:bg-white";
@@ -73,6 +74,7 @@ export function EvaluationList({
 }) {
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(0);
+  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
   const [activeTabKey, setActiveTabKey] = useState(tabs[0]!.key);
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [filters, setFilters] = useState<AdvancedFilters>(EMPTY_FILTERS);
@@ -88,12 +90,12 @@ export function EvaluationList({
     q: debouncedSearch,
     status: activeTab.status,
     ...filtersToParams(filters),
-    limit: PAGE_SIZE,
-    offset: page * PAGE_SIZE,
+    limit: pageSize,
+    offset: page * pageSize,
   });
 
   const total = data?.total ?? 0;
-  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  const totalPages = Math.max(1, Math.ceil(total / pageSize));
 
   function patchFilters(patch: Partial<AdvancedFilters>) {
     setFilters((prev) => ({ ...prev, ...patch }));
@@ -344,7 +346,11 @@ export function EvaluationList({
             page={page}
             totalPages={totalPages}
             totalCount={total}
-            pageSize={PAGE_SIZE}
+            pageSize={pageSize}
+            onPageSizeChange={(size) => {
+              setPageSize(size);
+              setPage(0);
+            }}
             onPageChange={setPage}
           />
         </>

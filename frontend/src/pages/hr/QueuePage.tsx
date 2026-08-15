@@ -12,6 +12,8 @@ export function QueuePage() {
         { key: "hr_approved", label: "در بررسی معاونت", status: "hr_approved" },
         { key: "deputy_approved", label: "در بررسی مدیرعامل", status: "deputy_approved" },
         { key: "finalized", label: "نهایی‌شده", status: "finalized" },
+        // پروندهٔ لغوشده در قیف داشبورد نمی‌آید، پس تنها جای دیدنش همین‌جاست
+        { key: "cancelled", label: "لغوشده", status: "cancelled" },
         { key: "all", label: "همه" },
       ]}
     />

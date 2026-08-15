@@ -47,7 +47,7 @@ export function ChartDownloadCard({
           <h3 className="text-base font-bold text-gray-900">{title}</h3>
           {subtitle && <p className="mt-0.5 text-xs text-gray-500">{subtitle}</p>}
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex min-w-0 max-w-full flex-wrap items-center justify-end gap-2">
           {actions}
           <button
             type="button"

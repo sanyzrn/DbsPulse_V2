@@ -28,7 +28,9 @@ from app.schemas.dashboard import (
     UnitIndicatorStat,
     UnitStat,
 )
+from app.services.audit import log_event
 from app.services.excel import build_report_workbook
+from app.services.privacy import suppressed_avg
 
 router = APIRouter(prefix="/api/dashboard/report", tags=["reports"])
 
@@ -120,6 +122,10 @@ def _summary_data(db: Session, filters: _Filters) -> ReportSummary:
     total = db.scalar(select(func.count()).select_from(base)) or 0
     avg_raw = db.scalar(select(func.avg(base.c.final_weighted_pct)))
     avg_final = round(float(avg_raw), 1) if avg_raw is not None else None
+    # سرجمع فقط وقتی سرکوب می‌شود که کاربر یک فرد مشخص را نام نبرده باشد؛ اگر خودش
+    # personnel_id داده، می‌داند دارد به دادهٔ چه کسی نگاه می‌کند.
+    if filters.personnel_id is None:
+        avg_final = suppressed_avg(avg_final, total)
 
     unit_rows = db.execute(
         select(Personnel.org_unit, func.avg(EvaluationRecord.final_weighted_pct), func.count())
@@ -129,7 +135,11 @@ def _summary_data(db: Session, filters: _Filters) -> ReportSummary:
         .order_by(func.avg(EvaluationRecord.final_weighted_pct).desc())
     ).all()
     by_org_unit = [
-        UnitStat(org_unit=unit, avg_final_pct=round(float(avg), 1), count=count)
+        UnitStat(
+            org_unit=unit,
+            avg_final_pct=suppressed_avg(round(float(avg), 1), count),
+            count=count,
+        )
         for unit, avg, count in unit_rows
     ]
 
@@ -155,7 +165,7 @@ def _summary_data(db: Session, filters: _Filters) -> ReportSummary:
             category=category,
             description=description,
             section=section.value,
-            avg_score=round(float(avg), 2),
+            avg_score=suppressed_avg(round(float(avg), 2), count),
             count=count,
         )
         for iid, category, description, section, avg, count in indicator_rows
@@ -201,6 +211,8 @@ def indicator_breakdown(
     overall_raw = db.scalar(select(func.avg(score_join.c.score)))
     overall_avg = round(float(overall_raw), 2) if overall_raw is not None else None
     total = db.scalar(select(func.count()).select_from(score_join)) or 0
+    if filters.personnel_id is None:
+        overall_avg = suppressed_avg(overall_avg, total)
 
     unit_rows = db.execute(
         select(score_join.c.org_unit, func.avg(score_join.c.score), func.count())
@@ -208,7 +220,9 @@ def indicator_breakdown(
         .order_by(func.avg(score_join.c.score).desc())
     ).all()
     by_org_unit = [
-        UnitIndicatorStat(org_unit=unit, avg_score=round(float(avg), 2), count=count)
+        UnitIndicatorStat(
+            org_unit=unit, avg_score=suppressed_avg(round(float(avg), 2), count), count=count
+        )
         for unit, avg, count in unit_rows
     ]
 
@@ -282,8 +296,13 @@ def employee_vs_unit(
         .join(Personnel, Personnel.id == EvaluationRecord.subject_personnel_id)
         .where(*unit_conditions)
     ).one()
-    unit_avg = round(float(unit_stats[0]), 1) if unit_stats[0] is not None else None
     unit_count = unit_stats[1] or 0
+    # میانگین واحد یک آمار گروهی است — اگر واحد یکی-دو نفر باشد، «میانگین واحد» عملاً
+    # امتیاز همان یکی-دو نفر است. سری امتیازهای خودِ فرد (per_evaluation) سرکوب
+    # نمی‌شود؛ کاربر خودش نام او را داده و چیز تازه‌ای افشا نمی‌شود.
+    unit_avg = suppressed_avg(
+        round(float(unit_stats[0]), 1) if unit_stats[0] is not None else None, unit_count
+    )
 
     return EmployeeVsUnit(
         personnel_id=personnel.id,
@@ -314,6 +333,18 @@ def export_report_excel(
             (i.category, i.description, i.avg_score, i.count) for i in summary.by_indicator
         ],
     )
+    # تنها مسیر خروج دادهٔ سامانه که ردی نمی‌گذاشت. فیلترها و تعداد ردیف ثبت
+    # می‌شوند تا بعداً بشود گفت *چه چیزی* استخراج شد، نه فقط این‌که استخراج شد.
+    log_event(
+        db,
+        actor_user_id=current_user.id,
+        event_type="report_excel_exported",
+        new_value={
+            "filters": {k: str(v) for k, v in vars(filters).items() if v is not None},
+            "row_count": summary.total_evaluations,
+        },
+    )
+    db.commit()
     return Response(
         content=content,
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",

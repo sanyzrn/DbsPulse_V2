@@ -20,10 +20,15 @@ from app.models.enums import (
     UserRole,
 )
 from app.models.evaluation import EvaluationRecord
+from app.models.evaluation_document import EvaluationDocument
 from app.models.improvement_plan import ImprovementPlan
 from app.models.personnel import Personnel
 from app.models.user import User
+from app.services.documents import archive_final_pdf
+from app.services.login_guard import purge_stale
 from app.services.notifications import notify_once
+from app.services.pdf import weasyprint_available
+from app.services.workflow import IS_OPEN_RECORD
 
 
 def _active_hr_ids(db: Session) -> list[int]:
@@ -41,7 +46,7 @@ def run_contract_expiry_sweep(db: Session) -> int:
         select(EvaluationRecord.id)
         .where(
             EvaluationRecord.subject_personnel_id == Personnel.id,
-            EvaluationRecord.status != EvaluationStatus.finalized,
+            IS_OPEN_RECORD,
         )
         .exists()
     )
@@ -93,13 +98,17 @@ def _current_owner_ids(db: Session, record: EvaluationRecord) -> list[int]:
 
 
 def run_sla_sweep(db: Session) -> int:
-    """به صاحبِ فعلیِ هر پرونده‌ای که بیش از حد آستانه در جریان مانده، یادآوری می‌فرستد.
-    dedup_key شامل وضعیت است تا با هر مرحله جدیدِ گیرکرده دوباره فعال شود."""
+    """به صاحبِ فعلیِ هر پرونده‌ای که بیش از حد آستانه *در همین مرحله* مانده، یادآوری
+    می‌فرستد. dedup_key شامل وضعیت است تا با هر مرحله جدیدِ گیرکرده دوباره فعال شود."""
+    # قبلاً معیار created_at بود، یعنی «سن کل پرونده». نتیجه‌اش دو خطای متقارن بود:
+    # پرونده‌ای که سه هفته در مراحل قبلی چرخیده، همان لحظهٔ رسیدن به مرحلهٔ جدید
+    # فوراً تأخیردار اعلام می‌شد (مسئول تازه‌کار بی‌دلیل نهیب می‌خورد)، و هیچ راهی
+    # نبود بفهمیم واقعاً کدام مرحله کند است.
     cutoff = datetime.now(UTC) - timedelta(days=settings.sla_reminder_days)
     stalled = db.scalars(
         select(EvaluationRecord).where(
-            EvaluationRecord.status != EvaluationStatus.finalized,
-            EvaluationRecord.created_at <= cutoff,
+            IS_OPEN_RECORD,
+            EvaluationRecord.stage_entered_at <= cutoff,
         )
     )
 
@@ -107,7 +116,7 @@ def run_sla_sweep(db: Session) -> int:
     for record in stalled:
         message = (
             f"پرونده {record.evaluation_code} ({record.subject.full_name}) بیش از "
-            f"{settings.sla_reminder_days} روز است منتظر اقدام شماست"
+            f"{settings.sla_reminder_days} روز است در همین مرحله منتظر اقدام شماست"
         )
         for owner_id in _current_owner_ids(db, record):
             if notify_once(
@@ -117,6 +126,50 @@ def run_sla_sweep(db: Session) -> int:
                 message=message,
                 dedup_key=f"sla:{record.id}:{record.status.value}",
                 within_days=settings.sla_reminder_days,
+                evaluation_record_id=record.id,
+                link=f"/evaluations/{record.id}",
+            ):
+                created += 1
+    return created
+
+
+def run_orphaned_case_sweep(db: Session) -> int:
+    """پرونده‌های بازی که مسئولِ مرحلهٔ فعلی‌شان دیگر کاربر فعالی نیست را به HR گزارش می‌کند.
+
+    این دقیقاً همان حالتی است که ابزارهای لغو/بازتخصیص برای آن ساخته شدند: گذار،
+    برابری `current_user.id` با مسئول ثبت‌شده را لازم دارد، پس اگر آن حساب غیرفعال
+    شود پرونده تا ابد سر جایش می‌ماند. بدون این جارو، HR فقط موقع تمدید قرارداد —
+    یعنی بدترین لحظهٔ ممکن — متوجهش می‌شد.
+    """
+    open_records = db.scalars(select(EvaluationRecord).where(IS_OPEN_RECORD))
+    hr_ids = _active_hr_ids(db)
+    created = 0
+
+    for record in open_records:
+        owner_ids = _current_owner_ids(db, record)
+        # وضعیت submitted صاحب مشخصی ندارد (هر HR فعالی می‌تواند اقدام کند)، پس
+        # «بی‌صاحب» بودنش معنای دیگری دارد و این‌جا موضوعیت ندارد.
+        if not owner_ids or record.status == EvaluationStatus.submitted:
+            continue
+
+        active_owners = db.scalars(
+            select(User.id).where(User.id.in_(owner_ids), User.is_active.is_(True))
+        ).all()
+        if active_owners:
+            continue
+
+        message = (
+            f"پرونده {record.evaluation_code} ({record.subject.full_name}) گیر کرده است: "
+            "مسئول مرحلهٔ فعلی دیگر کاربر فعالی نیست. مسئول جدید تعیین کنید یا پرونده را لغو کنید."
+        )
+        for hr_id in hr_ids:
+            if notify_once(
+                db,
+                user_id=hr_id,
+                type_="orphaned_case",
+                message=message,
+                dedup_key=f"orphaned:{record.id}:{record.status.value}",
+                within_days=settings.notification_dedup_days,
                 evaluation_record_id=record.id,
                 link=f"/evaluations/{record.id}",
             ):
@@ -157,9 +210,53 @@ def run_improvement_review_sweep(db: Session) -> int:
                 message=message,
                 dedup_key=f"improvement_review:{plan.id}:{plan.review_date.isoformat()}",
                 within_days=settings.notification_dedup_days,
-                link=f"/hr/improvement-plans/{plan.id}",
+                link=f"/improvement-plans/{plan.id}",
             ):
                 created += 1
+    return created
+
+
+#: چند سند در هر جارو ساخته شود. رندر PDF گران است و جارو هر پنج دقیقه اجرا
+#: می‌شود؛ بدون سقف، یک backlog بزرگ (مثلاً سروری که تازه WeasyPrint گرفته) کل
+#: پنجرهٔ جارو را می‌بلعد و بقیهٔ یادآوری‌ها را عقب می‌اندازد. با این سقف، backlog
+#: در چند دور تخلیه می‌شود.
+_DOCUMENT_BACKFILL_BATCH = 20
+
+
+def run_document_backfill_sweep(db: Session) -> int:
+    """پرونده‌های نهایی‌شده‌ای که هنوز PDF آرشیوی ندارند را می‌سازد (P2-05).
+
+    از وقتی رندر PDF از مسیر درخواستِ نهایی‌سازی بیرون رفته، ساخت سند یک کار
+    پس‌زمینه است — و کار پس‌زمینه ممکن است اصلاً اجرا نشود: پروسه ری‌استارت شود،
+    کتابخانهٔ بومی نصب نباشد، یا رندر خطا بدهد. این جارو همان تضمینِ «بالاخره
+    ساخته می‌شود» است که وعده‌اش را داده‌ایم.
+
+    نهایی‌شده‌هایی که snapshot ندارند رد می‌شوند: سندی که از روی snapshot ساخته
+    نشود، سندِ همان لحظه نیست و ادعای byte-stable بودن را باطل می‌کند.
+    """
+    if not weasyprint_available():
+        return 0
+
+    has_document = (
+        select(EvaluationDocument.id)
+        .where(EvaluationDocument.evaluation_record_id == EvaluationRecord.id)
+        .exists()
+    )
+    pending = db.scalars(
+        select(EvaluationRecord)
+        .where(
+            EvaluationRecord.status == EvaluationStatus.finalized,
+            EvaluationRecord.final_snapshot.is_not(None),
+            ~has_document,
+        )
+        .order_by(EvaluationRecord.finalized_at)
+        .limit(_DOCUMENT_BACKFILL_BATCH)
+    ).all()
+
+    created = 0
+    for record in pending:
+        if archive_final_pdf(db, record) is not None:
+            created += 1
     return created
 
 
@@ -168,7 +265,13 @@ def run_all_sweeps(db: Session) -> dict[str, int]:
     summary = {
         "contract_expiry": run_contract_expiry_sweep(db),
         "sla_reminder": run_sla_sweep(db),
+        "orphaned_case": run_orphaned_case_sweep(db),
         "improvement_review": run_improvement_review_sweep(db),
+        # سندهای جامانده — تضمین «بالاخره ساخته می‌شود» برای رندرِ پس‌زمینه‌ای
+        "documents_archived": run_document_backfill_sweep(db),
+        # نگهداری، نه اعلان: ردیف‌های منقضیِ شمارش تلاش ورود را پاک می‌کند تا جدول
+        # با نام‌های کاربریِ تصادفیِ یک حملهٔ enumeration باد نکند.
+        "stale_login_attempts_purged": purge_stale(db),
     }
     db.commit()
     return summary

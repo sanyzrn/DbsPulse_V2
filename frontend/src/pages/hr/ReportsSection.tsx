@@ -1,124 +1,103 @@
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import {
-  Area,
-  AreaChart,
-  Bar,
-  BarChart,
-  CartesianGrid,
-  Cell,
-  LabelList,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from "recharts";
-import {
-  useDebouncedValue,
-  useEmployeeVsUnit,
   useIndicatorBreakdown,
   useIndicators,
   useOrgUnits,
   usePeriods,
-  usePersonnelList,
   useReportSummary,
 } from "../../api/queries";
 import { ChartDownloadCard } from "../../components/ChartDownloadCard";
 import { ExcelExportButton } from "../../components/ExcelExportButton";
 import { Card, EmptyState, FilterSelect, PageHeader, TableSkeleton } from "../../ui/Card";
+import { IndicatorScorePanel, type IndicatorSort } from "../../ui/IndicatorScorePanel";
+import { DotPlot, fa1 } from "../../ui/plot";
 import { CountUp, ScoreRing } from "../../ui/Meters";
 import { JalaliDatePicker } from "../../ui/JalaliDatePicker";
 import type { ReportFilters } from "../../types";
 
-const SERIES_COLOR = "#b61615";
-const UNIT_COLOR = "#6b7280";
-const GRID_STROKE = "#eef0f4";
-const AXIS_STROKE = "#e5e7eb";
-const TICK_STYLE = { fontSize: 11, fill: "#6b7280", fontFamily: "Vazirmatn, Tahoma, sans-serif" };
-const TOOLTIP_STYLE = {
-  direction: "rtl" as const,
-  fontFamily: "Vazirmatn, Tahoma, sans-serif",
-  fontSize: 12,
-  borderRadius: 12,
-  border: "1px solid #eef0f4",
-  boxShadow: "0 12px 40px rgba(0,0,0,0.12)",
-  background: "rgba(255,255,255,0.97)",
-};
-
 function faNum(value: unknown): string {
   return typeof value === "number" ? value.toLocaleString("fa-IR") : String(value);
+}
+
+/** پیام خالی‌بودن نمودار، وقتی همهٔ ردیف‌ها به‌خاطر سرکوب کوهورت حذف شده‌اند.
+ *
+ * «داده‌ای وجود ندارد» در این حالت دروغ است: داده هست، ولی جمعیتش برای نمایش
+ * بی‌نام کوچک است. این دو حالت باید در UI از هم جدا باشند، وگرنه HR فکر می‌کند
+ * فیلترش اشتباه بوده و دنبال داده‌ای می‌گردد که همان‌جاست. */
+function chartEmptyMessage(totalRows: number, visibleRows: number, fallback: string): string {
+  if (totalRows > 0 && visibleRows === 0)
+    return "داده هست، ولی تعداد افراد هر گروه کمتر از حد لازم برای نمایش میانگین بی‌نام است.";
+  return fallback;
 }
 
 const inputClass =
   "w-full rounded-xl border border-gray-200 bg-gray-100 px-3 py-1.5 text-sm text-gray-700 outline-none transition-colors duration-150 focus:border-pulse-500 focus:bg-white";
 
 /** بخش گزارش‌های تحلیلی فیلترشونده — جدا از کارت‌های خلاصهٔ همیشگیِ بالای داشبورد.
- * همهٔ فیلترها ترکیب‌پذیرند و روی همهٔ نمودارها/خروجی‌های این بخش اعمال می‌شوند. */
+ * همهٔ فیلترها ترکیب‌پذیرند و روی همهٔ نمودارها/خروجی‌های این بخش اعمال می‌شوند.
+ *
+ * این بخش عمداً هیچ فیلتر «یک فردِ مشخص» ندارد: هرچه دربارهٔ یک نفر است در زیرتب
+ * «کارنامهٔ فرد» جمع شده (PersonScorecard). فیلتر پرسنل این‌جا دو مشکل داشت —
+ * دومین انتخابگرِ فرد در صفحه بود که با انتخابگر آن تب هماهنگ نمی‌شد، و
+ * محدودکردن یک گزارشِ *سازمانی* به یک نفر، سرکوب کوهورت را هم بی‌اثر می‌کرد. */
 export function ReportsSection() {
   const [filters, setFilters] = useState<ReportFilters>({});
-  const [personnelSearch, setPersonnelSearch] = useState("");
-  const debouncedPersonnelSearch = useDebouncedValue(personnelSearch);
   const [selectedIndicatorId, setSelectedIndicatorId] = useState<number | null>(null);
+  const [indicatorSort, setIndicatorSort] = useState<IndicatorSort>("form");
 
   const { data: orgUnits = [] } = useOrgUnits(true);
   const { data: periods = [] } = usePeriods();
   const { data: indicators = [] } = useIndicators({ includeInactive: true });
-  const { data: personnelResults } = usePersonnelList({
-    q: debouncedPersonnelSearch,
-    limit: 30,
-    offset: 0,
-  });
-  const personnelOptions = personnelResults?.items ?? [];
-
+  // ترتیب خودِ سرور (section، سپس display_order) حفظ می‌شود؛ Map ترتیب درج را نگه می‌دارد.
+  const indicatorGroups = Array.from(
+    indicators
+      .reduce((groups, i) => {
+        const bucket = groups.get(i.category);
+        if (bucket) bucket.push(i);
+        else groups.set(i.category, [i]);
+        return groups;
+      }, new Map<string, typeof indicators>())
+      .entries(),
+  );
   const { data: summary, isPending: summaryPending } = useReportSummary(filters);
   const { data: indicatorBreakdown, isPending: indicatorPending } = useIndicatorBreakdown(
     selectedIndicatorId,
     filters
   );
-  const employeeFilters = useMemo(
-    () => ({
-      period_id: filters.period_id,
-      created_from: filters.created_from,
-      created_to: filters.created_to,
-    }),
-    [filters.period_id, filters.created_from, filters.created_to]
-  );
-  const { data: empVsUnit } = useEmployeeVsUnit(filters.personnel_id ?? null, employeeFilters);
-
-  const selectedPersonName =
-    personnelOptions.find((p) => p.id === filters.personnel_id)?.full_name ??
-    empVsUnit?.full_name ??
-    null;
 
   function patch(next: Partial<ReportFilters>) {
     setFilters((prev) => ({ ...prev, ...next }));
   }
   function reset() {
     setFilters({});
-    setPersonnelSearch("");
     setSelectedIndicatorId(null);
   }
 
   const activeFilterCount = Object.values(filters).filter((v) => v !== undefined && v !== "").length;
 
-  const unitChartData = (summary?.by_org_unit ?? []).map((u) => ({
-    name: u.org_unit,
-    میانگین: Math.round(u.avg_final_pct),
-  }));
-  const indicatorChartData = (summary?.by_indicator ?? []).map((i) => ({
-    name: i.category,
-    میانگین: Number(i.avg_score.toFixed(2)),
-  }));
-  const indicatorUnitData = (indicatorBreakdown?.by_org_unit ?? []).map((u) => ({
-    name: u.org_unit,
-    میانگین: Number(u.avg_score.toFixed(2)),
-  }));
-  const empComparisonData =
-    empVsUnit && (empVsUnit.employee_avg !== null || empVsUnit.unit_avg !== null)
-      ? [
-          { name: selectedPersonName ?? "این فرد", مقدار: empVsUnit.employee_avg ?? 0, fill: SERIES_COLOR },
-          { name: `میانگین واحد (${empVsUnit.org_unit})`, مقدار: empVsUnit.unit_avg ?? 0, fill: UNIT_COLOR },
-        ]
-      : [];
+  // ردیف‌های سرکوب‌شده (P1-08) از نمودارها کنار گذاشته می‌شوند: میله نمی‌تواند
+  // «پنهان» را نشان دهد و صفر نشان‌دادنشان دروغ است. جدول‌ها نشانِ «محرمانه» دارند.
+  const unitChartData = (summary?.by_org_unit ?? [])
+    .filter((u) => u.avg_final_pct !== null)
+    .map((u) => ({
+      key: u.org_unit,
+      label: u.org_unit,
+      value: u.avg_final_pct!,
+      note: `${faNum(u.count)} ارزیابی`,
+    }));
+  // شاخص‌ها دیگر میلهٔ افقی نیستند (IndicatorScorePanel دلیلش را توضیح می‌دهد)؛
+  // این‌جا فقط باید بدانیم بعد از سرکوب کوهورت چیزی برای نمایش مانده یا نه.
+  const visibleIndicatorCount = (summary?.by_indicator ?? []).filter(
+    (i) => i.avg_score !== null,
+  ).length;
+  const indicatorUnitData = (indicatorBreakdown?.by_org_unit ?? [])
+    .filter((u) => u.avg_score !== null)
+    .map((u) => ({
+      key: u.org_unit,
+      label: u.org_unit,
+      value: u.avg_score!,
+      note: `${faNum(u.count)} نمره`,
+    }));
 
   return (
     <div className="space-y-4">
@@ -195,32 +174,6 @@ export function ReportsSection() {
               <option value="inactive">فقط غیرفعال</option>
             </FilterSelect>
           </label>
-
-          {/* دراپ‌داون جست‌وجوی پرسنل */}
-          <div className="flex flex-col gap-1 text-xs font-medium text-gray-600">
-            پرسنل مشخص
-            <input
-              className={inputClass}
-              placeholder="جست‌وجوی نام برای فیلتر…"
-              value={personnelSearch}
-              onChange={(e) => setPersonnelSearch(e.target.value)}
-            />
-            <FilterSelect
-              aria-label="انتخاب پرسنل"
-              value={filters.personnel_id ? String(filters.personnel_id) : ""}
-              onChange={(v) => patch({ personnel_id: v ? Number(v) : undefined })}
-            >
-              <option value="">همهٔ پرسنل</option>
-              {filters.personnel_id && selectedPersonName && !personnelOptions.some((p) => p.id === filters.personnel_id) && (
-                <option value={filters.personnel_id}>{selectedPersonName}</option>
-              )}
-              {personnelOptions.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.full_name} ({p.org_unit})
-                </option>
-              ))}
-            </FilterSelect>
-          </div>
 
           <label className="flex flex-col gap-1 text-xs font-medium text-gray-600">
             از تاریخ شروع ارزیابی
@@ -329,51 +282,42 @@ export function ReportsSection() {
         {summaryPending ? (
           <TableSkeleton rows={4} />
         ) : unitChartData.length === 0 ? (
-          <EmptyState>برای فیلترهای فعلی داده‌ای وجود ندارد.</EmptyState>
+          <EmptyState>
+            {chartEmptyMessage((summary?.by_org_unit ?? []).length, unitChartData.length, "برای فیلترهای فعلی داده‌ای وجود ندارد.")}
+          </EmptyState>
         ) : (
-          <div style={{ height: Math.max(280, unitChartData.length * 54) }}>
-            <ResponsiveContainer>
-              <BarChart data={unitChartData} layout="vertical" margin={{ top: 8, right: 40, bottom: 8, left: 12 }}>
-                <CartesianGrid strokeDasharray="4 4" stroke={GRID_STROKE} horizontal={false} />
-                <XAxis type="number" domain={[0, 100]} tick={TICK_STYLE} tickLine={false} axisLine={{ stroke: AXIS_STROKE }} />
-                <YAxis type="category" dataKey="name" tick={{ ...TICK_STYLE, fontSize: 12 }} tickLine={false} axisLine={false} width={130} />
-                <Tooltip contentStyle={TOOLTIP_STYLE} formatter={faNum} cursor={{ fill: "rgba(107,114,128,0.06)" }} />
-                <Bar dataKey="میانگین" radius={[0, 6, 6, 0]} fill={SERIES_COLOR} animationDuration={800}>
-                  {/* direction:ltr روی برچسب: تحت dir="rtl" صفحه، text-anchor="start" که
-                      Recharts برای position="right" می‌سازد معکوس تفسیر می‌شود و عدد به‌جای
-                      فاصله از میله، داخل خودِ میله می‌افتد (تقریباً نامرئی). */}
-                  <LabelList dataKey="میانگین" position="right" formatter={(v) => (v == null ? "" : faNum(Number(v)))} style={{ fontSize: 12, fill: "#374151", fontFamily: "Vazirmatn, Tahoma, sans-serif", direction: "ltr" }} />
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
+          <DotPlot
+            rows={unitChartData}
+            reference={summary?.avg_final_pct ?? null}
+            ariaLabel="میانگین امتیاز نهایی به تفکیک واحد سازمانی"
+          />
         )}
       </ChartDownloadCard>
 
       {/* ── میانگین هر شاخص (بزرگ + دانلود) ── */}
       <ChartDownloadCard
         title="میانگین امتیاز هر شاخص (از ۵)"
-        subtitle="میانگین امتیاز هر شاخص در همهٔ پرسنل منطبق با فیلتر"
+        subtitle="میانگین نمره‌های منطبق با فیلتر، گروه‌بندی‌شده بر اساس دسته — روی هر دسته بزنید تا شرح شاخص‌هایش باز شود."
         filename="avg-by-indicator.png"
+        actions={
+          <FilterSelect
+            aria-label="ترتیب نمایش شاخص‌ها"
+            value={indicatorSort}
+            onChange={(v) => setIndicatorSort(v as IndicatorSort)}
+          >
+            <option value="form">ترتیب فرم ارزیابی</option>
+            <option value="lowest">کم‌امتیازترین در صدر</option>
+          </FilterSelect>
+        }
       >
         {summaryPending ? (
           <TableSkeleton rows={5} />
-        ) : indicatorChartData.length === 0 ? (
-          <EmptyState>برای فیلترهای فعلی داده‌ای وجود ندارد.</EmptyState>
+        ) : visibleIndicatorCount === 0 ? (
+          <EmptyState>
+            {chartEmptyMessage((summary?.by_indicator ?? []).length, visibleIndicatorCount, "برای فیلترهای فعلی داده‌ای وجود ندارد.")}
+          </EmptyState>
         ) : (
-          <div style={{ height: Math.max(320, indicatorChartData.length * 34) }}>
-            <ResponsiveContainer>
-              <BarChart data={indicatorChartData} layout="vertical" margin={{ top: 8, right: 32, bottom: 8, left: 12 }}>
-                <CartesianGrid strokeDasharray="4 4" stroke={GRID_STROKE} horizontal={false} />
-                <XAxis type="number" domain={[0, 5]} tick={TICK_STYLE} tickLine={false} axisLine={{ stroke: AXIS_STROKE }} />
-                <YAxis type="category" dataKey="name" tick={{ ...TICK_STYLE, fontSize: 11 }} tickLine={false} axisLine={false} width={150} />
-                <Tooltip contentStyle={TOOLTIP_STYLE} formatter={faNum} cursor={{ fill: "rgba(107,114,128,0.06)" }} />
-                <Bar dataKey="میانگین" radius={[0, 6, 6, 0]} fill={SERIES_COLOR} animationDuration={800}>
-                  <LabelList dataKey="میانگین" position="right" formatter={(v) => (v == null ? "" : faNum(Number(v)))} style={{ fontSize: 11, fill: "#374151", fontFamily: "Vazirmatn, Tahoma, sans-serif", direction: "ltr" }} />
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
+          <IndicatorScorePanel stats={summary?.by_indicator ?? []} sort={indicatorSort} />
         )}
       </ChartDownloadCard>
 
@@ -389,10 +333,19 @@ export function ReportsSection() {
             onChange={(v) => setSelectedIndicatorId(v ? Number(v) : null)}
           >
             <option value="">— انتخاب شاخص —</option>
-            {indicators.map((i) => (
-              <option key={i.id} value={i.id}>
-                {i.category}
-              </option>
+            {/* گروه‌بندی با optgroup و برچسب‌زدن با «شرح» شاخص.
+                قبلاً هر گزینه فقط category را نشان می‌داد، ولی category یک برچسب
+                گروه است نه شناسه: مثلاً سه شاخصِ کاملاً متفاوت همگی زیر «تعهد
+                سازمانی» هستند. نتیجه‌اش فهرستی بود که تکراری به‌نظر می‌رسید و
+                انتخاب از آن عملاً حدس زدن بود. */}
+            {indicatorGroups.map(([category, items]) => (
+              <optgroup key={category} label={category}>
+                {items.map((i) => (
+                  <option key={i.id} value={i.id}>
+                    {i.description}
+                  </option>
+                ))}
+              </optgroup>
             ))}
           </FilterSelect>
         }
@@ -402,7 +355,9 @@ export function ReportsSection() {
         ) : indicatorPending ? (
           <TableSkeleton rows={4} />
         ) : indicatorUnitData.length === 0 ? (
-          <EmptyState>برای این شاخص و فیلترها داده‌ای وجود ندارد.</EmptyState>
+          <EmptyState>
+            {chartEmptyMessage((indicatorBreakdown?.by_org_unit ?? []).length, indicatorUnitData.length, "برای این شاخص و فیلترها داده‌ای وجود ندارد.")}
+          </EmptyState>
         ) : (
           <>
             <p className="mb-3 text-sm text-gray-600">
@@ -412,83 +367,19 @@ export function ReportsSection() {
               </span>{" "}
               از ۵
             </p>
-            <div style={{ height: Math.max(260, indicatorUnitData.length * 54) }}>
-              <ResponsiveContainer>
-                <BarChart data={indicatorUnitData} layout="vertical" margin={{ top: 8, right: 32, bottom: 8, left: 12 }}>
-                  <CartesianGrid strokeDasharray="4 4" stroke={GRID_STROKE} horizontal={false} />
-                  <XAxis type="number" domain={[0, 5]} tick={TICK_STYLE} tickLine={false} axisLine={{ stroke: AXIS_STROKE }} />
-                  <YAxis type="category" dataKey="name" tick={{ ...TICK_STYLE, fontSize: 12 }} tickLine={false} axisLine={false} width={130} />
-                  <Tooltip contentStyle={TOOLTIP_STYLE} formatter={faNum} cursor={{ fill: "rgba(107,114,128,0.06)" }} />
-                  <Bar dataKey="میانگین" radius={[0, 6, 6, 0]} fill={SERIES_COLOR} animationDuration={800}>
-                    <LabelList dataKey="میانگین" position="right" formatter={(v) => (v == null ? "" : faNum(Number(v)))} style={{ fontSize: 12, fill: "#374151", fontFamily: "Vazirmatn, Tahoma, sans-serif", direction: "ltr" }} />
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
+            <DotPlot
+              rows={indicatorUnitData}
+              min={1}
+              max={5}
+              ticks={[1, 2, 3, 4, 5]}
+              format={fa1}
+              reference={indicatorBreakdown?.overall_avg ?? null}
+              ariaLabel="میانگین این شاخص به تفکیک واحد سازمانی"
+            />
           </>
         )}
       </ChartDownloadCard>
 
-      {/* ── مقایسهٔ فرد با میانگین واحد ── */}
-      <ChartDownloadCard
-        title="مقایسهٔ امتیاز فرد با میانگین واحد سازمانی"
-        subtitle="یک «پرسنل مشخص» از فیلترهای بالا انتخاب کنید تا امتیاز او در برابر میانگین واحدش دیده شود."
-        filename="employee-vs-unit.png"
-      >
-        {!filters.personnel_id ? (
-          <EmptyState>برای مقایسه، از نوار فیلتر یک «پرسنل مشخص» انتخاب کنید.</EmptyState>
-        ) : empComparisonData.length === 0 ? (
-          <EmptyState>برای این فرد و فیلترها نتیجهٔ نهایی‌شده‌ای وجود ندارد.</EmptyState>
-        ) : (
-          <>
-            <div className="mb-4 flex flex-wrap gap-4 text-sm">
-              <span className="rounded-lg bg-pulse-50 px-3 py-1.5 font-medium text-pulse-700">
-                میانگین فرد: {empVsUnit?.employee_avg != null ? faNum(empVsUnit.employee_avg) : "—"}٪
-                {" "}({faNum(empVsUnit?.evaluation_count ?? 0)} ارزیابی)
-              </span>
-              <span className="rounded-lg bg-gray-100 px-3 py-1.5 font-medium text-gray-700">
-                میانگین واحد «{empVsUnit?.org_unit}»: {empVsUnit?.unit_avg != null ? faNum(empVsUnit.unit_avg) : "—"}٪
-                {" "}({faNum(empVsUnit?.unit_evaluation_count ?? 0)} ارزیابی)
-              </span>
-            </div>
-            <div style={{ height: 240 }}>
-              <ResponsiveContainer>
-                <BarChart data={empComparisonData} margin={{ top: 8, right: 16, bottom: 8, left: 0 }}>
-                  <CartesianGrid strokeDasharray="4 4" stroke={GRID_STROKE} vertical={false} />
-                  <XAxis dataKey="name" tick={{ ...TICK_STYLE, fontSize: 12 }} tickLine={false} axisLine={{ stroke: AXIS_STROKE }} />
-                  <YAxis domain={[0, 100]} tick={TICK_STYLE} tickLine={false} axisLine={false} width={36} />
-                  <Tooltip contentStyle={TOOLTIP_STYLE} formatter={faNum} cursor={{ fill: "rgba(107,114,128,0.06)" }} />
-                  <Bar dataKey="مقدار" radius={[6, 6, 0, 0]} animationDuration={800}>
-                    <LabelList dataKey="مقدار" position="top" formatter={(v) => (v == null ? "" : faNum(Number(v)))} style={{ fontSize: 12, fill: "#374151", fontFamily: "Vazirmatn, Tahoma, sans-serif" }} />
-                    {empComparisonData.map((entry, i) => (
-                      <Cell key={i} fill={entry.fill} />
-                    ))}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-            {(empVsUnit?.per_evaluation.length ?? 0) > 1 && (
-              <div className="mt-4">
-                <h4 className="mb-2 text-sm font-semibold text-gray-600">روند امتیاز نهایی این فرد</h4>
-                <div style={{ height: 200 }}>
-                  <ResponsiveContainer>
-                    <AreaChart
-                      data={empVsUnit?.per_evaluation.map((p) => ({ name: p.evaluation_code, مقدار: p.final_weighted_pct }))}
-                      margin={{ top: 8, right: 16, bottom: 8, left: 0 }}
-                    >
-                      <CartesianGrid strokeDasharray="4 4" stroke={GRID_STROKE} vertical={false} />
-                      <XAxis dataKey="name" tick={TICK_STYLE} tickLine={false} axisLine={{ stroke: AXIS_STROKE }} />
-                      <YAxis domain={[0, 100]} tick={TICK_STYLE} tickLine={false} axisLine={false} width={36} />
-                      <Tooltip contentStyle={TOOLTIP_STYLE} formatter={faNum} />
-                      <Area type="monotone" dataKey="مقدار" stroke={SERIES_COLOR} strokeWidth={2.5} fill="rgba(182,22,21,0.12)" dot={{ r: 4, fill: "#fff", strokeWidth: 2.5, stroke: SERIES_COLOR }} />
-                    </AreaChart>
-                  </ResponsiveContainer>
-                </div>
-              </div>
-            )}
-          </>
-        )}
-      </ChartDownloadCard>
     </div>
   );
 }

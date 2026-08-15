@@ -17,6 +17,8 @@ interface VerificationResult {
   recommendation: string | null;
   finalized_at: string | null;
   sha256: string;
+  /** سند هنوز در حال ساخت است (رندر PDF پس از نهایی‌سازی انجام می‌شود) */
+  document_ready: boolean;
 }
 
 // صفحه عمومی (بدون احراز هویت) برای تأیید اصالت سند از روی QR نسخه چاپی
@@ -125,14 +127,22 @@ export function VerifyPage() {
                   {result.recommendation && <Row label="نتیجه پیشنهادی" value={result.recommendation} />}
                   <Row label="تاریخ نهایی‌شدن" value={formatDateTime(result.finalized_at)} />
                 </dl>
-                {result.sha256 && (
-                  <div className="mt-4 border-t border-gray-100 pt-3">
-                    <p className="text-xs text-gray-400">اثر انگشت دیجیتال سند (SHA-256):</p>
+                {/* «هشِ خالی» روی یک صفحهٔ تأیید اصالت، از «سند دستکاری‌شده» قابل
+                    تشخیص نیست — پس نبودنش صریحاً توضیح داده می‌شود. */}
+                <div className="mt-4 border-t border-gray-100 pt-3">
+                  <p className="text-xs text-gray-400">اثر انگشت دیجیتال سند (SHA-256):</p>
+                  {result.sha256 ? (
                     <p dir="ltr" className="mt-1 break-all text-left font-mono text-[10px] text-gray-500">
                       {result.sha256}
                     </p>
-                  </div>
-                )}
+                  ) : (
+                    <p className="mt-1 text-xs text-amber-700">
+                      سند رسمی این ارزیابی هنوز در حال آماده‌سازی است؛ چند لحظهٔ دیگر
+                      دوباره این صفحه را باز کنید. اصالت خودِ ارزیابی — که در بالا آمده —
+                      تأیید شده است.
+                    </p>
+                  )}
+                </div>
               </motion.div>
             )}
           </AnimatePresence>

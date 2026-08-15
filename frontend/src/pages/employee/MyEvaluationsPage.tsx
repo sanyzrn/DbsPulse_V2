@@ -2,7 +2,8 @@ import { useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { motion } from "motion/react";
 import { apiClient, extractErrorMessage } from "../../api/client";
-import { useMyEvaluations, useMyImprovementPlans } from "../../api/queries";
+import { useMyEvaluations, useMyImprovementPlans, useMyOpenEvaluations } from "../../api/queries";
+import { OpenCaseCard } from "../../components/employee/OpenCaseCard";
 import { useConfirm } from "../../components/ConfirmDialog";
 import { RoleOverviewCards } from "../../components/RoleOverviewCards";
 import { useToast } from "../../components/Toast";
@@ -84,8 +85,122 @@ function MyEvaluationCard({ item, index }: { item: MyEvaluation; index: number }
             <span><span className="text-xs text-gray-500">پیشنهاد سامانه: </span>{item.recommendation}</span>
           </p>
         )}
+
+        {/* سندی که دربارهٔ این فرد است باید در اختیار خودش باشد — تا پیش از این
+            تنها HR می‌توانست کارنامهٔ هش‌شده و قابل‌تأیید را دانلود کند. */}
+        <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-gray-100 pt-3">
+          <a
+            href={`/api/evaluations/${item.id}/summary.pdf`}
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex items-center gap-1.5 rounded-xl border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-100"
+          >
+            <svg viewBox="0 0 20 20" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M10 3v9m0 0l-3-3m3 3l3-3M4 15v2h12v-2" />
+            </svg>
+            دریافت کارنامهٔ رسمی (PDF)
+          </a>
+        </div>
+
+        <ObjectionSection item={item} />
       </Card>
     </motion.div>
+  );
+}
+
+/** مسیر اعتراض (P0-06).
+ *
+ * «رؤیت شد» فقط ثبت می‌کند که فرد نتیجه را *دید*، نه این‌که پذیرفت. بدون این بخش،
+ * سامانه هیچ جایی برای مخالفت او ندارد و در هر بازبینی حقوقی پاسخِ «کارمند چه گفت؟»
+ * می‌شود «هیچ‌چیز ثبت نشده». نتیجه و سند نهایی تغییر نمی‌کنند — اعتراض یک رکورد
+ * موازی است که HR باید به آن پاسخ دهد.
+ */
+function ObjectionSection({ item }: { item: MyEvaluation }) {
+  const { showSuccess, showError } = useToast();
+  const queryClient = useQueryClient();
+  const [open, setOpen] = useState(false);
+  const [reason, setReason] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  async function submit() {
+    setBusy(true);
+    try {
+      await apiClient.post(`/me/evaluations/${item.id}/object`, { reason });
+      await queryClient.invalidateQueries({ queryKey: ["me", "evaluations"] });
+      showSuccess("اعتراض شما ثبت شد و به منابع انسانی اطلاع داده شد");
+      setOpen(false);
+      setReason("");
+    } catch (err) {
+      showError(extractErrorMessage(err));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (item.objection_at) {
+    return (
+      <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50/60 p-3 text-sm">
+        <p className="font-medium text-amber-900">
+          اعتراض شما ثبت شده است — {formatDateTime(item.objection_at)}
+        </p>
+        <p className="mt-1 text-amber-800">{item.objection_reason}</p>
+        {item.objection_resolved_at ? (
+          <div className="mt-3 rounded-lg bg-white/70 p-2.5">
+            <p className="text-xs font-medium text-gray-500">
+              پاسخ منابع انسانی — {formatDateTime(item.objection_resolved_at)}
+            </p>
+            <p className="mt-1 text-gray-800">{item.objection_resolution}</p>
+          </div>
+        ) : (
+          <p className="mt-2 text-xs text-amber-700">در انتظار بررسی منابع انسانی…</p>
+        )}
+      </div>
+    );
+  }
+
+  // اعتراض فقط پس از رؤیت معنا دارد: اول باید نتیجه را دیده باشید
+  if (!item.acknowledged_at) return null;
+
+  return (
+    <div className="mt-3">
+      {!open ? (
+        <button
+          onClick={() => setOpen(true)}
+          className="text-sm font-medium text-gray-500 underline-offset-4 hover:text-amber-700 hover:underline"
+        >
+          به این نتیجه اعتراض دارید؟
+        </button>
+      ) : (
+        <div className="rounded-xl border border-amber-200 bg-amber-50/60 p-3">
+          <label htmlFor={`objection-${item.id}`} className="mb-1.5 block text-sm font-medium text-amber-900">
+            دلیل اعتراض شما
+          </label>
+          <textarea
+            id={`objection-${item.id}`}
+            className="w-full resize-none rounded-xl border border-amber-300 bg-white px-3 py-2 text-sm outline-none"
+            rows={3}
+            value={reason}
+            onChange={(e) => setReason(e.target.value)}
+            placeholder="مثلاً: شواهد ثبت‌شده برای شاخص تعهد سازمانی با گزارش حضور و غیاب هم‌خوان نیست"
+          />
+          <p className="mt-1.5 text-xs text-amber-700">
+            نتیجه و سند رسمی تغییر نمی‌کنند؛ اعتراض شما ثبت و به منابع انسانی ارجاع می‌شود
+            و پاسخ آن همین‌جا نمایش داده خواهد شد.
+          </p>
+          <div className="mt-3 flex gap-2">
+            <Button onClick={submit} loading={busy} disabled={!reason.trim()}>
+              ثبت اعتراض
+            </Button>
+            <button
+              onClick={() => setOpen(false)}
+              className="rounded-xl border border-amber-300 bg-white px-4 py-2 text-sm font-medium text-amber-800 transition-colors hover:bg-amber-100"
+            >
+              انصراف
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -146,6 +261,7 @@ function MyPlanCard({ plan, index }: { plan: ImprovementPlanDetail; index: numbe
 export function MyEvaluationsPage() {
   const { data, isPending, error } = useMyEvaluations();
   const { data: plans = [], error: plansError } = useMyImprovementPlans();
+  const { data: openCases = [] } = useMyOpenEvaluations();
 
   return (
     <div className="space-y-4">
@@ -154,6 +270,12 @@ export function MyEvaluationsPage() {
         subtitle="نتایج نهایی‌شده ارزیابی عملکرد شما. با دکمه «رؤیت شد» ابلاغ رسمی نتیجه ثبت می‌شود."
       />
       <RoleOverviewCards />
+
+      {/* پروندهٔ در جریان بالاتر از نتایج گذشته می‌آید: مهم‌ترین چیزی که فرد
+          همین حالا باید بداند، این است که تصمیمی دربارهٔ او در راه است. */}
+      {openCases.map((item, i) => (
+        <OpenCaseCard key={item.id} item={item} index={i} />
+      ))}
 
       {plansError != null && (
         <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">

@@ -11,6 +11,8 @@ from alembic import op
 import sqlalchemy as sa
 from sqlalchemy import text
 
+from app.core.config import settings
+from app.core.demo_data import DEMO_PASSWORD
 from app.core.security import hash_password
 
 # revision identifiers, used by Alembic.
@@ -19,11 +21,15 @@ down_revision: Union[str, None] = '74797edbc85f'
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
-# رمزهای نمونه فقط برای محیط توسعه/دمو هستند؛ حتماً پیش از استقرار واقعی تغییر کنند.
-DEMO_PASSWORD = "DbsPulse@12345"
-
 
 def upgrade() -> None:
+    # این کاربران یک رمز مشترک دارند که در مخزن عمومی منتشر شده است. پیش‌تر این
+    # مایگریشن بی‌قید و شرط اجرا می‌شد، یعنی هر محیطی که مایگریشن می‌خورد —
+    # از جمله production — پنج اعتبارنامهٔ معتبر و عمومی پیدا می‌کرد (hr1 عملاً
+    # super-admin است). حالا فقط با SEED_DEMO_DATA=true ساخته می‌شوند.
+    if not settings.seed_demo_data:
+        return
+
     conn = op.get_bind()
 
     def insert_user(username: str, role: str) -> int:

@@ -11,6 +11,9 @@ import {
 } from "../api/queries";
 import { useAuth } from "../auth/AuthContext";
 import { useConfirm } from "../components/ConfirmDialog";
+import { HrOwnerBar, HrRecoveryBox } from "../components/HrRecoveryBox";
+import { ObjectionPanel } from "../components/ObjectionPanel";
+import { SelfAssessmentPanel } from "../components/SelfAssessmentPanel";
 import { ScoreFormTable, computePreview, scoredRows, useScoreForm } from "../components/ScoreForm";
 import { StatusBadge } from "../components/StatusBadge";
 import { useToast } from "../components/Toast";
@@ -125,6 +128,13 @@ export function EvaluationDetailPage() {
     evaluation.stage === "ceo_final" &&
     evaluation.ceo_user_id === user.id;
 
+  // HR روی هر پروندهٔ باز — نه فقط آن‌هایی که در مرحلهٔ خودش هستند. کل هدف این است
+  // که پرونده‌ای که مسئولِ مرحله‌اش دیگر در دسترس نیست هم قابل نجات باشد.
+  const canRecoverStuckCase =
+    user.role === "hr" &&
+    evaluation.status !== "finalized" &&
+    evaluation.status !== "cancelled";
+
   const canComment =
     (user.role === "hr" && evaluation.status === "submitted") ||
     (user.role === "deputy" && evaluation.status === "hr_approved" && evaluation.deputy_user_id === user.id) ||
@@ -190,7 +200,8 @@ export function EvaluationDetailPage() {
           <div className="text-end text-sm">
             <p className="font-medium text-gray-800">{evaluation.evaluation_code}</p>
             <p className="flex flex-wrap items-center justify-end gap-1.5 text-gray-500">
-              <StatusBadge status={evaluation.status} /> · {STAGE_LABELS[evaluation.stage]}
+              <StatusBadge status={evaluation.status} />
+              {evaluation.stage && <> · {STAGE_LABELS[evaluation.stage]}</>}
               {evaluation.was_returned && (
                 <span
                   className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-[11px] font-medium text-amber-700"
@@ -386,6 +397,22 @@ export function EvaluationDetailPage() {
       {(canHrApprove || canDeputyApprove || canCeoFinalize) && (
         <ReturnBox evaluationId={evaluation.id} onReturned={load} />
       )}
+
+      {/* دیدگاه خودِ فرد، کنار امتیاز ارزیاب — برای دیدن اختلاف‌ها، نه میانگین‌گیری */}
+      <SelfAssessmentPanel evaluation={evaluation} indicators={indicators} />
+
+      {/* اعتراض ثبت‌شدهٔ کارمند + پاسخ منابع انسانی */}
+      <ObjectionPanel evaluation={evaluation} isHr={user.role === "hr"} onChanged={load} />
+
+      {/* مسئولِ HR پرونده — تا وقتی کسی برنداشته، در صف مشترک است. */}
+      {canRecoverStuckCase && (
+        <HrOwnerBar evaluation={evaluation} currentUserId={user.id} onChanged={load} />
+      )}
+
+      {/* ابزار نجات پروندهٔ گیرکرده — HR روی هر پروندهٔ باز، در هر مرحله‌ای که باشد.
+          برخلاف «برگشت» که پرونده را یک مرحله عقب می‌برد، این‌ها وقتی لازم‌اند که خود
+          مسئولِ مرحله دیگر نمی‌تواند اقدام کند. */}
+      {canRecoverStuckCase && <HrRecoveryBox evaluation={evaluation} onChanged={load} />}
 
       <div className="flex justify-end gap-2">
         {canHrApprove && (
@@ -606,6 +633,7 @@ function EditableScoring({
   const { showSuccess, showError } = useToast();
   const confirm = useConfirm();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const { drafts, setScore, setEvidence, violations, unscored, isValid } = useScoreForm(
     indicators,
     existing,
@@ -622,9 +650,18 @@ function EditableScoring({
     setSaving(true);
     setError(null);
     try {
-      await apiClient.put(`/evaluations/${evaluationId}/scores`, {
-        scores: scoredRows(drafts),
-      });
+      const { data: saved } = await apiClient.put<EvaluationDetail["scores"]>(
+        `/evaluations/${evaluationId}/scores`,
+        { scores: scoredRows(drafts) }
+      );
+      // کش را با همان چیزی که سرور برگرداند به‌روز می‌کنیم. بدون این، ذخیرهٔ خودکار
+      // فقط سرور را عوض می‌کرد و کشِ ["evaluation", id] روی وضعیتِ *پیش از ذخیره*
+      // می‌ماند؛ بازگشت به همان صفحه بدون رفرش، فرم را از آن کشِ کهنه پر می‌کرد و
+      // پیش‌نویس‌ها ناپدید به‌نظر می‌رسیدند. setQueryData به‌جای invalidate، تا هر
+      // ذخیرهٔ دو‌ثانیه‌ای یک درخواست اضافه نسازد.
+      queryClient.setQueryData<EvaluationDetail>(["evaluation", evaluationId], (old) =>
+        old ? { ...old, scores: saved } : old
+      );
       setDirty(false);
       setLastSavedAt(new Date());
       if (!options?.silent) showSuccess("پیش‌نویس ذخیره شد");

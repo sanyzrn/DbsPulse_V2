@@ -112,6 +112,14 @@ def notify_for_workflow_action(db: Session, record: EvaluationRecord, action: st
     elif action == "ceo_return":
         recipients = [record.deputy_user_id]
         message = f"پرونده {code} ({name}) توسط مدیرعامل برگشت داده شد؛ دلیل در کامنت‌های پرونده"
+    elif action == "cancel":
+        # همهٔ کسانی که روی این پرونده نقشی داشتند باید بدانند دیگر منتظرشان نیست.
+        recipients = [
+            user_id
+            for user_id in (record.unit_supervisor_user_id, record.deputy_user_id, record.ceo_user_id)
+            if user_id is not None
+        ]
+        message = f"پرونده {code} ({name}) توسط منابع انسانی لغو شد؛ دلیل در کامنت‌های پرونده"
 
     if recipients and message:
         notify(
@@ -145,3 +153,21 @@ def notify_for_workflow_action(db: Session, record: EvaluationRecord, action: st
                 evaluation_record_id=record.id,
                 link="/me",
             )
+
+
+def notify_stage_owner_reassigned(
+    db: Session, record: EvaluationRecord, new_owner_id: int, stage_label: str
+) -> None:
+    """مسئول جدید مرحله باید بداند پرونده‌ای روی میزش آمده — وگرنه پرونده دوباره
+    همان‌جا می‌ماند و بازتخصیص هیچ چیزی را حل نکرده است."""
+    notify(
+        db,
+        [new_owner_id],
+        type_="workflow_reassigned",
+        message=(
+            f"پرونده {record.evaluation_code} ({record.subject.full_name}) به‌عنوان "
+            f"«{stage_label}» به شما واگذار شد"
+        ),
+        evaluation_record_id=record.id,
+        link=f"/evaluations/{record.id}",
+    )

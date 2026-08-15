@@ -11,6 +11,7 @@ from app.models.user import User
 from app.schemas.auth import CurrentUser
 from app.schemas.evaluation_access import EvaluationAccessRead, EvaluationAccessUpsert
 from app.services.audit import log_event
+from app.services.self_evaluation import ensure_evaluators_are_not_the_subject
 
 router = APIRouter(prefix="/api/personnel/{personnel_id}/access", tags=["evaluation-access"])
 
@@ -75,6 +76,11 @@ def upsert_access(
         _ensure_active_user_with_role(db, payload.unit_supervisor_user_id, UserRole.unit_supervisor)
     _ensure_active_user_with_role(db, payload.deputy_user_id, UserRole.deputy)
     _ensure_active_user_with_role(db, payload.ceo_user_id, UserRole.ceo)
+    ensure_evaluators_are_not_the_subject(
+        db,
+        personnel_id,
+        [payload.unit_supervisor_user_id, payload.deputy_user_id, payload.ceo_user_id],
+    )
 
     access = db.scalar(select(EvaluationAccess).where(EvaluationAccess.personnel_id == personnel_id))
     if access is None:

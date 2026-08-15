@@ -1,2 +1,7 @@
 # Auto detect text files and perform LF normalization
 * text=auto
+
+# اسکریپت‌های شل همیشه با LF چک‌اوت شوند، حتی روی ویندوز. با CRLF، خط
+# «#!/bin/sh» داخل کانتینر لینوکسی به «/bin/sh^M: bad interpreter» می‌خورد و
+# ایمیج اصلاً بالا نمی‌آید.
+*.sh text eol=lf

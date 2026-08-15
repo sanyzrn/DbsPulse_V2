@@ -1,39 +1,17 @@
 import { useState } from "react";
-import {
-  Radar,
-  RadarChart,
-  PolarGrid,
-  PolarAngleAxis,
-  PolarRadiusAxis,
-  Area,
-  AreaChart,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-  Bar,
-  BarChart,
-  LabelList,
-} from "recharts";
 import { motion } from "motion/react";
 import { useQueryClient } from "@tanstack/react-query";
 import { apiClient, extractErrorMessage } from "../../api/client";
-import {
-  useDashboardOverview,
-  useExpiringContracts,
-  usePipeline,
-  usePersonRadar,
-  usePersonTrend,
-  usePersonnelList,
-} from "../../api/queries";
+import { useDashboardOverview, useExpiringContracts, usePipeline } from "../../api/queries";
 import { RoleOverviewCards } from "../../components/RoleOverviewCards";
 import { StatusBadge } from "../../components/StatusBadge";
 import { useToast } from "../../components/Toast";
+import { PersonScorecard } from "./PersonScorecard";
 import { ReportsSection } from "./ReportsSection";
 import { PageHeader } from "../../ui/Card";
-import { CountUp, PctBadge, ScoreRing } from "../../ui/Meters";
+import { CountUp, PctBadge, ScoreRing, SuppressedValue } from "../../ui/Meters";
 import { TAB_TRANSITION } from "../../ui/motion";
+import { DotPlot } from "../../ui/plot";
 import { Table } from "../../ui/Table";
 import { formatDate } from "../../utils/dates";
 import type { EvaluationStatus } from "../../types";
@@ -42,21 +20,6 @@ import type { EvaluationStatus } from "../../types";
    نمودارهای این صفحه تک‌سری‌اند (بزرگی/magnitude) — یک هیو واحد به‌جای گرادیانت
    دورنگهٔ قبلی (قرمز به طوسی تیره) که کدر و شلوغ به‌نظر می‌رسید
    ═══════════════════════════════════════════════════════════════════════ */
-const SERIES_COLOR = "#b61615"; // pulse-600
-const GRID_STROKE = "#eef0f4";
-const AXIS_STROKE = "#e5e7eb";
-
-const TICK_STYLE = { fontSize: 11, fill: "#6b7280", fontFamily: "Vazirmatn, Tahoma, sans-serif" };
-const TOOLTIP_STYLE = {
-  direction: "rtl" as const,
-  fontFamily: "Vazirmatn, Tahoma, sans-serif",
-  fontSize: 12,
-  borderRadius: 12,
-  border: "1px solid #eef0f4",
-  boxShadow: "0 12px 40px rgba(0,0,0,0.12)",
-  background: "rgba(255,255,255,0.95)",
-  backdropFilter: "blur(8px)",
-};
 
 const DASHBOARD_TABS = [
   { key: "overview" as const, label: "نمای کلی" },
@@ -71,16 +34,10 @@ const ANALYSIS_SUBTABS = [
 ];
 
 export function DashboardPage() {
-  const [selectedPersonId, setSelectedPersonId] = useState<number | null>(null);
   const [tab, setTab] = useState<"overview" | "analysis">("overview");
   const [analysisTab, setAnalysisTab] = useState<"org" | "reports" | "person">("org");
 
   const { data: overview, error: overviewError } = useDashboardOverview();
-  const { data: personnelPage } = usePersonnelList({ limit: 1000, offset: 0 });
-  // React Query خودش پاسخ‌های کهنه (تعویض سریع فرد انتخاب‌شده) را کنار می‌گذارد
-  const { data: radar = [] } = usePersonRadar(selectedPersonId);
-  const { data: trend = [] } = usePersonTrend(selectedPersonId);
-  const personnel = personnelPage?.items ?? [];
 
   if (overviewError != null)
     return <p className="p-6 text-center text-sm text-red-600">{extractErrorMessage(overviewError)}</p>;
@@ -255,99 +212,8 @@ export function DashboardPage() {
       </div>
       )}
 
-      {/* ── کارت رادار + روند فرد ── */}
-      {analysisTab === "person" && (
-      <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-card">
-        <h2 className="mb-3 text-base font-bold text-gray-900">نمودار رادار شایستگی و روند فرد</h2>
-        <div className="relative mb-4">
-          <select
-            className="w-full appearance-none rounded-xl border border-gray-200 bg-gray-100 px-4 py-2.5 pl-10 text-sm text-gray-700 outline-none transition-colors duration-150 focus:border-pulse-500 focus:bg-white sm:w-80"
-            value={selectedPersonId ?? ""}
-            onChange={(e) => setSelectedPersonId(e.target.value ? Number(e.target.value) : null)}
-          >
-            <option value="">— انتخاب فرد —</option>
-            {personnel.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.full_name}
-              </option>
-            ))}
-          </select>
-          <svg viewBox="0 0 20 20" className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" fill="none" stroke="currentColor" strokeWidth="2">
-            <path d="M6 8l4 4 4-4" />
-          </svg>
-        </div>
-
-        {selectedPersonId && (
-          <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-            <div>
-              <h3 className="mb-3 text-sm font-semibold text-gray-600">میانگین امتیاز هر شاخص (از ۵)</h3>
-              <div style={{ height: 320 }}>
-                {radar.length === 0 ? (
-                  <p className="pt-20 text-center text-sm text-gray-400">داده‌ای برای این فرد یافت نشد.</p>
-                ) : (
-                  <ResponsiveContainer>
-                    <RadarChart data={radar} margin={{ top: 12, right: 24, bottom: 12, left: 24 }}>
-                      <defs>
-                        <linearGradient id="radar-fill" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="0%" stopColor={SERIES_COLOR} stopOpacity={0.28} />
-                          <stop offset="100%" stopColor={SERIES_COLOR} stopOpacity={0.06} />
-                        </linearGradient>
-                      </defs>
-                      <PolarGrid stroke={GRID_STROKE} />
-                      <PolarAngleAxis dataKey="category" tick={{ ...TICK_STYLE, fontSize: 10 }} />
-                      <PolarRadiusAxis domain={[0, 5]} tickCount={6} tick={TICK_STYLE} stroke={GRID_STROKE} axisLine={false} />
-                      <Radar
-                        dataKey="avg_score"
-                        name="میانگین امتیاز"
-                        stroke={SERIES_COLOR}
-                        strokeWidth={2}
-                        fill="url(#radar-fill)"
-                        dot={{ r: 3.5, fill: SERIES_COLOR, strokeWidth: 0 }}
-                      />
-                      <Tooltip contentStyle={TOOLTIP_STYLE} formatter={tooltipNumber} />
-                    </RadarChart>
-                  </ResponsiveContainer>
-                )}
-              </div>
-            </div>
-            <div>
-              <h3 className="mb-3 text-sm font-semibold text-gray-600">روند امتیاز نهایی (٪)</h3>
-              <div style={{ height: 320 }}>
-                {trend.length === 0 ? (
-                  <p className="pt-20 text-center text-sm text-gray-400">روندی برای این فرد ثبت نشده است.</p>
-                ) : (
-                  <ResponsiveContainer>
-                    <AreaChart data={trend} margin={{ top: 12, right: 16, bottom: 12, left: 0 }}>
-                      <defs>
-                        <linearGradient id="trend-fill" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="0%" stopColor={SERIES_COLOR} stopOpacity={0.22} />
-                          <stop offset="100%" stopColor={SERIES_COLOR} stopOpacity={0.02} />
-                        </linearGradient>
-                      </defs>
-                      <CartesianGrid strokeDasharray="4 4" stroke={GRID_STROKE} vertical={false} />
-                      <XAxis dataKey="evaluation_code" tick={TICK_STYLE} tickLine={false} axisLine={{ stroke: AXIS_STROKE }} />
-                      <YAxis domain={[0, 100]} tick={TICK_STYLE} tickLine={false} axisLine={false} width={36} />
-                      <Tooltip contentStyle={TOOLTIP_STYLE} formatter={tooltipNumber} />
-                      <Area
-                        type="monotone"
-                        dataKey="final_weighted_pct"
-                        name="امتیاز نهایی"
-                        stroke={SERIES_COLOR}
-                        strokeWidth={2.5}
-                        fill="url(#trend-fill)"
-                        dot={{ r: 4, fill: "#fff", strokeWidth: 2.5, stroke: SERIES_COLOR }}
-                        activeDot={{ r: 6, fill: SERIES_COLOR, strokeWidth: 2, stroke: "#fff" }}
-                        animationDuration={1200}
-                      />
-                    </AreaChart>
-                  </ResponsiveContainer>
-                )}
-              </div>
-            </div>
-          </div>
-        )}
-      </div>
-      )}
+      {/* ── کارنامهٔ یک فرد: مقایسه با واحد + رادار + روند، با یک انتخابگر ── */}
+      {analysisTab === "person" && <PersonScorecard />}
 
       {/* ── گزارش‌های تحلیلی فیلترشونده ── */}
       {analysisTab === "reports" && <ReportsSection />}
@@ -358,12 +224,11 @@ export function DashboardPage() {
   );
 }
 
-function tooltipNumber(value: unknown): string {
-  return typeof value === "number" ? value.toLocaleString("fa-IR") : String(value);
-}
 
 /** نمایش امتیاز ۰ تا ۵ به‌صورت نوار کوچک تک‌رنگ + عدد. */
-function ScoreOutOfFive({ value }: { value: number }) {
+function ScoreOutOfFive({ value }: { value: number | null }) {
+  // null = سرکوب کوهورت حداقلی (P1-08): داده هست، ولی جمعیتش برای نمایشِ بی‌نام کم است
+  if (value === null) return <SuppressedValue />;
   const pct = Math.max(0, Math.min(100, (value / 5) * 100));
   const color = pct >= 70 ? "bg-green-500" : pct >= 50 ? "bg-amber-500" : "bg-red-500";
   return (
@@ -406,38 +271,34 @@ function DashboardSkeleton() {
 
 /** جدول مدرن با هدر گرادیانت و هاور. */
 /** نمودار میله‌ای میانگین به تفکیک واحد. */
-function BarByOrgUnitCard({ data }: { data: { org_unit: string; avg_final_pct: number; count: number }[] }) {
+function BarByOrgUnitCard({
+  data,
+}: {
+  data: { org_unit: string; avg_final_pct: number | null; count: number }[];
+}) {
   if (data.length === 0) return null;
-  const chartData = data.map((u) => ({
-    name: u.org_unit,
-    میانگین: Math.round(u.avg_final_pct),
+  // واحدهای سرکوب‌شده از نمودار کنار گذاشته می‌شوند: میله نمی‌تواند بگوید «پنهان»،
+  // و صفر نشان‌دادنشان دروغ است. تعدادشان زیر نمودار اعلام می‌شود.
+  const visible = data.filter((u) => u.avg_final_pct !== null);
+  const hiddenCount = data.length - visible.length;
+  if (visible.length === 0) return null;
+  const chartData = visible.map((u) => ({
+    key: u.org_unit,
+    label: u.org_unit,
+    value: u.avg_final_pct!,
+    note: `${u.count.toLocaleString("fa-IR")} ارزیابی`,
   }));
 
   return (
     <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-card">
-      <h2 className="mb-3 text-base font-bold text-gray-900">میانگین امتیاز به تفکیک واحد</h2>
-      <div style={{ height: Math.max(220, data.length * 48) }}>
-        <ResponsiveContainer>
-          <BarChart data={chartData} layout="vertical" margin={{ top: 4, right: 24, bottom: 4, left: 8 }}>
-            <CartesianGrid strokeDasharray="4 4" stroke={GRID_STROKE} horizontal={false} />
-            <XAxis type="number" domain={[0, 100]} tick={TICK_STYLE} tickLine={false} axisLine={{ stroke: AXIS_STROKE }} />
-            <YAxis type="category" dataKey="name" tick={{ ...TICK_STYLE, fontSize: 11 }} tickLine={false} axisLine={false} width={90} />
-            <Tooltip contentStyle={TOOLTIP_STYLE} formatter={tooltipNumber} cursor={{ fill: "rgba(107,114,128,0.06)" }} />
-            <Bar dataKey="میانگین" radius={[0, 6, 6, 0]} fill={SERIES_COLOR} animationDuration={1000}>
-              <LabelList
-                dataKey="میانگین"
-                position="right"
-                formatter={(v) => (v == null ? "" : Number(v).toLocaleString("fa-IR"))}
-                // باگ RTL: text-anchor="start" که Recharts برای position="right" تولید می‌کند،
-                // با جهت ارثی rtl صفحه (html dir="rtl") به‌جای «شروع از x و ادامه به راست»
-                // به «پایان در x» تفسیر می‌شود؛ برچسب به‌جای فاصله از میله، داخل خودِ میله
-                // می‌افتد. direction:ltr فقط روی همین برچسب، بدون اثر روی برچسب‌های محور.
-                style={{ fontSize: 11, fill: "#6b7280", fontFamily: "Vazirmatn, Tahoma, sans-serif", direction: "ltr" }}
-              />
-            </Bar>
-          </BarChart>
-        </ResponsiveContainer>
-      </div>
+      <h2 className="mb-1 text-base font-bold text-gray-900">میانگین امتیاز به تفکیک واحد</h2>
+      {hiddenCount > 0 && (
+        <p className="mb-3 text-xs text-gray-500">
+          {hiddenCount.toLocaleString("fa-IR")} واحد به دلیل تعداد کم افراد نمایش داده نشده است
+          (میانگینشان عملاً امتیاز فرد است).
+        </p>
+      )}
+      <DotPlot rows={chartData} ariaLabel="میانگین امتیاز به تفکیک واحد سازمانی" />
     </div>
   );
 }
@@ -558,7 +419,11 @@ function ExpiringContractsCard() {
   );
 }
 
-const PIPELINE_ORDER: EvaluationStatus[] = [
+// قیف فقط مسیر پیشرفت است؛ «لغوشده» عمداً در آن نیست (بک‌اند هم برنمی‌گرداند) چون
+// پرونده‌ای که به مرحلهٔ بعد نمی‌رود، نرخ عبور قیف را مخدوش می‌کند.
+type PipelineStatus = Exclude<EvaluationStatus, "cancelled">;
+
+const PIPELINE_ORDER: PipelineStatus[] = [
   "draft",
   "submitted",
   "hr_approved",
@@ -567,7 +432,7 @@ const PIPELINE_ORDER: EvaluationStatus[] = [
 ];
 
 // رنگ هر مرحله قیف — از خاکستری به سبز
-const PIPELINE_COLORS: Record<EvaluationStatus, string> = {
+const PIPELINE_COLORS: Record<PipelineStatus, string> = {
   draft: "from-gray-300 to-gray-400",
   submitted: "from-blue-400 to-blue-500",
   hr_approved: "from-pulse-400 to-pulse-500",

@@ -35,7 +35,7 @@ def _actors(db_session):
     return hr, sup, dep, ceo
 
 
-def test_report_summary_and_org_unit_filter(client, db_session):
+def test_report_summary_and_org_unit_filter(client, db_session, no_cohort_suppression):
     hr, sup, dep, ceo = _actors(db_session)
     p_sales = make_personnel(db_session, org_unit="واحدRPT-فروش")
     p_it = make_personnel(db_session, org_unit="واحدRPT-فناوری")
@@ -69,7 +69,7 @@ def test_report_summary_and_org_unit_filter(client, db_session):
     assert all(i["avg_score"] == 3.0 for i in body["by_indicator"])
 
 
-def test_indicator_breakdown_by_unit(client, db_session):
+def test_indicator_breakdown_by_unit(client, db_session, no_cohort_suppression):
     hr, sup, dep, ceo = _actors(db_session)
     p_sales = make_personnel(db_session, org_unit="واحدIND-فروش")
     p_it = make_personnel(db_session, org_unit="واحدIND-فناوری")
@@ -92,7 +92,7 @@ def test_indicator_breakdown_by_unit(client, db_session):
     assert client.get("/api/dashboard/report/indicator/999999", headers=auth_header(hr)).status_code == 404
 
 
-def test_employee_vs_unit(client, db_session):
+def test_employee_vs_unit(client, db_session, no_cohort_suppression):
     hr, sup, dep, ceo = _actors(db_session)
     me = make_personnel(db_session, org_unit="واحدEVU")
     peer = make_personnel(db_session, org_unit="واحدEVU")

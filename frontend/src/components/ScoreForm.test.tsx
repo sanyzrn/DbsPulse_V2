@@ -89,6 +89,56 @@ describe("useScoreForm", () => {
     // بازسازی‌شده اما هنوز بی‌امتیاز → نامعتبر
     expect(result.current.isValid).toBe(false);
   });
+
+  it("hydrates saved scores that arrive AFTER the first render", () => {
+    // باگ واقعی: کاربر چند شاخص را امتیاز می‌داد (پیش‌نویس ذخیره می‌شد)، به داشبورد
+    // می‌رفت و بدون رفرش برمی‌گشت. کش react-query هنوز نسخهٔ *پیش از ذخیره* را
+    // داشت، پس فرم با آن پر می‌شد؛ refetch پس‌زمینه امتیازها را می‌آورد ولی فرم
+    // فقط یک‌بار seed می‌شد و دیگر به‌روز نمی‌شد → «پیش‌نویس‌ها نیستند».
+    const { result, rerender } = renderHook(
+      ({ existing }) => useScoreForm(INDICATORS, existing),
+      { initialProps: { existing: [] as { id: number; indicator_id: number; score: number; evidence_text: string | null }[] } }
+    );
+    expect(result.current.drafts.every((d) => d.score === null)).toBe(true);
+
+    rerender({ existing: [{ id: 7, indicator_id: 2, score: 5, evidence_text: "شواهد ذخیره‌شده" }] });
+
+    const draft = result.current.drafts.find((d) => d.indicator_id === 2);
+    expect(draft?.score).toBe(5);
+    expect(draft?.evidence_text).toBe("شواهد ذخیره‌شده");
+  });
+
+  it("never overwrites what the evaluator is typing with late server data", () => {
+    const { result, rerender } = renderHook(
+      ({ existing }) => useScoreForm(INDICATORS, existing),
+      { initialProps: { existing: [] as { id: number; indicator_id: number; score: number; evidence_text: string | null }[] } }
+    );
+    act(() => {
+      result.current.setScore(1, 4);
+      result.current.setEvidence(1, "در حال تایپ");
+    });
+
+    // پاسخ کهنهٔ سرور می‌رسد — نباید ویرایش کاربر را پاک کند
+    rerender({ existing: [{ id: 1, indicator_id: 1, score: 1, evidence_text: "" }] });
+
+    const draft = result.current.drafts.find((d) => d.indicator_id === 1);
+    expect(draft?.score).toBe(4);
+    expect(draft?.evidence_text).toBe("در حال تایپ");
+  });
+
+  it("keeps the same drafts array when server data repeats, so autosave is not retriggered", () => {
+    // یک آرایهٔ نو در هر refetch باعث می‌شد افکت autosave شلیک کند، آن هم کش را
+    // به‌روز کند و دوباره همین چرخه — یک حلقهٔ ذخیرهٔ بی‌پایان.
+    const row = { id: 3, indicator_id: 1, score: 3, evidence_text: null };
+    const { result, rerender } = renderHook(({ e }) => useScoreForm(INDICATORS, e), {
+      initialProps: { e: [row] },
+    });
+    const first = result.current.drafts;
+
+    rerender({ e: [{ ...row }] }); // همان محتوا، آرایه/شیء تازه
+
+    expect(result.current.drafts).toBe(first);
+  });
 });
 
 describe("scoredRows", () => {

@@ -22,12 +22,30 @@ const NAV_BY_ROLE: Record<string, { to: string; label: string }[]> = {
     ...(FEATURE_PERIODS_ENABLED
       ? [{ to: "/hr/periods", label: "دوره‌های ارزیابی" }]
       : []),
-    { to: "/hr/improvement-plans", label: "برنامه‌های بهبود" },
+    { to: "/improvement-plans", label: "برنامه‌های بهبود" },
     { to: "/hr/audit-log", label: "گزارش رویدادها" },
   ],
-  unit_supervisor: [{ to: "/supervisor", label: "افراد زیرمجموعه" }],
-  deputy: [{ to: "/deputy", label: "پرونده‌های در انتظار" }],
-  ceo: [{ to: "/ceo", label: "پرونده‌های در انتظار" }],
+  // مسئول واحد و معاونت ممکن است «مسئول پیگیریِ» یک برنامهٔ بهبود باشند (P1-10).
+  // سرور فهرست را به برنامه‌های خودشان محدود می‌کند؛ بدون این لینک، تنها راه
+  // رسیدن به آن، کلیک روی اعلان بود.
+  unit_supervisor: [
+    { to: "/supervisor", label: "افراد زیرمجموعه" },
+    // P2-01: تا پیش از این، ارزیاب هیچ راهی نداشت بفهمد نمره‌دهی‌اش نسبت به
+    // بقیه کجاست — و این مفیدترین بازخوردی است که یک نمره‌دهنده می‌گیرد.
+    { to: "/my-scoring", label: "نمره‌دهی من" },
+    { to: "/improvement-plans", label: "برنامه‌های بهبود" },
+  ],
+  // معاونت هم نمره می‌دهد (مسیر «مدیر») و هم تصمیم‌گیر است، پس هر دو نما را دارد.
+  deputy: [
+    { to: "/deputy", label: "پرونده‌های در انتظار" },
+    { to: "/my-scoring", label: "نمره‌دهی من" },
+    { to: "/executive", label: "تحلیل سازمان" },
+    { to: "/improvement-plans", label: "برنامه‌های بهبود" },
+  ],
+  ceo: [
+    { to: "/ceo", label: "پرونده‌های در انتظار" },
+    { to: "/executive", label: "تحلیل سازمان" },
+  ],
   employee: [{ to: "/me", label: "کارنامه من" }],
 };
 

@@ -140,12 +140,18 @@ export function usePersonnelDetail(id: number | null) {
   });
 }
 
-export function useUsersList(params: {
+export function useUsersList({
+  enabled = true,
+  ...params
+}: {
   role?: UserRole;
   q?: string;
   is_active?: boolean;
   limit: number;
   offset?: number;
+  /** فهرست کاربران endpointای مخصوص HR است؛ صفحه‌هایی که نقش‌های دیگر هم بازشان
+   *  می‌کنند باید بتوانند این واکشی را خاموش کنند تا ۴۰۳ بی‌مورد نگیرند. */
+  enabled?: boolean;
 }) {
   return useQuery({
     queryKey: ["users", params],
@@ -155,6 +161,7 @@ export function useUsersList(params: {
           params: compactParams(params),
         })
       ).data,
+    enabled,
     placeholderData: keepPreviousData,
   });
 }
@@ -262,6 +269,15 @@ export function useMyEvaluations() {
   return useQuery({
     queryKey: ["me", "evaluations"],
     queryFn: async () => (await apiClient.get<Page<MyEvaluation>>("/me/evaluations")).data,
+  });
+}
+
+/** پروندهٔ در جریانِ خود کارمند — فقط وضعیت، بدون امتیاز. */
+export function useMyOpenEvaluations() {
+  return useQuery({
+    queryKey: ["me", "evaluations", "open"],
+    queryFn: async () =>
+      (await apiClient.get<import("../types").MyOpenEvaluation[]>("/me/evaluations/open")).data,
   });
 }
 

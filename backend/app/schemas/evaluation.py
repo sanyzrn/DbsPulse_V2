@@ -1,7 +1,17 @@
 from datetime import datetime
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, computed_field
 
+from app.core.text_limits import (
+    COMMENT_MAX,
+    EVALUATOR_COMMENT_MAX,
+    EVIDENCE_MAX,
+    OBJECTION_MAX,
+    REASON_MAX,
+    SELF_ASSESSMENT_NOTE_MAX,
+    SELF_ASSESSMENT_SUMMARY_MAX,
+)
 from app.models.enums import CommentStage, EvaluationStage, EvaluationStatus
 
 # مرحله نمایشی از وضعیت مشتق می‌شود؛ ستون جداگانه‌ای در دیتابیس ندارد (G1 در PROJECT_AUDIT).
@@ -11,6 +21,17 @@ _STAGE_BY_STATUS: dict[EvaluationStatus, EvaluationStage] = {
     EvaluationStatus.hr_approved: EvaluationStage.deputy_review,
     EvaluationStatus.deputy_approved: EvaluationStage.ceo_final,
     EvaluationStatus.finalized: EvaluationStage.ceo_final,
+    # cancelled عمداً این‌جا نیست: پروندهٔ لغوشده در هیچ مرحله‌ای «نیست» و نسبت‌دادن
+    # یک مرحله به آن گمراه‌کننده است. stage برای این حالت None برمی‌گردد.
+}
+
+# برچسب‌های مرحله از دید خودِ کارمند — «چه کسی الان باید اقدام کند»، نه اصطلاح داخلی
+# گردش‌کار. کارمند نباید برای فهمیدن وضعیت پرونده‌اش واژگان سازمانی یاد بگیرد.
+_EMPLOYEE_STAGE_LABELS: dict[EvaluationStatus, str] = {
+    EvaluationStatus.draft: "در حال تکمیل توسط ارزیاب",
+    EvaluationStatus.submitted: "در حال بررسی منابع انسانی",
+    EvaluationStatus.hr_approved: "در انتظار تأیید معاونت",
+    EvaluationStatus.deputy_approved: "در انتظار تأیید مدیرعامل",
 }
 
 
@@ -21,7 +42,7 @@ class EvaluationCreate(BaseModel):
 class ScoreInput(BaseModel):
     indicator_id: int
     score: int = Field(ge=1, le=5)
-    evidence_text: str | None = None
+    evidence_text: str | None = Field(default=None, max_length=EVIDENCE_MAX)
 
 
 class ScoresUpsert(BaseModel):
@@ -40,7 +61,7 @@ class ScoreRead(BaseModel):
 class CommentCreate(BaseModel):
     model_config = ConfigDict(str_strip_whitespace=True)
 
-    comment_text: str = Field(min_length=1)
+    comment_text: str = Field(min_length=1, max_length=COMMENT_MAX)
     # اگر مقدار داشته باشد، این یک پاسخ threaded به یک کامنتِ سطح‌بالاست (فقط یک سطح عمق).
     parent_comment_id: int | None = None
 
@@ -60,7 +81,34 @@ class CommentRead(BaseModel):
 class ReturnRequest(BaseModel):
     model_config = ConfigDict(str_strip_whitespace=True)
 
-    reason: str = Field(min_length=1)
+    reason: str = Field(min_length=1, max_length=REASON_MAX)
+
+
+class CancelRequest(BaseModel):
+    """لغو پرونده دلیل اجباری دارد — این یک تصمیم ثبت‌شدنی است، نه یک پاک‌کردن بی‌صدا."""
+
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+    reason: str = Field(min_length=1, max_length=REASON_MAX)
+
+
+class HrHandover(BaseModel):
+    """واگذاری مسئولیتِ HR یک پرونده به کاربر دیگری از منابع انسانی."""
+
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+    new_hr_user_id: int
+    reason: str = Field(min_length=1, max_length=REASON_MAX)
+
+
+class StageOwnerReassign(BaseModel):
+    """جایگزینی مسئول یکی از سه مرحله روی یک پروندهٔ باز."""
+
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+    stage_field: Literal["unit_supervisor_user_id", "deputy_user_id", "ceo_user_id"]
+    new_user_id: int
+    reason: str = Field(min_length=1, max_length=REASON_MAX)
 
 
 class EvaluationRead(BaseModel):
@@ -74,6 +122,9 @@ class EvaluationRead(BaseModel):
     unit_supervisor_user_id: int | None
     deputy_user_id: int
     ceo_user_id: int
+    # مسئولِ HR این پرونده؛ null یعنی هنوز در صف مشترک منابع انسانی است
+    hr_user_id: int | None = None
+    hr_username: str | None = None
     status: EvaluationStatus
     general_score_pct: float | None
     specialized_score_pct: float | None
@@ -86,16 +137,25 @@ class EvaluationRead(BaseModel):
     # آیا این پرونده قبلاً حداقل یک‌بار برگشت خورده — تا صف بررسی بتواند آن را
     # از یک ثبت/تأیید تازه متمایز کند (روی list_evaluations پر می‌شود، نه اینجا)
     was_returned: bool = False
+    # اعتراض کارمند روی نمای کامل هم دیده می‌شود، وگرنه HR جایی برای رسیدگی ندارد
+    objection_at: datetime | None = None
+    objection_reason: str | None = None
+    objection_resolved_at: datetime | None = None
+    objection_resolution: str | None = None
 
     @computed_field  # type: ignore[prop-decorator]
     @property
-    def stage(self) -> EvaluationStage:
-        return _STAGE_BY_STATUS[self.status]
+    def stage(self) -> EvaluationStage | None:
+        """None برای پروندهٔ لغوشده — در هیچ مرحله‌ای از زنجیره نیست."""
+        return _STAGE_BY_STATUS.get(self.status)
 
 
 class EvaluationDetail(EvaluationRead):
     scores: list[ScoreRead] = []
     comments: list[CommentRead] = []
+    # خودارزیابی کنار امتیاز ارزیاب دیده می‌شود تا فاصله‌ها موضوع گفت‌وگو شوند.
+    # عمداً در محاسبه نقشی ندارد — جدولش هم جداست (models/self_assessment.py).
+    self_assessment: "SelfAssessmentRead | None" = None
 
 
 class EvaluationPage(BaseModel):
@@ -104,7 +164,9 @@ class EvaluationPage(BaseModel):
 
 
 class EvaluatorCommentUpdate(BaseModel):
-    evaluator_comment: str
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+    evaluator_comment: str = Field(max_length=EVALUATOR_COMMENT_MAX)
 
 
 class MyEvaluationRead(BaseModel):
@@ -122,8 +184,88 @@ class MyEvaluationRead(BaseModel):
     recommendation: str | None
     finalized_at: datetime | None
     acknowledged_at: datetime | None
+    # مسیر اعتراض: «رؤیت» فقط ثبت می‌کند که فرد نتیجه را دیده، نه این‌که پذیرفته.
+    objection_at: datetime | None = None
+    objection_reason: str | None = None
+    objection_resolved_at: datetime | None = None
+    objection_resolution: str | None = None
 
 
 class MyEvaluationPage(BaseModel):
     total: int
     items: list[MyEvaluationRead]
+
+
+class MyOpenEvaluation(BaseModel):
+    """نمای «وضعیت‌فقط» از پروندهٔ در جریانِ خود کارمند.
+
+    عمداً هیچ امتیاز، شواهد یا کامنتی ندارد: پرونده هنوز در حال تصمیم‌گیری است و
+    نمرهٔ پیش‌نویس نه نهایی است نه قابل استناد. ولی این‌که «پرونده‌ای دربارهٔ من باز
+    است و الان روی میز چه کسی است» چیزی است که فرد حق دارد بداند — بدون آن، فرایند
+    از دید او یک جعبهٔ سیاه است که یک روز نتیجه‌اش اعلام می‌شود.
+    """
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    evaluation_code: str
+    status: EvaluationStatus
+    created_at: datetime
+    stage_entered_at: datetime
+
+    @computed_field  # type: ignore[prop-decorator]
+    @property
+    def stage_label(self) -> str:
+        """برچسب فارسیِ «الان روی میز چه کسی است» برای نمایش مستقیم."""
+        return _EMPLOYEE_STAGE_LABELS.get(self.status, "در جریان")
+
+
+class SelfAssessmentInput(BaseModel):
+    indicator_id: int
+    score: int = Field(ge=1, le=5)
+    note: str | None = Field(default=None, max_length=SELF_ASSESSMENT_NOTE_MAX)
+
+
+class SelfAssessmentSubmit(BaseModel):
+    """خودارزیابی کارمند — یک‌بار ثبت می‌شود و بعد قفل است.
+
+    تغییرپذیر بودنش یعنی می‌شود بعد از دیدن نمرهٔ ارزیاب نظر خود را عوض کرد، که کل
+    ارزش «دیدگاه مستقل» را از بین می‌برد.
+    """
+
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+    scores: list[SelfAssessmentInput]
+    note: str | None = Field(default=None, max_length=SELF_ASSESSMENT_SUMMARY_MAX)
+
+
+class SelfAssessmentScoreRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    indicator_id: int
+    score: int
+    note: str | None
+
+
+class SelfAssessmentRead(BaseModel):
+    """نمای خودارزیابی — هم برای خودِ کارمند، هم کنار امتیاز ارزیاب برای زنجیره."""
+
+    submitted_at: datetime | None
+    note: str | None
+    scores: list[SelfAssessmentScoreRead] = []
+
+
+class ObjectionRequest(BaseModel):
+    """اعتراض رسمی کارمند به نتیجهٔ نهایی."""
+
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+    reason: str = Field(min_length=1, max_length=OBJECTION_MAX)
+
+
+class ObjectionResolution(BaseModel):
+    """پاسخ منابع انسانی به اعتراض — اعتراضی که کسی جواب ندهد تشریفات است."""
+
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+    resolution: str = Field(min_length=1, max_length=OBJECTION_MAX)

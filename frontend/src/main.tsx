@@ -13,6 +13,7 @@ import { AuthProvider } from './auth/AuthContext.tsx'
 import { ErrorBoundary } from './components/ErrorBoundary.tsx'
 import { ToastProvider } from './components/Toast.tsx'
 import { ConfirmProvider } from './components/ConfirmDialog.tsx'
+import { registerServiceWorker } from './pwa.ts'
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -42,3 +43,5 @@ createRoot(document.getElementById('root')!).render(
     </BrowserRouter>
   </StrictMode>,
 )
+
+registerServiceWorker()

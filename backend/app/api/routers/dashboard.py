@@ -29,10 +29,23 @@ from app.schemas.dashboard import (
     UnitStat,
 )
 from app.schemas.notification import ExpiringContract
+from app.services.privacy import suppressed_avg
+from app.services.workflow import IS_OPEN_RECORD
 
 router = APIRouter(prefix="/api/dashboard", tags=["dashboard"])
 
 _FINALIZED = EvaluationRecord.status == EvaluationStatus.finalized
+
+# قیف «پیشرفت» را نشان می‌دهد، پس cancelled عمداً در آن نیست: پروندهٔ لغوشده به
+# مرحلهٔ بعد نمی‌رود و آوردنش در قیف، نرخ عبور را مخدوش می‌کند. HR پرونده‌های لغوشده
+# را از فهرست ارزیابی‌ها با فیلتر وضعیت می‌بیند.
+_PIPELINE_STATUSES: tuple[EvaluationStatus, ...] = (
+    EvaluationStatus.draft,
+    EvaluationStatus.submitted,
+    EvaluationStatus.hr_approved,
+    EvaluationStatus.deputy_approved,
+    EvaluationStatus.finalized,
+)
 
 
 @router.get("/overview", response_model=DashboardOverview)
@@ -57,7 +70,11 @@ def overview(
         .group_by(Personnel.org_unit)
     ).all()
     by_org_unit = [
-        UnitStat(org_unit=unit, avg_final_pct=round(float(avg), 1), count=count)
+        UnitStat(
+            org_unit=unit,
+            avg_final_pct=suppressed_avg(round(float(avg), 1), count),
+            count=count,
+        )
         for unit, avg, count in unit_rows
     ]
 
@@ -84,7 +101,9 @@ def overview(
         EvaluatorStat(
             evaluator_user_id=uid,
             username=username,
-            avg_final_pct=round(float(avg), 1),
+            # میانگین یک ارزیاب که فقط دو پرونده داده، پروفایل او نیست — امتیاز همان
+            # دو نفر است. تحلیل رفتار ارزیاب به دادهٔ کافی نیاز دارد.
+            avg_final_pct=suppressed_avg(round(float(avg), 1), count),
             subordinate_count=subordinate_counts.get(uid, 0),
             evaluation_count=count,
         )
@@ -92,7 +111,7 @@ def overview(
     ]
 
     indicator_rows = db.execute(
-        select(Indicator.id, Indicator.category, func.avg(EvaluationScore.score))
+        select(Indicator.id, Indicator.category, func.avg(EvaluationScore.score), func.count())
         .join(EvaluationScore, EvaluationScore.indicator_id == Indicator.id)
         .join(EvaluationRecord, EvaluationRecord.id == EvaluationScore.evaluation_record_id)
         .where(_FINALIZED)
@@ -101,11 +120,21 @@ def overview(
         .limit(5)
     ).all()
     lowest_by_indicator = [
-        IndicatorStat(indicator_id=iid, category=category, avg_score=round(float(avg), 2))
-        for iid, category, avg in indicator_rows
+        IndicatorStat(
+            indicator_id=iid,
+            category=category,
+            avg_score=suppressed_avg(round(float(avg), 2), count),
+        )
+        for iid, category, avg, count in indicator_rows
     ]
 
-    lowest_by_unit = sorted(by_org_unit, key=lambda x: x.avg_final_pct)[:5]
+    # «۵ واحد ضعیف‌تر» فقط از میان واحدهایی انتخاب می‌شود که میانگینشان قابل نمایش
+    # است؛ رتبه‌بندی روی مقدار سرکوب‌شده هم بی‌معناست و هم خود سرکوب را دور می‌زند
+    # (جایگاه در فهرست «ضعیف‌ترین‌ها» خودش یک نشت است).
+    lowest_by_unit = sorted(
+        (u for u in by_org_unit if u.avg_final_pct is not None),
+        key=lambda x: x.avg_final_pct,
+    )[:5]
 
     person_rows = db.execute(
         select(Personnel.id, Personnel.full_name, EvaluationRecord.final_weighted_pct)
@@ -152,7 +181,7 @@ def pipeline(
             count=rows.get(status_member, (0, None))[0],
             oldest_created_at=rows.get(status_member, (0, None))[1],
         )
-        for status_member in EvaluationStatus
+        for status_member in _PIPELINE_STATUSES
     ]
 
 
@@ -171,7 +200,7 @@ def expiring_contracts(
         select(EvaluationRecord.id)
         .where(
             EvaluationRecord.subject_personnel_id == Personnel.id,
-            EvaluationRecord.status != EvaluationStatus.finalized,
+            IS_OPEN_RECORD,
         )
         .exists()
     )
@@ -269,7 +298,7 @@ def personnel_in_progress(
         select(EvaluationRecord)
         .where(
             EvaluationRecord.subject_personnel_id == personnel_id,
-            EvaluationRecord.status != EvaluationStatus.finalized,
+            IS_OPEN_RECORD,
         )
         .order_by(EvaluationRecord.created_at.desc())
     )
@@ -426,7 +455,7 @@ def role_overview(
             RoleOverviewCard(
                 key="open",
                 label="پرونده‌های باز",
-                value=_count_records(db, EvaluationRecord.status != EvaluationStatus.finalized),
+                value=_count_records(db, IS_OPEN_RECORD),
                 tone="pulse",
             ),
             RoleOverviewCard(

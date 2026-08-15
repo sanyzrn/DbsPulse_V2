@@ -138,3 +138,78 @@ def test_periods_are_hr_only(client, db_session):
         headers=auth_header(sup),
     )
     assert r.status_code == 403
+
+
+def test_progress_reports_how_many_files_are_still_mid_workflow(client, db_session):
+    """عددی که تصمیمِ بستن دوره به آن بستگی دارد.
+
+    بستن دوره‌ای که چند پرونده وسط گردش‌کار دارد اشتباهی است که باید *پیش* از
+    انجامش دیده شود؛ تا پیش از این هیچ‌جا شمرده نمی‌شد.
+    """
+    hr = make_user(db_session, "hr")
+    sup = make_user(db_session, "unit_supervisor")
+    dep = make_user(db_session, "deputy")
+    ceo = make_user(db_session, "ceo")
+    person = make_personnel(db_session, full_name="پروندهٔ باز")
+    make_access(db_session, person, sup, dep, ceo)
+    db_session.commit()
+
+    period = _create_period(client, hr)
+    progress = lambda: client.get(  # noqa: E731
+        f"/api/periods/{period['id']}/progress", headers=auth_header(hr)
+    ).json()
+
+    assert progress()["in_progress"] == 0
+
+    client.post(
+        "/api/evaluations", json={"subject_personnel_id": person.id}, headers=auth_header(sup)
+    )
+    assert progress()["in_progress"] == 1
+
+
+def test_a_cancelled_file_counts_as_neither_open_nor_finalized(client, db_session):
+    """«started منهای finalized» غلط بود: پروندهٔ لغوشده را «در جریان» نشان می‌داد."""
+    hr = make_user(db_session, "hr")
+    sup = make_user(db_session, "unit_supervisor")
+    dep = make_user(db_session, "deputy")
+    ceo = make_user(db_session, "ceo")
+    person = make_personnel(db_session, full_name="پروندهٔ لغوشده")
+    make_access(db_session, person, sup, dep, ceo)
+    db_session.commit()
+
+    period = _create_period(client, hr)
+    created = client.post(
+        "/api/evaluations", json={"subject_personnel_id": person.id}, headers=auth_header(sup)
+    ).json()
+    client.post(
+        f"/api/evaluations/{created['id']}/cancel",
+        json={"reason": "ثبت اشتباه بود و باید حذف شود"},
+        headers=auth_header(hr),
+    )
+
+    body = client.get(f"/api/periods/{period['id']}/progress", headers=auth_header(hr)).json()
+
+    assert body["started"] == 1
+    assert body["finalized"] == 0
+    assert body["in_progress"] == 0
+
+
+def test_not_started_list_is_capped_but_the_total_is_not(client, db_session):
+    """فهرست بریده می‌شود تا پاسخ چندهزارردیفی نشود، ولی عدد کل پنهان نمی‌ماند."""
+    from app.api.routers.periods import NOT_STARTED_LIMIT
+
+    hr = make_user(db_session, "hr")
+    sup = make_user(db_session, "unit_supervisor")
+    dep = make_user(db_session, "deputy")
+    ceo = make_user(db_session, "ceo")
+    for i in range(3):
+        person = make_personnel(db_session, full_name=f"جامانده {i}")
+        make_access(db_session, person, sup, dep, ceo)
+    db_session.commit()
+
+    period = _create_period(client, hr)
+    body = client.get(f"/api/periods/{period['id']}/progress", headers=auth_header(hr)).json()
+
+    assert body["not_started_total"] >= 3
+    assert len(body["not_started"]) <= NOT_STARTED_LIMIT
+    assert len(body["not_started"]) <= body["not_started_total"]

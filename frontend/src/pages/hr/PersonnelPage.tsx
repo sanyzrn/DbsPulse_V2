@@ -9,8 +9,10 @@ import {
 } from "../../api/queries";
 import { EmployeeProfileModal } from "../../components/EmployeeProfileModal";
 import { ExcelExportButton } from "../../components/ExcelExportButton";
+import { PersonnelImportDialog } from "../../components/PersonnelImportDialog";
 import { PaginationControls } from "../../components/PaginationControls";
 import { useToast } from "../../components/Toast";
+import { generatePassword } from "../../utils/password";
 import { Button } from "../../ui/Button";
 import { FilterSelect, PageHeader, TableSkeleton } from "../../ui/Card";
 import { Modal } from "../../ui/Modal";
@@ -43,9 +45,105 @@ const emptyAccess: AccessDraft = {
   ceo_user_id: null,
 };
 
+/** حساب کاربری «کارمند» که هم‌زمان با پرسنل ساخته می‌شود.
+ *
+ * پیش‌فرض روشن است چون حالت رایج همین است، ولی قابل خاموش‌کردن: هر پرسنلی لازم
+ * نیست حساب داشته باشد، و حسابِ خفته با رمز موقتِ تغییرنکرده خودش یک بدهی امنیتی است. */
+type AccountDraft = { enabled: boolean; username: string; password: string };
+
+const emptyAccount: AccountDraft = { enabled: true, username: "", password: "" };
+
+/** نام کاربری پیشنهادی از روی کد پرسنلی — یکتا به‌طور طبیعی، و بدون حدس‌زدنِ
+ *  آوانگاری نام فارسی که هم شکننده است و هم تکراری‌پذیر. */
+function suggestUsername(personnelCode: string): string {
+  return personnelCode.trim().toLowerCase().replace(/[^a-z0-9_.-]/g, "-").replace(/^-+|-+$/g, "");
+}
+
+/** رمز موقتِ قوی. HR باید آن را به فرد بدهد، پس باید بتواند ببیندش. */
+
 /** کلاس استاندارد فیلد ورودی مدرن. */
 const inputClass =
   "w-full rounded-xl border border-gray-200 bg-gray-100 px-3 py-2 text-sm text-gray-900 outline-none transition-colors duration-150 focus:border-pulse-500 focus:bg-white";
+
+/** حساب کاربری کارمند، داخل همان فرم ثبت پرسنل — تا «دسترسی دادن به فرد» یک
+ * مرحلهٔ جدا و فراموش‌شدنی نباشد. */
+function AccountFields({
+  personnelCode,
+  account,
+  setAccount,
+}: {
+  personnelCode: string;
+  account: AccountDraft;
+  setAccount: (a: AccountDraft) => void;
+}) {
+  // تا وقتی HR دستی چیزی ننوشته، نام کاربری از کد پرسنلی پیروی می‌کند
+  const [usernameTouched, setUsernameTouched] = useState(false);
+  const username = usernameTouched ? account.username : suggestUsername(personnelCode);
+
+  return (
+    <>
+      <label className="flex items-center gap-2 text-sm">
+        <input
+          type="checkbox"
+          checked={account.enabled}
+          onChange={(e) => setAccount({ ...account, enabled: e.target.checked })}
+          className="h-4 w-4 cursor-pointer rounded border-gray-300 text-pulse-500 focus:ring-gray-400"
+        />
+        <span className="font-semibold text-gray-800">ساخت حساب کاربری برای این فرد</span>
+      </label>
+      <p className="mt-1 text-xs text-gray-500">
+        تا وقتی حساب نداشته باشد، نمی‌تواند کارنامهٔ خودش را ببیند. اگر این فرد اصلاً با
+        سامانه کار نمی‌کند، تیک را بردارید.
+      </p>
+
+      {account.enabled && (
+        <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <label className="block text-sm">
+            <span className="mb-1.5 block font-medium text-gray-700">نام کاربری</span>
+            <input
+              className={inputClass}
+              value={username}
+              onChange={(e) => {
+                setUsernameTouched(true);
+                setAccount({ ...account, username: e.target.value });
+              }}
+              placeholder="مثلاً p-1004"
+              dir="ltr"
+            />
+            <span className="mt-1 block text-xs text-gray-400">
+              حروف انگلیسی، عدد، نقطه، خط تیره و زیرخط
+            </span>
+          </label>
+
+          <label className="block text-sm">
+            <span className="mb-1.5 block font-medium text-gray-700">رمز عبور موقت</span>
+            <div className="flex gap-2">
+              <input
+                className={inputClass}
+                value={account.password}
+                onChange={(e) => setAccount({ ...account, username: username, password: e.target.value })}
+                placeholder="حداقل ۱۰ نویسه"
+                dir="ltr"
+              />
+              <button
+                type="button"
+                onClick={() =>
+                  setAccount({ ...account, username, password: generatePassword() })
+                }
+                className="whitespace-nowrap rounded-xl border border-gray-300 bg-white px-3 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-100"
+              >
+                تولید
+              </button>
+            </div>
+            <span className="mt-1 block text-xs text-gray-400">
+              همین رمز را به فرد بدهید؛ در اولین ورود مجبور به تغییرش می‌شود.
+            </span>
+          </label>
+        </div>
+      )}
+    </>
+  );
+}
 
 /** فیلدهای دسترسی زنجیره ارزیابی (مسئول واحد/معاونت/مدیرعامل) که هم در فرم افزودن
  * و هم در مودال ویرایش پرسنل استفاده می‌شوند؛ دسترسی جزئی از ثبت پرسنل است نه یک
@@ -148,8 +246,10 @@ export function PersonnelPage() {
   const queryClient = useQueryClient();
   const [form, setForm] = useState(emptyForm);
   const [access, setAccess] = useState<AccessDraft>(emptyAccess);
+  const [account, setAccount] = useState<AccountDraft>(emptyAccount);
   const [error, setError] = useState<string | null>(null);
   const [showAddPersonnel, setShowAddPersonnel] = useState(false);
+  const [showImport, setShowImport] = useState(false);
   const [profilePerson, setProfilePerson] = useState<Personnel | null>(null);
   const [editingPersonnel, setEditingPersonnel] = useState<Personnel | null>(null);
   const [search, setSearch] = useState("");
@@ -197,13 +297,28 @@ export function PersonnelPage() {
     }
     try {
       // ثبت پرسنل و سپس تنظیم دسترسی در همان جریان؛ دسترسی بخشی از ایجاد پرسنل است.
-      const { data: created } = await apiClient.post<Personnel>("/personnel", form);
+      // حساب کاربری در همان درخواستِ ساخت پرسنل می‌رود تا اگر نام کاربری تکراری بود،
+      // هیچ‌کدام ساخته نشوند — نه پرسنلی که حسابش نیمه‌کاره مانده.
+      const username = account.username.trim() || suggestUsername(form.personnel_code);
+      const body = account.enabled
+        ? { ...form, account: { username, password: account.password } }
+        : form;
+      const { data: created } = await apiClient.post<Personnel & { account_username: string | null }>(
+        "/personnel",
+        body,
+      );
       await apiClient.put(`/personnel/${created.id}/access`, accessPayload(access, form.is_manager));
       setForm(emptyForm);
       setAccess(emptyAccess);
+      setAccount(emptyAccount);
       await queryClient.invalidateQueries({ queryKey: ["personnel"] });
+      await queryClient.invalidateQueries({ queryKey: ["users"] });
       setShowAddPersonnel(false);
-      showSuccess("پرسنل با موفقیت افزوده شد");
+      showSuccess(
+        created.account_username
+          ? `پرسنل افزوده شد و حساب کاربری «${created.account_username}» برایش ساخته شد`
+          : "پرسنل با موفقیت افزوده شد",
+      );
     } catch (err) {
       const message = extractErrorMessage(err);
       setError(message);
@@ -215,6 +330,13 @@ export function PersonnelPage() {
     <div className="space-y-4">
       <PageHeader title="پرسنل" subtitle="ثبت پرسنل جدید و مدیریت دسترسی زنجیره ارزیابی هر فرد" />
       <div className="space-y-4">
+        {showImport && (
+          <PersonnelImportDialog
+            onClose={() => setShowImport(false)}
+            onImported={() => queryClient.invalidateQueries({ queryKey: ["personnel"] })}
+          />
+        )}
+
         {showAddPersonnel && (
           <Modal
             title="افزودن پرسنل"
@@ -305,6 +427,15 @@ export function PersonnelPage() {
               </label>
             </div>
 
+            {/* حساب کاربری کارمند — همان‌جا، تا مرحلهٔ جدا و فراموش‌شدنی نباشد */}
+            <div className="mt-4 border-t border-gray-100 pt-4">
+              <AccountFields
+                personnelCode={form.personnel_code}
+                account={account}
+                setAccount={setAccount}
+              />
+            </div>
+
             {/* دسترسی زنجیره ارزیابی — بخشی از همان فرم ثبت پرسنل */}
             <div className="mt-4 border-t border-gray-100 pt-4">
               <h3 className="mb-3 text-sm font-semibold text-gray-800">دسترسی زنجیره ارزیابی</h3>
@@ -335,6 +466,16 @@ export function PersonnelPage() {
                 filename="personnel.xlsx"
                 params={listParams}
               />
+              <button
+                type="button"
+                onClick={() => setShowImport(true)}
+                className="inline-flex items-center gap-1.5 rounded-xl border border-gray-200 bg-white px-3 py-1.5 text-sm font-medium text-gray-600 shadow-sm transition-colors hover:bg-gray-50"
+              >
+                <svg viewBox="0 0 20 20" className="h-4 w-4 text-pulse-600" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                  <path d="M10 14V4m0 0L6.5 7.5M10 4l3.5 3.5M4 15v1a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1v-1" />
+                </svg>
+                ورودی Excel
+              </button>
               <div className="relative">
                 <svg viewBox="0 0 20 20" className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
                   <circle cx="9" cy="9" r="6" />

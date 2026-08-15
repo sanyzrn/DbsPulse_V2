@@ -5,6 +5,9 @@ os.environ.setdefault(
 )
 os.environ.setdefault("ENVIRONMENT", "development")
 os.environ.setdefault("JWT_SECRET_KEY", "test-secret-key-not-for-production")
+# زمان‌بند در تست عمداً خاموش است: هر تست خودش جاروها را صدا می‌زند و یک حلقهٔ
+# پس‌زمینه فقط نویز و ناپایداری اضافه می‌کند.
+os.environ.setdefault("ENABLE_SCHEDULER", "false")
 
 import subprocess
 from pathlib import Path
@@ -38,6 +41,39 @@ def db_session():
     outer_transaction.rollback()
     connection.close()
     engine.dispose()
+
+
+@pytest.fixture(autouse=True)
+def _reset_rate_limiter():
+    """سطل محدودیت نرخِ per-IP بین تست‌ها ریست می‌شود.
+
+    همهٔ تست‌ها از یک آدرس (testclient) درخواست می‌زنند، پس بدون این، هر تستی که به
+    /api/auth/login می‌زند سهمیهٔ تست‌های بعدی را می‌سوزاند و شکست‌ها به ترتیب اجرا
+    وابسته می‌شوند. تست خودِ محدودیت نرخ سالم می‌ماند چون سهمیه‌اش را در یک تست
+    مصرف می‌کند.
+    """
+    from app.core.rate_limit import limiter
+
+    limiter.reset()
+    yield
+    limiter.reset()
+
+
+@pytest.fixture()
+def no_cohort_suppression():
+    """سرکوب کوهورت حداقلی (P1-08) را برای این تست خاموش می‌کند.
+
+    تست‌هایی که *ریاضیِ* تجمیع را می‌سنجند با دو-سه رکورد کار می‌کنند، یعنی زیر آستانه
+    می‌افتند و میانگینشان درست و حسابی سرکوب می‌شود. آن‌ها به عدد نیاز دارند، نه به
+    رفتار سرکوب — رفتار سرکوب خودش در test_cohort_suppression.py تست می‌شود.
+    عمداً autouse نیست: پیش‌فرض باید همان رفتار واقعی بماند.
+    """
+    from app.core.config import settings
+
+    original = settings.min_cohort_size
+    settings.min_cohort_size = 1
+    yield
+    settings.min_cohort_size = original
 
 
 @pytest.fixture()

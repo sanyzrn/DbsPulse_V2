@@ -123,6 +123,10 @@ REM 4. Database migrations (Alembic)
 REM ------------------------------------------------------------
 echo [4/6] Running database migrations...
 pushd "%BACKEND%"
+REM This script bootstraps a LOCAL DEVELOPMENT environment, so the sample
+REM users/personnel are seeded on purpose. They are gated behind this flag and are
+REM never created in production - see README.md, "کاربران نمونه".
+set "SEED_DEMO_DATA=true"
 "%PY%" -m alembic upgrade head
 if errorlevel 1 (
     popd

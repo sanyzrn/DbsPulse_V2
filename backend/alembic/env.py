@@ -35,7 +35,17 @@ def run_migrations_online() -> None:
         poolclass=pool.NullPool,
     )
     with connectable.connect() as connection:
-        context.configure(connection=connection, target_metadata=target_metadata)
+        context.configure(
+            connection=connection,
+            target_metadata=target_metadata,
+            # هر مایگریشن تراکنش خودش را دارد، نه یک تراکنش برای کل زنجیره.
+            # لازم است چون Postgres اجازه نمی‌دهد مقدار تازهٔ یک enum در همان تراکنشی
+            # که اضافه شده استفاده شود (d7a2c91fb480 مقدار cancelled را اضافه می‌کند و
+            # e4b8d03ca712 در predicate ایندکس از آن استفاده می‌کند).
+            # ضمناً عملیاتی‌تر هم هست: اگر زنجیرهٔ بلندی وسط راه شکست بخورد،
+            # مایگریشن‌های موفقِ قبلی برنمی‌گردند و از همان‌جا ادامه می‌دهید.
+            transaction_per_migration=True,
+        )
         with context.begin_transaction():
             context.run_migrations()
 

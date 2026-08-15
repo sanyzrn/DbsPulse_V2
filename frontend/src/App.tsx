@@ -1,5 +1,5 @@
 import { lazy, Suspense } from "react";
-import { Navigate, Route, Routes } from "react-router-dom";
+import { Navigate, Route, Routes, useParams } from "react-router-dom";
 import { FEATURE_PERIODS_ENABLED } from "./appInfo";
 import { useAuth } from "./auth/AuthContext";
 import { ProtectedRoute } from "./auth/ProtectedRoute";
@@ -12,6 +12,9 @@ import { LoginPage } from "./pages/LoginPage";
 const VerifyPage = lazy(() => import("./pages/VerifyPage").then((m) => ({ default: m.VerifyPage })));
 const ChangePasswordPage = lazy(() =>
   import("./pages/ChangePasswordPage").then((m) => ({ default: m.ChangePasswordPage }))
+);
+const SessionsPage = lazy(() =>
+  import("./pages/SessionsPage").then((m) => ({ default: m.SessionsPage }))
 );
 const EvaluationDetailPage = lazy(() =>
   import("./pages/EvaluationDetailPage").then((m) => ({ default: m.EvaluationDetailPage }))
@@ -40,6 +43,12 @@ const ImprovementPlanDetailPage = lazy(() =>
   import("./pages/hr/ImprovementPlanDetailPage").then((m) => ({
     default: m.ImprovementPlanDetailPage,
   }))
+);
+const MyScoringPage = lazy(() =>
+  import("./pages/supervisor/MyScoringPage").then((m) => ({ default: m.MyScoringPage }))
+);
+const ExecutivePage = lazy(() =>
+  import("./pages/ceo/ExecutivePage").then((m) => ({ default: m.ExecutivePage }))
 );
 const SupervisorHomePage = lazy(() =>
   import("./pages/supervisor/SupervisorHomePage").then((m) => ({ default: m.SupervisorHomePage }))
@@ -80,6 +89,12 @@ function DisabledFeature({ title }: { title: string }) {
   );
 }
 
+/** نشانی قدیمیِ جزئیات برنامهٔ بهبود، با حفظ شناسه. */
+export function LegacyImprovementPlanRedirect() {
+  const { id } = useParams();
+  return <Navigate to={`/improvement-plans/${id}`} replace />;
+}
+
 function HomeRedirect() {
   const { user } = useAuth();
   if (!user) return <Navigate to="/login" replace />;
@@ -107,7 +122,22 @@ function App() {
           <Route element={<Layout />}>
             <Route path="/" element={<HomeRedirect />} />
             <Route path="/change-password" element={<ChangePasswordPage />} />
+            <Route path="/sessions" element={<SessionsPage />} />
             <Route path="/evaluations/:id" element={<EvaluationDetailPage />} />
+            {/* برنامه‌های بهبود پشت گاردِ hr نیستند چون «مسئول پیگیری» هم باید
+                بتواند برنامهٔ سپرده‌شده به خودش را باز کند — زمان‌بند دقیقاً همین
+                لینک را برایش می‌فرستد (P1-10). محدودیت واقعی سمت سرور است: غیرِ
+                HR فقط برنامه‌های خودش را می‌بیند و فقط اهداف را تیک می‌زند.
+                به همین دلیل مسیر هم زیر /hr/ نیست: نشانیِ صفحه‌ای که مسئول واحد و
+                معاونت هر روز باز می‌کنند نباید بگوید مالِ منابع انسانی است. */}
+            <Route path="/improvement-plans" element={<ImprovementPlansPage />} />
+            <Route path="/improvement-plans/:id" element={<ImprovementPlanDetailPage />} />
+            {/* نشانی قدیمی: اعلان‌های ارسال‌شده و بوکمارک‌های موجود نباید بشکنند */}
+            <Route path="/hr/improvement-plans" element={<Navigate to="/improvement-plans" replace />} />
+            <Route
+              path="/hr/improvement-plans/:id"
+              element={<LegacyImprovementPlanRedirect />}
+            />
 
             <Route element={<ProtectedRoute allowedRoles={["hr"]} />}>
               <Route path="/hr/personnel" element={<PersonnelPage />} />
@@ -120,8 +150,6 @@ function App() {
                   FEATURE_PERIODS_ENABLED ? <PeriodsPage /> : <DisabledFeature title="دوره‌های ارزیابی" />
                 }
               />
-              <Route path="/hr/improvement-plans" element={<ImprovementPlansPage />} />
-              <Route path="/hr/improvement-plans/:id" element={<ImprovementPlanDetailPage />} />
               <Route path="/hr/dashboard" element={<DashboardPage />} />
               <Route path="/hr/audit-log" element={<AuditLogPage />} />
             </Route>
@@ -136,6 +164,18 @@ function App() {
 
             <Route element={<ProtectedRoute allowedRoles={["ceo"]} />}>
               <Route path="/ceo" element={<CeoHomePage />} />
+            </Route>
+
+            {/* P2-01 — تحلیل برای نقش‌هایی غیر از منابع انسانی.
+                «آینهٔ ارزیاب» برای کسانی که نمره می‌دهند (مسئول واحد و معاونت، که
+                در مسیر «مدیر» خودش نمره‌دهندهٔ اول است)؛ «تحلیل سازمان» برای
+                کسانی که تصمیم می‌گیرند. معاونت در هر دو گروه است. */}
+            <Route element={<ProtectedRoute allowedRoles={["unit_supervisor", "deputy"]} />}>
+              <Route path="/my-scoring" element={<MyScoringPage />} />
+            </Route>
+
+            <Route element={<ProtectedRoute allowedRoles={["ceo", "deputy"]} />}>
+              <Route path="/executive" element={<ExecutivePage />} />
             </Route>
 
             <Route element={<ProtectedRoute allowedRoles={["employee"]} />}>

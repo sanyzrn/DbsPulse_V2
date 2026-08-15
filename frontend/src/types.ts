@@ -75,7 +75,8 @@ export type EvaluationStatus =
   | "submitted"
   | "hr_approved"
   | "deputy_approved"
-  | "finalized";
+  | "finalized"
+  | "cancelled";
 
 export interface EvaluationRecord {
   id: number;
@@ -86,7 +87,11 @@ export interface EvaluationRecord {
   unit_supervisor_user_id: number | null;
   deputy_user_id: number;
   ceo_user_id: number;
-  stage: EvaluationStage;
+  // مسئولِ منابع انسانیِ این پرونده؛ null یعنی هنوز در صف مشترک HR است
+  hr_user_id: number | null;
+  hr_username: string | null;
+  // null برای پروندهٔ لغوشده — در هیچ مرحله‌ای از زنجیره نیست
+  stage: EvaluationStage | null;
   status: EvaluationStatus;
   general_score_pct: number | null;
   specialized_score_pct: number | null;
@@ -97,6 +102,10 @@ export interface EvaluationRecord {
   finalized_at: string | null;
   acknowledged_at: string | null;
   was_returned: boolean;
+  objection_at: string | null;
+  objection_reason: string | null;
+  objection_resolved_at: string | null;
+  objection_resolution: string | null;
 }
 
 export interface MyEvaluation {
@@ -110,6 +119,33 @@ export interface MyEvaluation {
   recommendation: string | null;
   finalized_at: string | null;
   acknowledged_at: string | null;
+  // مسیر اعتراض — «رؤیت» یعنی دیدم، نه یعنی پذیرفتم
+  objection_at: string | null;
+  objection_reason: string | null;
+  objection_resolved_at: string | null;
+  objection_resolution: string | null;
+}
+
+/** نمای «وضعیت‌فقط» از پروندهٔ در جریان — عمداً بدون هیچ امتیازی. */
+export interface MyOpenEvaluation {
+  id: number;
+  evaluation_code: string;
+  status: EvaluationStatus;
+  created_at: string;
+  stage_entered_at: string;
+  stage_label: string;
+}
+
+export interface SelfAssessmentScoreRow {
+  indicator_id: number;
+  score: number;
+  note: string | null;
+}
+
+export interface SelfAssessment {
+  submitted_at: string | null;
+  note: string | null;
+  scores: SelfAssessmentScoreRow[];
 }
 
 export interface EvaluationScoreRow {
@@ -134,6 +170,8 @@ export interface EvaluationCommentRow {
 export interface EvaluationDetail extends EvaluationRecord {
   scores: EvaluationScoreRow[];
   comments: EvaluationCommentRow[];
+  // دیدگاه خودِ فرد، کنار امتیاز ارزیاب. null یعنی چیزی ثبت نکرده (کاملاً مجاز).
+  self_assessment: SelfAssessment | null;
 }
 
 export const STAGE_LABELS: Record<EvaluationStage, string> = {
@@ -145,14 +183,15 @@ export const STAGE_LABELS: Record<EvaluationStage, string> = {
 
 export interface UnitStat {
   org_unit: string;
-  avg_final_pct: number;
+  // null = سرکوب‌شده: جمعیت این واحد کمتر از آستانهٔ کوهورت است (P1-08)
+  avg_final_pct: number | null;
   count: number;
 }
 
 export interface EvaluatorStat {
   evaluator_user_id: number;
   username: string;
-  avg_final_pct: number;
+  avg_final_pct: number | null;
   subordinate_count: number;
   evaluation_count: number;
 }
@@ -160,7 +199,7 @@ export interface EvaluatorStat {
 export interface IndicatorStat {
   indicator_id: number;
   category: string;
-  avg_score: number;
+  avg_score: number | null;
 }
 
 export interface PersonStat {
@@ -203,7 +242,7 @@ export interface IndicatorReportStat {
   category: string;
   description: string;
   section: IndicatorSection;
-  avg_score: number;
+  avg_score: number | null;
   count: number;
 }
 
@@ -216,7 +255,7 @@ export interface ReportSummary {
 
 export interface UnitIndicatorStat {
   org_unit: string;
-  avg_score: number;
+  avg_score: number | null;
   count: number;
 }
 
@@ -303,6 +342,18 @@ export const AUDIT_EVENT_LABELS: Record<string, string> = {
   login_succeeded: "ورود موفق",
   login_failed: "ورود ناموفق",
   password_changed_self: "تغییر رمز توسط خود کاربر",
+  account_locked: "قفل حساب پس از تلاش‌های ناموفق",
+  hr_case_claimed: "برداشتن پرونده توسط منابع انسانی",
+  hr_case_handed_over: "واگذاری مسئولیت منابع انسانی",
+  evaluation_cancelled: "لغو پرونده",
+  stage_owner_reassigned: "تغییر مسئول مرحله",
+  self_assessment_submitted: "ثبت خودارزیابی کارمند",
+  evaluation_objection_filed: "ثبت اعتراض کارمند",
+  evaluation_objection_resolved: "پاسخ به اعتراض کارمند",
+  improvement_goal_added: "افزودن هدف برنامه بهبود",
+  improvement_goal_updated: "ویرایش هدف برنامه بهبود",
+  improvement_goal_deleted: "حذف هدف برنامه بهبود",
+  report_excel_exported: "خروجی اکسل گزارش تحلیلی",
 };
 
 export const STATUS_LABELS: Record<EvaluationStatus, string> = {
@@ -311,6 +362,7 @@ export const STATUS_LABELS: Record<EvaluationStatus, string> = {
   hr_approved: "تأییدشده توسط HR",
   deputy_approved: "تأییدشده توسط معاونت",
   finalized: "نهایی‌شده",
+  cancelled: "لغوشده",
 };
 
 export interface Page<T> {
@@ -456,5 +508,9 @@ export interface PeriodProgress {
   eligible: number;
   started: number;
   finalized: number;
+  /** شروع‌شده ولی نهایی‌نشده — نقطهٔ تصمیمِ بستن دوره */
+  in_progress: number;
+  /** کل شروع‌نشده‌ها؛ `not_started` ممکن است بریده شده باشد */
+  not_started_total: number;
   not_started: NotStartedPersonnel[];
 }

@@ -1,8 +1,13 @@
-"""مدیریت برنامه‌های بهبود (R13.2) — فقط منابع انسانی.
+"""مدیریت برنامه‌های بهبود (R13.2).
 
 وقتی نتیجه یک ارزیابیِ نهایی‌شده «تمدید مشروط به برنامه بهبود مکتوب» است، HR می‌تواند
 یک برنامه بهبود با اهداف مشخص، مسئول پیگیری و تاریخ بازنگری بسازد و آن را تا تکمیل
 دنبال کند. زمان‌بند نزدیک‌شدن تاریخ بازنگری را یادآوری می‌کند (services/scheduled).
+
+ساخت/ویرایش/تکمیل/لغو فقط دست HR است. «مسئول پیگیری» (owner_user_id) برنامهٔ
+سپرده‌شده به خودش را می‌بیند و اهدافش را تیک می‌زند — چون زمان‌بند همان یادآوری
+را برای او می‌فرستد و بدون این دسترسی، سامانه از او کاری می‌خواست که اجازهٔ
+انجامش را نداشت (P1-10).
 """
 from datetime import UTC, datetime
 
@@ -56,6 +61,35 @@ def _ensure_plan_open(plan: ImprovementPlan) -> None:
         )
 
 
+# نقش‌هایی که می‌توانند «مسئول پیگیری» باشند. کارمند این‌جا نیست: برنامهٔ خودش را
+# از /api/me/improvement-plans می‌بیند و این روتر مدیریتی است، نه صفحهٔ شخصی.
+_PLAN_ROLES = (UserRole.hr, UserRole.unit_supervisor, UserRole.deputy, UserRole.ceo)
+require_plan_role = require_roles(*_PLAN_ROLES)
+
+
+def _is_owner(plan: ImprovementPlan, current_user: CurrentUser) -> bool:
+    return plan.owner_user_id is not None and plan.owner_user_id == current_user.id
+
+
+def _ensure_can_view(plan: ImprovementPlan, current_user: CurrentUser) -> None:
+    """P1-10 — «مسئول پیگیری» باید بتواند برنامه‌ای را که به او سپرده شده ببیند.
+
+    تا پیش از این هر endpoint این فایل `require_roles(hr)` بود، در حالی که
+    زمان‌بند یادآوری بازنگری را *به همان مسئول پیگیری* می‌فرستد با لینک همین
+    صفحه. یعنی سامانه از کسی کاری می‌خواست که اجازهٔ بازکردنش را به او نمی‌داد.
+
+    دسترسی عمداً حداقلی است: دیدن برنامه و تیک‌زدن اهداف. ساخت، تغییر مالک،
+    تکمیل و لغو دست HR می‌ماند — این سند را HR به‌عنوان مبنای تصمیم قرارداد
+    می‌نویسد و مجریِ آن نباید بتواند بازنویسی‌اش کند.
+    """
+    if current_user.role == UserRole.hr or _is_owner(plan, current_user):
+        return
+    raise HTTPException(
+        status_code=status.HTTP_403_FORBIDDEN,
+        detail="این برنامهٔ بهبود به شما سپرده نشده است",
+    )
+
+
 def _ensure_owner_is_valid(db: Session, owner_user_id: int | None) -> None:
     if owner_user_id is None:
         return
@@ -105,9 +139,13 @@ def list_plans(
     limit: int = Query(default=50, ge=1, le=200),
     offset: int = Query(default=0, ge=0),
     db: Session = Depends(get_db),
-    current_user: CurrentUser = Depends(require_roles(UserRole.hr)),
+    current_user: CurrentUser = Depends(require_plan_role),
 ) -> ImprovementPlanPage:
     query = select(ImprovementPlan)
+    # مسئول پیگیری فقط برنامه‌های سپرده‌شده به خودش را می‌بیند — تا بتواند بدون
+    # اتکا به لینک اعلان پیدایشان کند، ولی فهرست کل سازمان برایش باز نشود.
+    if current_user.role != UserRole.hr:
+        query = query.where(ImprovementPlan.owner_user_id == current_user.id)
     if status_filter is not None:
         query = query.where(ImprovementPlan.status == status_filter)
     if q:
@@ -186,7 +224,7 @@ def create_plan(
                 "به شما به‌عنوان مسئول پیگیری سپرده شد"
             ),
             evaluation_record_id=record.id,
-            link=f"/hr/improvement-plans/{plan.id}",
+            link=f"/improvement-plans/{plan.id}",
         )
     db.commit()
     db.refresh(plan)
@@ -245,9 +283,11 @@ def export_plans_excel(
 def get_plan(
     plan_id: int,
     db: Session = Depends(get_db),
-    current_user: CurrentUser = Depends(require_roles(UserRole.hr)),
+    current_user: CurrentUser = Depends(require_plan_role),
 ) -> ImprovementPlan:
-    return _get_plan_or_404(db, plan_id)
+    plan = _get_plan_or_404(db, plan_id)
+    _ensure_can_view(plan, current_user)
+    return plan
 
 
 @router.patch("/{plan_id}", response_model=ImprovementPlanDetail)
@@ -285,7 +325,7 @@ def update_plan(
                 "به شما به‌عنوان مسئول پیگیری سپرده شد"
             ),
             evaluation_record_id=plan.evaluation_record_id,
-            link=f"/hr/improvement-plans/{plan.id}",
+            link=f"/improvement-plans/{plan.id}",
         )
     log_event(
         db,
@@ -370,6 +410,14 @@ def add_goal(
         plan_id=plan.id, description=payload.description, display_order=next_order
     )
     db.add(goal)
+    db.flush()
+    log_event(
+        db,
+        actor_user_id=current_user.id,
+        event_type="improvement_goal_added",
+        evaluation_record_id=plan.evaluation_record_id,
+        new_value={"plan_id": plan.id, "goal_id": goal.id, "description": goal.description},
+    )
     db.commit()
     db.refresh(goal)
     return goal
@@ -381,15 +429,34 @@ def update_goal(
     goal_id: int,
     payload: GoalUpdate,
     db: Session = Depends(get_db),
-    current_user: CurrentUser = Depends(require_roles(UserRole.hr)),
+    current_user: CurrentUser = Depends(require_plan_role),
 ) -> ImprovementPlanGoal:
     goal = db.get(ImprovementPlanGoal, goal_id)
     if goal is None or goal.plan_id != plan_id:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="هدف یافت نشد")
-    _ensure_plan_open(_get_plan_or_404(db, plan_id))
+    plan = _get_plan_or_404(db, plan_id)
+    _ensure_can_view(plan, current_user)
+    _ensure_plan_open(plan)
     updates = payload.model_dump(exclude_unset=True)
+    # مسئول پیگیری فقط وضعیت انجام‌شدن را عوض می‌کند. متن هدف را HR نوشته و همان
+    # است که در تصمیم قرارداد به آن استناد می‌شود؛ اگر مجریِ برنامه بتواند
+    # بازنویسی‌اش کند، «هدف محقق شد» دیگر چیزی را ثابت نمی‌کند.
+    if current_user.role != UserRole.hr and set(updates) - {"is_done"}:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="مسئول پیگیری فقط می‌تواند هدف را انجام‌شده/انجام‌نشده علامت بزند",
+        )
+    before = {"description": goal.description, "is_done": goal.is_done}
     for field, value in updates.items():
         setattr(goal, field, value)
+    log_event(
+        db,
+        actor_user_id=current_user.id,
+        event_type="improvement_goal_updated",
+        evaluation_record_id=plan.evaluation_record_id,
+        old_value=before,
+        new_value={"plan_id": plan.id, "goal_id": goal.id, **updates},
+    )
     db.commit()
     db.refresh(goal)
     return goal
@@ -405,6 +472,20 @@ def delete_goal(
     goal = db.get(ImprovementPlanGoal, goal_id)
     if goal is None or goal.plan_id != plan_id:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="هدف یافت نشد")
-    _ensure_plan_open(_get_plan_or_404(db, plan_id))
+    plan = _get_plan_or_404(db, plan_id)
+    _ensure_plan_open(plan)
+    # مقدار پیشین پیش از حذف ثبت می‌شود، وگرنه از هدفِ حذف‌شده هیچ نمی‌ماند
+    log_event(
+        db,
+        actor_user_id=current_user.id,
+        event_type="improvement_goal_deleted",
+        evaluation_record_id=plan.evaluation_record_id,
+        old_value={
+            "plan_id": plan.id,
+            "goal_id": goal.id,
+            "description": goal.description,
+            "is_done": goal.is_done,
+        },
+    )
     db.delete(goal)
     db.commit()

@@ -1,7 +1,7 @@
 import secrets
 from datetime import UTC, date, datetime, timedelta
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, status
 from fastapi.responses import Response
 from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
@@ -21,8 +21,11 @@ from app.models.evaluation import EvaluationComment, EvaluationRecord, Evaluatio
 from app.models.evaluation_access import EvaluationAccess
 from app.models.evaluation_period import EvaluationPeriod
 from app.models.personnel import Personnel
+from app.models.self_assessment import SelfAssessmentScore
+from app.models.user import User
 from app.schemas.auth import CurrentUser
 from app.schemas.evaluation import (
+    CancelRequest,
     CommentCreate,
     CommentRead,
     EvaluationCreate,
@@ -30,17 +33,26 @@ from app.schemas.evaluation import (
     EvaluationPage,
     EvaluationRead,
     EvaluatorCommentUpdate,
+    HrHandover,
+    ObjectionResolution,
     ReturnRequest,
+    ScoreRead,
     ScoresUpsert,
+    SelfAssessmentRead,
+    SelfAssessmentScoreRead,
+    StageOwnerReassign,
 )
 from app.services.audit import log_event
-from app.services.documents import archive_final_pdf
+from app.services.documents import archive_final_pdf, archive_final_pdf_detached
 from app.services.evaluation import next_evaluation_code
 from app.services.excel import build_evaluations_workbook
-from app.services.notifications import notify
+from app.services.notifications import notify, notify_stage_owner_reassigned
 from app.services.pdf import weasyprint_available
+from app.services.self_evaluation import ensure_evaluators_are_not_the_subject
 from app.services.snapshot import build_final_snapshot
 from app.services.workflow import (
+    IS_OPEN_RECORD,
+    OPEN_STATUSES,
     active_indicators_by_id,
     apply_transition,
     finalize_scoring,
@@ -115,10 +127,47 @@ def _to_read(db: Session, record: EvaluationRecord) -> EvaluationRead:
     )
 
 
+def _self_assessment_of(db: Session, record: EvaluationRecord) -> SelfAssessmentRead | None:
+    """خودارزیابی فرد، برای نمایش کنار امتیاز ارزیاب.
+
+    None یعنی فرد چیزی ثبت نکرده — که کاملاً مجاز است: خودارزیابی اختیاری و
+    غیرمسدودکننده است.
+    """
+    if record.self_assessment_submitted_at is None:
+        return None
+    rows = db.scalars(
+        select(SelfAssessmentScore).where(
+            SelfAssessmentScore.evaluation_record_id == record.id
+        )
+    )
+    return SelfAssessmentRead(
+        submitted_at=record.self_assessment_submitted_at,
+        note=record.self_assessment_note,
+        scores=[SelfAssessmentScoreRead.model_validate(r) for r in rows],
+    )
+
+
 def _to_detail(db: Session, record: EvaluationRecord) -> EvaluationDetail:
     return EvaluationDetail.model_validate(record).model_copy(
-        update={"was_returned": _was_returned(db, record.id)}
+        update={
+            "was_returned": _was_returned(db, record.id),
+            "self_assessment": _self_assessment_of(db, record),
+        }
     )
+
+
+def _persisted_scores(db: Session, record: EvaluationRecord) -> list[ScoreRead]:
+    """ردیف‌های امتیاز همان‌گونه که ذخیره شدند — با id.
+
+    فرانت پس از ذخیرهٔ خودکار همین را مستقیم در کش می‌نشاند، پس باید *دقیقاً* شکل
+    `scores` در EvaluationDetail را داشته باشد؛ وگرنه کش با ردیف‌های ناقص پر می‌شود.
+    """
+    rows = db.scalars(
+        select(EvaluationScore)
+        .where(EvaluationScore.evaluation_record_id == record.id)
+        .order_by(EvaluationScore.id)
+    ).all()
+    return [ScoreRead.model_validate(row) for row in rows]
 
 
 def _replace_scores(db: Session, record: EvaluationRecord, payload: ScoresUpsert) -> list[dict]:
@@ -209,7 +258,7 @@ def create_evaluation(
     existing_open = db.scalar(
         select(EvaluationRecord).where(
             EvaluationRecord.subject_personnel_id == personnel.id,
-            EvaluationRecord.status != EvaluationStatus.finalized,
+            IS_OPEN_RECORD,
         )
     )
     if existing_open is not None:
@@ -246,7 +295,7 @@ def create_evaluation(
         winner = db.scalar(
             select(EvaluationRecord).where(
                 EvaluationRecord.subject_personnel_id == personnel.id,
-                EvaluationRecord.status != EvaluationStatus.finalized,
+                IS_OPEN_RECORD,
             )
         )
         raise HTTPException(
@@ -470,14 +519,19 @@ def get_evaluation(
     return _to_detail(db, record)
 
 
-@router.put("/{evaluation_id}/scores", response_model=list[dict])
+@router.put("/{evaluation_id}/scores", response_model=list[ScoreRead])
 def upsert_scores(
     evaluation_id: int,
     payload: ScoresUpsert,
     db: Session = Depends(get_db),
     current_user: CurrentUser = Depends(get_current_user),
-) -> list[dict]:
-    record = _get_record_or_404(db, evaluation_id)
+) -> list[ScoreRead]:
+    # قفل ردیف مثل خودِ گذارها: بدون آن، بررسی وضعیتِ پایین می‌توانست روی وضعیتی
+    # پاس شود که یک submit هم‌زمان دارد عوضش می‌کند، و امتیاز *بعد از*
+    # finalize_scoring روی رکورد بنشیند — یعنی امتیازهای ذخیره‌شده با درصد نهاییِ
+    # ذخیره‌شده نخوانند. فرانت هم پیش‌نویس امتیاز را حین تایپ auto-save می‌کند،
+    # پس این پنجره در عمل باز است، نه تئوریک.
+    record = _get_record_or_404_for_update(db, evaluation_id)
 
     is_supervisor_draft = (
         record.status == EvaluationStatus.draft
@@ -504,8 +558,9 @@ def upsert_scores(
         evaluation_record_id=record.id,
         new_value={"scored_indicators": len(rows)},
     )
+    saved = _persisted_scores(db, record)
     db.commit()
-    return rows
+    return saved
 
 
 @router.patch("/{evaluation_id}/evaluator-comment", response_model=EvaluationRead)
@@ -515,7 +570,9 @@ def set_evaluator_comment(
     db: Session = Depends(get_db),
     current_user: CurrentUser = Depends(get_current_user),
 ) -> EvaluationRead:
-    record = _get_record_or_404(db, evaluation_id)
+    # همان دلیل upsert_scores: نظر ارزیاب هم روی رکوردی نوشته می‌شود که یک گذار
+    # هم‌زمان ممکن است داشته از زیرش عوضش کند.
+    record = _get_record_or_404_for_update(db, evaluation_id)
     # نمره‌دهنده اول این نظر را ثبت می‌کند: مسیر عادی مسئول واحد در draft است؛
     # مسیر «مدیر» معاونت خودش نمره‌دهندهٔ اول است و در hr_approved این کار را می‌کند.
     is_supervisor_draft = (
@@ -590,6 +647,7 @@ def deputy_approve(
 @router.post("/{evaluation_id}/ceo-finalize", response_model=EvaluationRead)
 def ceo_finalize(
     evaluation_id: int,
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
     current_user: CurrentUser = Depends(require_roles(UserRole.ceo)),
 ) -> EvaluationRead:
@@ -603,12 +661,15 @@ def ceo_finalize(
         record.verify_token = secrets.token_urlsafe(24)
 
     apply_transition(db, record, "ceo_finalize", current_user, before=_before)
-    # سند PDF نهایی همین‌جا یک‌بار تولید، هش و آرشیو می‌شود تا از این پس همان بایت‌ها
-    # سرو شوند (سند حقوقی byte-stable) و QR تأیید اصالت داشته باشد.
-    db.flush()
-    archive_final_pdf(db, record)
     db.commit()
     db.refresh(record)
+    # سند PDF *پس از* ارسال پاسخ ساخته می‌شود (P2-05). قبلاً همین‌جا و به‌صورت
+    # همزمان رندر می‌شد، یعنی WeasyPrint — یک کتابخانهٔ بومیِ CPU-محور — روی مسیر
+    # تأخیرِ مهم‌ترین اقدام سامانه بود و کندشدنِ رندر به «نهایی‌سازی ناموفق» ترجمه
+    # می‌شد. حالا نهایی‌سازی قطعی است و سند دنبالش می‌آید؛ اگر این کار پس‌زمینه هم
+    # شکست بخورد (ری‌استارت پروسه، نبودِ کتابخانه)، جاروی زمان‌بند آن را می‌گیرد و
+    # مسیر دانلود هم در لحظه می‌سازدش. آرشیو idempotent است، پس تکرار بی‌خطر است.
+    background_tasks.add_task(archive_final_pdf_detached, record.id)
     return _to_read(db, record)
 
 
@@ -662,6 +723,284 @@ def return_evaluation(
     return _to_read(db, record)
 
 
+@router.post("/{evaluation_id}/cancel", response_model=EvaluationRead)
+def cancel_evaluation(
+    evaluation_id: int,
+    payload: CancelRequest,
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(require_roles(UserRole.hr)),
+) -> EvaluationRead:
+    """لغو پروندهٔ باز با دلیل اجباری — تنها راه خروج از پروندهٔ گیرکرده.
+
+    بدون این، پرونده‌ای که تأییدکننده‌اش از سازمان رفته هرگز کامل نمی‌شد و ایندکس
+    یکتای جزئی هم اجازهٔ ساخت پروندهٔ جایگزین نمی‌داد؛ آن پرسنل عملاً برای همیشه
+    غیرقابل‌ارزیابی می‌ماند و تنها درمانش SQL دستی روی پروداکشن بود.
+    """
+    record = _get_record_or_404_for_update(db, evaluation_id)
+
+    def _before() -> None:
+        # دلیل هم به‌صورت کامنت در خود پرونده می‌ماند و هم در audit — تصمیم است، نه پاک‌کردن.
+        db.add(
+            EvaluationComment(
+                evaluation_record_id=record.id,
+                commenter_user_id=current_user.id,
+                stage=CommentStage.hr_review,
+                comment_text=f"لغو پرونده — دلیل: {payload.reason}",
+            )
+        )
+        log_event(
+            db,
+            actor_user_id=current_user.id,
+            event_type="evaluation_cancelled",
+            evaluation_record_id=record.id,
+            old_value={"status": record.status.value},
+            new_value={"reason": payload.reason},
+        )
+
+    apply_transition(db, record, "cancel", current_user, before=_before)
+    db.commit()
+    db.refresh(record)
+    return _to_read(db, record)
+
+
+@router.post("/{evaluation_id}/hr-claim", response_model=EvaluationRead)
+def hr_claim(
+    evaluation_id: int,
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(require_roles(UserRole.hr)),
+) -> EvaluationRead:
+    """برداشتن یک پروندهٔ بی‌مالک از صف مشترک منابع انسانی.
+
+    اقدام روی پرونده (تأیید/برگشت) هم به‌طور ضمنی همین کار را می‌کند؛ این endpoint
+    برای وقتی است که کسی می‌خواهد *پیش از* اقدام مسئولیتش را اعلام کند تا دو نفر
+    هم‌زمان روی یک پرونده کار نکنند.
+    """
+    record = _get_record_or_404_for_update(db, evaluation_id)
+
+    if record.status not in OPEN_STATUSES:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="فقط پروندهٔ باز می‌تواند مسئول منابع انسانی بگیرد",
+        )
+    if record.hr_user_id is not None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                f"این پرونده از قبل در اختیار «{record.hr_username}» است؛ "
+                "برای جابه‌جایی از «واگذاری» استفاده کنید."
+            ),
+        )
+
+    record.hr_user_id = current_user.id
+    log_event(
+        db,
+        actor_user_id=current_user.id,
+        event_type="hr_case_claimed",
+        evaluation_record_id=record.id,
+        new_value={"hr_user_id": current_user.id, "implicit": False},
+    )
+    db.commit()
+    db.refresh(record)
+    return _to_read(db, record)
+
+
+@router.post("/{evaluation_id}/hr-handover", response_model=EvaluationRead)
+def hr_handover(
+    evaluation_id: int,
+    payload: HrHandover,
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(require_roles(UserRole.hr)),
+) -> EvaluationRead:
+    """واگذاری مسئولیتِ HR به کاربر دیگری از منابع انسانی، با دلیل و ثبت در audit.
+
+    محدودیت آگاهانه: هر کاربر HR می‌تواند این کار را بکند، چون هنوز نقش «سرپرست HR»
+    وجود ندارد. پس این یک قفل سخت نیست — یک زنجیرهٔ مسئولیتِ قابل ردیابی است، که
+    خودش از وضعیت قبلی («هر HR روی هر پرونده، بدون هیچ ردی») بسیار بهتر است.
+    تفکیک واقعی نقش‌های HR گام میان‌مدت همین یافته است.
+    """
+    record = _get_record_or_404_for_update(db, evaluation_id)
+
+    if record.status not in OPEN_STATUSES:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="فقط مسئولِ منابع انسانیِ یک پروندهٔ باز قابل تغییر است",
+        )
+
+    new_owner = db.get(User, payload.new_hr_user_id)
+    if new_owner is None or not new_owner.is_active or new_owner.role != UserRole.hr:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="کاربر انتخاب‌شده یافت نشد، غیرفعال است، یا نقش منابع انسانی ندارد",
+        )
+    if new_owner.id == record.hr_user_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="این پرونده از قبل در اختیار همین کاربر است",
+        )
+
+    previous_owner_id = record.hr_user_id
+    record.hr_user_id = new_owner.id
+    db.add(
+        EvaluationComment(
+            evaluation_record_id=record.id,
+            commenter_user_id=current_user.id,
+            stage=CommentStage.hr_review,
+            comment_text=f"واگذاری مسئولیت منابع انسانی — دلیل: {payload.reason}",
+        )
+    )
+    log_event(
+        db,
+        actor_user_id=current_user.id,
+        event_type="hr_case_handed_over",
+        evaluation_record_id=record.id,
+        old_value={"hr_user_id": previous_owner_id},
+        new_value={"hr_user_id": new_owner.id, "reason": payload.reason},
+    )
+    notify_stage_owner_reassigned(db, record, new_owner.id, "منابع انسانی")
+    db.commit()
+    db.refresh(record)
+    return _to_read(db, record)
+
+
+@router.post("/{evaluation_id}/resolve-objection", response_model=EvaluationRead)
+def resolve_objection(
+    evaluation_id: int,
+    payload: ObjectionResolution,
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(require_roles(UserRole.hr)),
+) -> EvaluationRead:
+    """ثبت پاسخ منابع انسانی به اعتراض کارمند.
+
+    اعتراضی که کسی موظف به پاسخ‌گویی به آن نباشد، تشریفات است. این endpoint اعتراض
+    را می‌بندد و پاسخ را کنار خودِ اعتراض در پرونده ثبت می‌کند.
+
+    نتیجهٔ ارزیابی و سند نهایی عمداً دست‌نخورده می‌مانند: اگر واقعاً باید امتیاز عوض
+    شود، مسیرش ارزیابی تازه است نه بازنویسی سندی که هش و امضا دارد.
+    """
+    record = _get_record_or_404_for_update(db, evaluation_id)
+
+    if record.objection_at is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="برای این پرونده اعتراضی ثبت نشده است",
+        )
+    if record.objection_resolved_at is not None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="به این اعتراض قبلاً پاسخ داده شده است",
+        )
+
+    record.objection_resolved_at = datetime.now(UTC)
+    record.objection_resolution = payload.resolution
+    record.objection_resolved_by_user_id = current_user.id
+    log_event(
+        db,
+        actor_user_id=current_user.id,
+        event_type="evaluation_objection_resolved",
+        evaluation_record_id=record.id,
+        old_value={"objection_reason": record.objection_reason},
+        new_value={"resolution": payload.resolution},
+    )
+
+    # خودِ معترض باید پاسخ را ببیند، وگرنه اعتراضش در سکوت گم می‌شود
+    subject_user_ids = list(
+        db.scalars(
+            select(User.id).where(
+                User.role == UserRole.employee,
+                User.personnel_id == record.subject_personnel_id,
+                User.is_active.is_(True),
+            )
+        )
+    )
+    if subject_user_ids:
+        notify(
+            db,
+            subject_user_ids,
+            type_="evaluation_objection_resolved",
+            message=f"به اعتراض شما دربارهٔ پروندهٔ {record.evaluation_code} پاسخ داده شد",
+            evaluation_record_id=record.id,
+            link="/me",
+        )
+
+    db.commit()
+    db.refresh(record)
+    return _to_read(db, record)
+
+
+_REASSIGNABLE_STAGES: dict[str, tuple[UserRole, str]] = {
+    "unit_supervisor_user_id": (UserRole.unit_supervisor, "مسئول واحد"),
+    "deputy_user_id": (UserRole.deputy, "معاونت"),
+    "ceo_user_id": (UserRole.ceo, "مدیرعامل"),
+}
+
+
+@router.post("/{evaluation_id}/reassign", response_model=EvaluationRead)
+def reassign_stage_owner(
+    evaluation_id: int,
+    payload: StageOwnerReassign,
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(require_roles(UserRole.hr)),
+) -> EvaluationRead:
+    """جایگزینی مسئول یک مرحله روی پروندهٔ باز — بدون از دست رفتن امتیازها.
+
+    عمداً در جدول TRANSITIONS نیست: وضعیت را عوض نمی‌کند، پس گذار نیست. ولی از همان
+    قفل ردیف و همان مسیر audit استفاده می‌کند.
+    """
+    record = _get_record_or_404_for_update(db, evaluation_id)
+
+    if record.status not in OPEN_STATUSES:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="فقط مسئول مراحل یک پروندهٔ باز قابل تغییر است",
+        )
+
+    expected_role, stage_label = _REASSIGNABLE_STAGES[payload.stage_field]
+    previous_user_id = getattr(record, payload.stage_field)
+    if previous_user_id is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"این پرونده مرحلهٔ «{stage_label}» ندارد (مسیر «مدیر»)",
+        )
+
+    new_user = db.get(User, payload.new_user_id)
+    if new_user is None or not new_user.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"کاربر انتخاب‌شده برای «{stage_label}» یافت نشد یا غیرفعال است",
+        )
+    if new_user.role != expected_role:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"کاربر انتخاب‌شده برای «{stage_label}» باید نقش «{stage_label}» داشته باشد",
+        )
+    # همان نامساوی P0-10: جایگزین نباید خودِ ارزیابی‌شونده باشد.
+    ensure_evaluators_are_not_the_subject(
+        db, record.subject_personnel_id, [payload.new_user_id]
+    )
+
+    setattr(record, payload.stage_field, payload.new_user_id)
+    db.add(
+        EvaluationComment(
+            evaluation_record_id=record.id,
+            commenter_user_id=current_user.id,
+            stage=CommentStage.hr_review,
+            comment_text=f"تغییر مسئول «{stage_label}» — دلیل: {payload.reason}",
+        )
+    )
+    log_event(
+        db,
+        actor_user_id=current_user.id,
+        event_type="stage_owner_reassigned",
+        evaluation_record_id=record.id,
+        old_value={payload.stage_field: previous_user_id},
+        new_value={payload.stage_field: payload.new_user_id, "reason": payload.reason},
+    )
+    notify_stage_owner_reassigned(db, record, new_user.id, stage_label)
+    db.commit()
+    db.refresh(record)
+    return _to_read(db, record)
+
+
 @router.get("/{evaluation_id}/summary.pdf")
 def evaluation_summary_pdf(
     evaluation_id: int,
@@ -669,14 +1008,25 @@ def evaluation_summary_pdf(
     current_user: CurrentUser = Depends(get_current_user),
 ) -> Response:
     record = _get_record_or_404(db, evaluation_id)
-    _ensure_can_view(record, current_user)
-    # خروجی PDF فقط برای منابع انسانی — سایر نقش‌ها حتی اگر پرونده را ببینند، اجازهٔ
-    # چاپ/دانلود سند رسمی را ندارند.
-    if current_user.role != UserRole.hr:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="خروجی PDF فقط برای منابع انسانی در دسترس است",
-        )
+
+    # سوژهٔ پرونده حق دارد سندِ مربوط به خودش را داشته باشد. تا پیش از این تنها
+    # کسی که می‌توانست کارنامهٔ هش‌شده و قابل‌تأیید یک نفر را دانلود کند HR بود —
+    # یعنی فرد سندی را که دربارهٔ اوست در اختیار نداشت و برای هر استفادهٔ بعدی
+    # (اعتراض، پروندهٔ حقوقی، کارفرمای بعدی) باید از سازمان درخواست می‌کرد.
+    is_subject = (
+        current_user.role == UserRole.employee
+        and current_user.personnel_id is not None
+        and current_user.personnel_id == record.subject_personnel_id
+    )
+    if not is_subject:
+        _ensure_can_view(record, current_user)
+        # سایر نقش‌های زنجیره پرونده را می‌بینند ولی سند رسمی را دانلود نمی‌کنند.
+        if current_user.role != UserRole.hr:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="خروجی PDF فقط برای منابع انسانی و خودِ فرد در دسترس است",
+            )
+
     if record.status != EvaluationStatus.finalized or record.final_snapshot is None:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST, detail="ارزیابی هنوز نهایی نشده است"
@@ -699,6 +1049,9 @@ def evaluation_summary_pdf(
         actor_user_id=current_user.id,
         event_type="pdf_downloaded",
         evaluation_record_id=record.id,
+        # دسترسی خودِ فرد به سندش هم ثبت می‌شود — نه به‌عنوان چیزی مشکوک، بلکه چون
+        # زنجیرهٔ حسابرسیِ یک سند رسمی باید کامل باشد و بگوید چه کسی نسخه‌ای دارد.
+        new_value={"by_subject": is_subject},
     )
 
     # سند آرشیوشده را سرو می‌کنیم؛ برای رکوردهای قدیمی (پیش از قابلیت آرشیو) در همین

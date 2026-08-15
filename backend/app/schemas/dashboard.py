@@ -7,14 +7,16 @@ from app.models.enums import EvaluationStatus
 
 class UnitStat(BaseModel):
     org_unit: str
-    avg_final_pct: float
+    # None یعنی «سرکوب‌شده»: جمعیت این واحد کمتر از آستانهٔ کوهورت است و
+    # نمایش میانگینش عملاً افشای امتیاز فرد بود (P1-08).
+    avg_final_pct: float | None
     count: int
 
 
 class EvaluatorStat(BaseModel):
     evaluator_user_id: int
     username: str
-    avg_final_pct: float
+    avg_final_pct: float | None
     subordinate_count: int
     evaluation_count: int
 
@@ -22,7 +24,7 @@ class EvaluatorStat(BaseModel):
 class IndicatorStat(BaseModel):
     indicator_id: int
     category: str
-    avg_score: float
+    avg_score: float | None
 
 
 class PersonStat(BaseModel):
@@ -95,7 +97,7 @@ class IndicatorReportStat(BaseModel):
     category: str
     description: str
     section: str
-    avg_score: float
+    avg_score: float | None
     count: int
 
 
@@ -110,7 +112,7 @@ class ReportSummary(BaseModel):
 
 class UnitIndicatorStat(BaseModel):
     org_unit: str
-    avg_score: float
+    avg_score: float | None
     count: int
 
 

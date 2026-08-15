@@ -13,6 +13,7 @@ from app.schemas.auth import CurrentUser
 from app.schemas.user import UserCreate, UserPage, UserRead, UserUpdate
 from app.services.audit import log_event
 from app.services.excel import build_users_workbook
+from app.services.self_evaluation import ensure_user_link_is_not_self_evaluation
 from app.services.sessions import revoke_all_for_user
 
 router = APIRouter(prefix="/api/users", tags=["users"])
@@ -142,6 +143,9 @@ def update_user(
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST, detail="پرسنل انتخاب‌شده یافت نشد"
             )
+        # مسیر دوم تداخل ارزیاب/ارزیابی‌شونده: دسترسی درست بوده و حالا کاربرِ ارزیاب
+        # به همان پرسنل لینک می‌شود.
+        ensure_user_link_is_not_self_evaluation(db, user, updates["personnel_id"])
     for field, value in updates.items():
         setattr(user, field, value)
     if user.role == UserRole.employee and user.personnel_id is None:

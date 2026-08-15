@@ -6,6 +6,7 @@ import { apiClient, extractErrorMessage } from "../../api/client";
 import { useImprovementPlanDetail, useUsersList } from "../../api/queries";
 import { useConfirm } from "../../components/ConfirmDialog";
 import { useToast } from "../../components/Toast";
+import { useAuth } from "../../auth/AuthContext";
 import { Button } from "../../ui/Button";
 import { Card, EmptyState } from "../../ui/Card";
 import { PctBar } from "../../ui/Meters";
@@ -30,6 +31,7 @@ const STATUS_DOT: Record<ImprovementPlanStatus, string> = {
 
 export function ImprovementPlanDetailPage() {
   const { id } = useParams();
+  const { user } = useAuth();
   const planId = id ? Number(id) : null;
   const { showSuccess, showError } = useToast();
   const confirm = useConfirm();
@@ -37,8 +39,9 @@ export function ImprovementPlanDetailPage() {
   const [newGoal, setNewGoal] = useState("");
 
   const { data: plan, error, isPending } = useImprovementPlanDetail(planId);
-  // نامزدهای مسئول پیگیری: مسئولان واحد و معاونت‌ها
-  const { data: owners } = useUsersList({ limit: 1000 });
+  // نامزدهای مسئول پیگیری: مسئولان واحد و معاونت‌ها. فقط برای HR واکشی می‌شود —
+  // فهرست کاربران endpointای مخصوص HR است و برای مسئول پیگیری ۴۰۳ می‌داد.
+  const { data: owners } = useUsersList({ limit: 1000, enabled: user?.role === "hr" });
 
   async function refresh() {
     await queryClient.invalidateQueries({ queryKey: ["improvement-plan", planId] });
@@ -133,11 +136,15 @@ export function ImprovementPlanDetailPage() {
 
   const doneCount = plan.goals.filter((g) => g.is_done).length;
   const isOpen = plan.status === "open";
+  // P1-10: مسئول پیگیری این صفحه را می‌بیند و اهداف را تیک می‌زند، ولی نوشتن/حذف
+  // هدف و تکمیل/لغو برنامه دست HR است. سرور هم همین را اعمال می‌کند؛ این‌جا فقط
+  // دکمه‌ای نشان نمی‌دهیم که به ۴۰۳ ختم شود.
+  const canEditPlan = user?.role === "hr";
   const progressPct = plan.goals.length ? (doneCount / plan.goals.length) * 100 : 0;
 
   return (
     <div className="space-y-4">
-      <Link to="/hr/improvement-plans" className="inline-flex items-center gap-1 text-sm font-medium text-pulse-600 hover:text-pulse-700">
+      <Link to="/improvement-plans" className="inline-flex items-center gap-1 text-sm font-medium text-pulse-600 hover:text-pulse-700">
         {/* RTL: فلش «بازگشت» به سمت راست است */}
         <svg viewBox="0 0 20 20" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
           <path d="M7 5l5 5-5 5" />
@@ -182,7 +189,7 @@ export function ImprovementPlanDetailPage() {
           )}
         </dl>
 
-        {isOpen && (
+        {isOpen && canEditPlan && (
           <div className="mt-4 flex flex-wrap items-end gap-3 border-t border-gray-100 pt-4 text-sm">
             <label className="flex flex-col gap-1 text-xs font-medium text-gray-600">
               مسئول پیگیری
@@ -257,7 +264,7 @@ export function ImprovementPlanDetailPage() {
                 <span className={`flex-1 ${goal.is_done ? "text-gray-400 line-through" : "text-gray-700"}`}>
                   {goal.description}
                 </span>
-                {isOpen && (
+                {isOpen && canEditPlan && (
                   <button
                     onClick={() => deleteGoal(goal)}
                     className="text-gray-300 transition-colors hover:text-red-500"
@@ -272,7 +279,7 @@ export function ImprovementPlanDetailPage() {
             ))}
           </AnimatePresence>
         </ul>
-        {isOpen && (
+        {isOpen && canEditPlan && (
           <form
             onSubmit={(e) => {
               e.preventDefault();
@@ -291,13 +298,20 @@ export function ImprovementPlanDetailPage() {
         )}
       </Card>
 
-      {isOpen && (
+      {isOpen && canEditPlan && (
         <div className="flex gap-2">
           <Button onClick={complete}>تکمیل برنامه</Button>
           <Button variant="secondary" onClick={cancel}>
             لغو برنامه
           </Button>
         </div>
+      )}
+
+      {isOpen && !canEditPlan && (
+        <p className="rounded-xl border border-gray-100 bg-gray-50 px-4 py-3 text-xs text-gray-500">
+          این برنامه به شما سپرده شده است: اهداف انجام‌شده را تیک بزنید. تغییر متن
+          اهداف و تکمیل یا لغو برنامه بر عهدهٔ منابع انسانی است.
+        </p>
       )}
     </div>
   );

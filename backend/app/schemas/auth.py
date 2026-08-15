@@ -1,4 +1,6 @@
-from pydantic import BaseModel, Field
+from datetime import datetime
+
+from pydantic import BaseModel, ConfigDict, Field
 
 from app.models.enums import UserRole
 
@@ -34,3 +36,22 @@ class CurrentUser(BaseModel):
     role: UserRole
     personnel_id: int | None = None
     must_change_password: bool = False
+
+
+class SessionRead(BaseModel):
+    """یک نشست فعال، آن‌قدر که کاربر بتواند تشخیصش بدهد.
+
+    jti عمداً برنمی‌گردد: شناسهٔ عددیِ ردیف برای «این یکی را ببند» کافی است، و
+    خودِ jti بخشی از یک توکن زنده است که نباید در پاسخ API پخش شود.
+    """
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    user_agent: str | None
+    ip: str | None
+    created_at: datetime
+    last_used_at: datetime | None
+    # آیا همین نشستی است که این درخواست با آن آمده؟ بدون این، کاربر نمی‌داند
+    # کدام ردیف را نباید ببندد.
+    is_current: bool = False

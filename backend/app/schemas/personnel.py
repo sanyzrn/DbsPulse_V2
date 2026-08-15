@@ -3,6 +3,7 @@ from datetime import date, datetime
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from app.models.enums import PersonnelStatus
+from app.schemas.user import _PASSWORD_MIN_LENGTH, _USERNAME_PATTERN
 
 
 class PersonnelBase(BaseModel):
@@ -17,7 +18,29 @@ class PersonnelBase(BaseModel):
     contract_end_date: date
 
 
+class PersonnelAccountCreate(BaseModel):
+    """حساب کاربری «کارمند» که هم‌زمان با خودِ پرسنل ساخته می‌شود.
+
+    نقش عمداً در ورودی نیست: این مسیر دقیقاً برای این وجود دارد که فرد بتواند
+    کارنامهٔ خودش را ببیند، پس همیشه employee است. نقش‌های زنجیرهٔ تأیید از مسیر
+    مدیریت کاربران ساخته می‌شوند.
+
+    قواعد نام کاربری و رمز از schemas/user.py می‌آیند تا یک سیاست بیشتر نداشته باشیم.
+    """
+
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+    username: str = Field(pattern=_USERNAME_PATTERN)
+    password: str = Field(min_length=_PASSWORD_MIN_LENGTH)
+
+
 class PersonnelCreate(PersonnelBase):
+    # اختیاری و نه خودکار: هر پرسنلی لازم نیست حساب داشته باشد (خط تولید، پیمانکار،
+    # کسی که اصلاً با سامانه کار نمی‌کند). ساختن خودکارِ حسابی که هیچ‌وقت استفاده
+    # نمی‌شود یعنی انباشتن حساب‌های خفته با رمز موقتِ تغییرنکرده — همان دسته مشکلی
+    # که فاز ۰ تازه پاکش کرد.
+    account: PersonnelAccountCreate | None = None
+
     @model_validator(mode="after")
     def _contract_dates_in_order(self) -> "PersonnelCreate":
         if self.contract_end_date <= self.contract_start_date:
@@ -54,6 +77,58 @@ class PersonnelRead(BaseModel):
     updated_at: datetime
 
 
+class PersonnelCreated(PersonnelRead):
+    """پاسخ ساخت پرسنل — ابرمجموعهٔ PersonnelRead.
+
+    نام کاربریِ ساخته‌شده برگردانده می‌شود تا UI بتواند صریح تأیید کند «حساب هم
+    ساخته شد»؛ بدون آن، HR نمی‌داند تیک زدنش اثری داشته یا نه.
+    """
+
+    account_username: str | None = None
+
+
 class PersonnelPage(BaseModel):
     total: int
     items: list[PersonnelRead]
+
+
+# ───────────────────────────── ورود دسته‌ای از Excel
+
+
+class ImportRowIssue(BaseModel):
+    """یک ردیف فایل به‌همراه وضعیتش — چه سالم چه خطادار.
+
+    ردیف‌های خطادار هم برگردانده می‌شوند، نه فقط شمارششان: کاربر باید بداند کدام
+    ردیف و دقیقاً چرا، وگرنه باید کل فایل را خودش بگردد.
+    """
+
+    row_number: int
+    personnel_code: str
+    full_name: str
+    username: str | None = None
+    errors: list[str] = []
+
+
+class PersonnelImportPreview(BaseModel):
+    total_rows: int
+    valid_count: int
+    invalid_count: int
+    accounts_to_create: int
+    rows: list[ImportRowIssue]
+    file_errors: list[str] = []
+
+
+class CreatedAccount(BaseModel):
+    """رمز موقت فقط همین یک بار برگردانده می‌شود؛ ذخیره نمی‌شود و در لاگ نمی‌رود."""
+
+    personnel_code: str
+    full_name: str
+    username: str
+    temporary_password: str
+
+
+class PersonnelImportResult(BaseModel):
+    created_personnel: int
+    created_accounts: int
+    skipped_rows: int
+    accounts: list[CreatedAccount] = []

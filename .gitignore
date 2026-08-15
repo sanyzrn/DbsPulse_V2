@@ -2,6 +2,10 @@ backend/.venv/
 backend/__pycache__/
 backend/**/__pycache__/
 backend/.env
+# فایل .env کنار docker-compose.yml (کپی‌شده از .env.production.example) رازهای
+# واقعی استقرار را دارد — نمونه‌های *.example عمداً استثنا شده‌اند.
+.env
+!*.example
 backend/*.egg-info/
 backend/.pytest_cache/
 frontend/node_modules/

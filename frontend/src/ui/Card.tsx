@@ -75,11 +75,15 @@ export function FilterSelect({
   children: ReactNode;
   "aria-label"?: string;
 }) {
+  // یک <select> به اندازهٔ بلندترین گزینه‌اش پهن می‌شود. انتخابگر شاخص گزینه‌های
+  // ۷۹ نویسه‌ای دارد، پس ۵۵۸px می‌شد و کل صفحهٔ گزارش‌ها را روی موبایل به اسکرول
+  // افقی می‌انداخت. min-w-0 اجازهٔ کوچک‌شدن در ظرف flex را می‌دهد و max-w-full سقف
+  // را روی عرض در دسترس می‌گذارد؛ متن گزینه خودش با … کوتاه می‌شود.
   return (
-    <div className="relative">
+    <div className="relative min-w-0 max-w-full">
       <select
         aria-label={ariaLabel}
-        className="appearance-none rounded-xl border border-gray-200 bg-gray-100 py-1.5 pr-3 pl-8 text-sm text-gray-700 outline-none transition-colors duration-150 focus:border-pulse-500 focus:bg-white"
+        className="max-w-full appearance-none truncate rounded-xl border border-gray-200 bg-gray-100 py-1.5 pr-3 pl-8 text-sm text-gray-700 outline-none transition-colors duration-150 focus:border-pulse-500 focus:bg-white"
         value={value}
         onChange={(e) => onChange(e.target.value)}
       >

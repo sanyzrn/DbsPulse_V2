@@ -298,8 +298,14 @@ def test_employee_sees_own_open_plan(client, db_session):
     assert len(plans) == 1
     assert plans[0]["goals"][0]["description"] == "هدف قابل مشاهده"
 
-    # نقش‌های دیگر به روتر مدیریتی برنامه دسترسی ندارند
-    assert client.get("/api/improvement-plans", headers=auth_header(sup)).status_code == 403
+    # از P1-10 به بعد، ارزیاب‌ها به این روتر دسترسی دارند ولی فقط به برنامه‌های
+    # سپرده‌شده به خودشان. این مسئول واحد مالک هیچ برنامه‌ای نیست، پس فهرستش
+    # خالی است — ادعایی قوی‌تر از ۴۰۳ قبلی: در را باز می‌کنیم و نشان می‌دهیم
+    # پشتش چیزی برای این کاربر نیست.
+    listed = client.get("/api/improvement-plans", headers=auth_header(sup))
+    assert listed.status_code == 200
+    assert listed.json()["items"] == []
+    # کارمند همچنان فقط از مسیر /api/me برنامهٔ خودش را می‌بیند
     assert client.get("/api/improvement-plans", headers=auth_header(employee)).status_code == 403
 
 
@@ -320,3 +326,175 @@ def test_plan_persisted_with_evaluation_link(client, db_session):
     )
     assert plan is not None
     assert plan.personnel_id == personnel.id
+
+
+# ───────────────────────────── P1-10 · دسترسی مسئول پیگیری
+
+
+def _plan_with_owner(client, db_session, owner):
+    """یک برنامهٔ بهبود باز، با یک هدف، که به `owner` سپرده شده است."""
+    personnel = make_personnel(db_session, full_name="نیازمند پیگیری")
+    hr, sup, dep, ceo, evaluation_id = _finalize_with_conditional_result(
+        client, db_session, personnel
+    )
+    plan = client.post(
+        "/api/improvement-plans",
+        json={
+            "evaluation_record_id": evaluation_id,
+            "title": "برنامهٔ بهبود کیفیت",
+            "review_date": str(date.today() + timedelta(days=30)),
+            "owner_user_id": owner.id,
+        },
+        headers=auth_header(hr),
+    ).json()
+    goal = client.post(
+        f"/api/improvement-plans/{plan['id']}/goals",
+        json={"description": "گذراندن دورهٔ کنترل کیفیت"},
+        headers=auth_header(hr),
+    ).json()
+    return hr, plan, goal
+
+
+def test_the_owner_can_open_the_plan_the_reminder_links_to(client, db_session):
+    """قلب P1-10.
+
+    زمان‌بند یادآوری بازنگری را به مسئول پیگیری می‌فرستد با لینک همین صفحه، ولی
+    همهٔ endpointها `require_roles(hr)` بودند — یعنی سامانه از کسی کاری می‌خواست
+    که اجازهٔ بازکردنش را به او نمی‌داد.
+    """
+    owner = make_user(db_session, "unit_supervisor")
+    db_session.commit()
+    _, plan, _ = _plan_with_owner(client, db_session, owner)
+
+    r = client.get(f"/api/improvement-plans/{plan['id']}", headers=auth_header(owner))
+
+    assert r.status_code == 200
+    assert r.json()["title"] == "برنامهٔ بهبود کیفیت"
+
+
+def test_the_owner_can_tick_a_goal_off(client, db_session):
+    """کاری که اصلاً به او سپرده شده: پیگیری تحقق اهداف."""
+    owner = make_user(db_session, "deputy")
+    db_session.commit()
+    _, plan, goal = _plan_with_owner(client, db_session, owner)
+
+    r = client.patch(
+        f"/api/improvement-plans/{plan['id']}/goals/{goal['id']}",
+        json={"is_done": True},
+        headers=auth_header(owner),
+    )
+
+    assert r.status_code == 200
+    assert r.json()["is_done"] is True
+
+
+def test_the_owner_may_not_rewrite_the_goal_text(client, db_session):
+    """متن هدف را HR نوشته و مبنای تصمیم قرارداد است؛ اگر مجریِ برنامه بتواند
+    بازنویسی‌اش کند، «هدف محقق شد» دیگر چیزی را ثابت نمی‌کند."""
+    owner = make_user(db_session, "unit_supervisor")
+    db_session.commit()
+    _, plan, goal = _plan_with_owner(client, db_session, owner)
+
+    r = client.patch(
+        f"/api/improvement-plans/{plan['id']}/goals/{goal['id']}",
+        json={"description": "یک هدف آسان‌تر"},
+        headers=auth_header(owner),
+    )
+
+    assert r.status_code == 403
+
+
+def test_the_owner_may_not_complete_or_cancel_the_plan(client, db_session):
+    owner = make_user(db_session, "unit_supervisor")
+    db_session.commit()
+    _, plan, _ = _plan_with_owner(client, db_session, owner)
+
+    assert (
+        client.post(
+            f"/api/improvement-plans/{plan['id']}/complete", headers=auth_header(owner)
+        ).status_code
+        == 403
+    )
+    assert (
+        client.post(
+            f"/api/improvement-plans/{plan['id']}/cancel", headers=auth_header(owner)
+        ).status_code
+        == 403
+    )
+
+
+def test_the_owner_may_not_add_or_delete_goals(client, db_session):
+    owner = make_user(db_session, "unit_supervisor")
+    db_session.commit()
+    _, plan, goal = _plan_with_owner(client, db_session, owner)
+
+    assert (
+        client.post(
+            f"/api/improvement-plans/{plan['id']}/goals",
+            json={"description": "هدف خودساخته"},
+            headers=auth_header(owner),
+        ).status_code
+        == 403
+    )
+    assert (
+        client.delete(
+            f"/api/improvement-plans/{plan['id']}/goals/{goal['id']}",
+            headers=auth_header(owner),
+        ).status_code
+        == 403
+    )
+
+
+def test_someone_elses_plan_stays_closed(client, db_session):
+    """گشودن دسترسی نباید به «هر ارزیابی می‌تواند هر برنامه‌ای را ببیند» تبدیل شود."""
+    owner = make_user(db_session, "unit_supervisor")
+    stranger = make_user(db_session, "deputy")
+    db_session.commit()
+    _, plan, goal = _plan_with_owner(client, db_session, owner)
+
+    assert (
+        client.get(
+            f"/api/improvement-plans/{plan['id']}", headers=auth_header(stranger)
+        ).status_code
+        == 403
+    )
+    assert (
+        client.patch(
+            f"/api/improvement-plans/{plan['id']}/goals/{goal['id']}",
+            json={"is_done": True},
+            headers=auth_header(stranger),
+        ).status_code
+        == 403
+    )
+
+
+def test_the_list_shows_the_owner_only_their_own_plans(client, db_session):
+    owner = make_user(db_session, "unit_supervisor")
+    stranger = make_user(db_session, "deputy")
+    db_session.commit()
+    hr, plan, _ = _plan_with_owner(client, db_session, owner)
+
+    mine = client.get("/api/improvement-plans", headers=auth_header(owner)).json()
+    assert [p["id"] for p in mine["items"]] == [plan["id"]]
+
+    theirs = client.get("/api/improvement-plans", headers=auth_header(stranger)).json()
+    assert theirs["items"] == []
+
+    # HR همچنان همه را می‌بیند
+    all_plans = client.get("/api/improvement-plans", headers=auth_header(hr)).json()
+    assert any(p["id"] == plan["id"] for p in all_plans["items"])
+
+
+def test_an_employee_cannot_reach_improvement_plans(client, db_session):
+    """کارمند برنامهٔ خودش را از مسیر /api/me می‌بیند، نه از این مسیر."""
+    employee = make_user(db_session, "employee")
+    owner = make_user(db_session, "unit_supervisor")
+    db_session.commit()
+    _, plan, _ = _plan_with_owner(client, db_session, owner)
+
+    assert (
+        client.get(
+            f"/api/improvement-plans/{plan['id']}", headers=auth_header(employee)
+        ).status_code
+        == 403
+    )

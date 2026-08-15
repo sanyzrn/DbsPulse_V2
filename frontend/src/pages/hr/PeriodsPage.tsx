@@ -3,6 +3,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { motion } from "motion/react";
 import { apiClient, extractErrorMessage } from "../../api/client";
 import { usePeriodProgress, usePeriods } from "../../api/queries";
+import { BulkCreateDialog } from "../../components/BulkCreateDialog";
 import { useConfirm } from "../../components/ConfirmDialog";
 import { useToast } from "../../components/Toast";
 import { Button } from "../../ui/Button";
@@ -26,6 +27,7 @@ export function PeriodsPage() {
   const [form, setForm] = useState(emptyForm);
   const [error, setError] = useState<string | null>(null);
   const [showAddPeriod, setShowAddPeriod] = useState(false);
+  const [showBulkCreate, setShowBulkCreate] = useState(false);
 
   const { data: periods = [], error: loadError } = usePeriods();
   const openPeriod = periods.find((p) => p.status === "open") ?? null;
@@ -87,13 +89,19 @@ export function PeriodsPage() {
   return (
     <div className="space-y-4">
       <PageHeader title="دوره‌های ارزیابی" subtitle="آغاز، پایش پیشرفت و بستن دوره‌های ارزیابی سازمان" />
-      {!openPeriod && (
-        <div className="flex justify-end">
+      {/* ساخت دسته‌ای این‌جاست چون «باز کردن چرخه» همین صفحه است؛ پروندهٔ ساخته‌شده
+          به همان دورهٔ باز برچسب می‌خورد و پیشرفتش در همین صفحه دیده می‌شود. */}
+      <div className="flex flex-wrap justify-end gap-2">
+        <Button variant="secondary" onClick={() => setShowBulkCreate(true)}>
+          ساخت دسته‌ای ارزیابی
+        </Button>
+        {!openPeriod && (
           <Button onClick={() => { setError(null); setShowAddPeriod(true); }}>
             + آغاز دوره ارزیابی جدید
           </Button>
-        </div>
-      )}
+        )}
+      </div>
+      {showBulkCreate && <BulkCreateDialog onClose={() => setShowBulkCreate(false)} />}
       {showAddPeriod && !openPeriod && (
         <Modal
           title="آغاز دوره ارزیابی جدید"

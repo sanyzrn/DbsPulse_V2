@@ -14,8 +14,17 @@ from app.models.evaluation_period import EvaluationPeriod
 from app.models.personnel import Personnel
 from app.models.user import User
 from app.schemas.auth import CurrentUser
-from app.schemas.period import NotStartedPersonnel, PeriodCreate, PeriodProgress, PeriodRead
+from app.schemas.period import (
+    BulkCreateRequest,
+    BulkCreateResult,
+    BulkPersonResult,
+    NotStartedPersonnel,
+    PeriodCreate,
+    PeriodProgress,
+    PeriodRead,
+)
 from app.services.audit import log_event
+from app.services.bulk_evaluation import BulkOutcome, CohortFilter, execute, plan, summarise
 from app.services.notifications import notify
 from app.services.workflow import IS_OPEN_RECORD
 
@@ -205,3 +214,102 @@ def period_progress(
             for pid, name, unit in not_started_rows
         ],
     )
+
+
+def _to_cohort(payload: BulkCreateRequest) -> CohortFilter:
+    return CohortFilter(
+        org_unit=payload.org_unit,
+        only_managers=payload.only_managers,
+        contract_ends_before=payload.contract_ends_before,
+    )
+
+
+def _to_result(plans: list, *, dry_run: bool) -> BulkCreateResult:
+    return BulkCreateResult(
+        dry_run=dry_run,
+        total=len(plans),
+        counts=summarise(plans),
+        results=[
+            BulkPersonResult(
+                personnel_id=p.personnel_id,
+                full_name=p.full_name,
+                org_unit=p.org_unit,
+                outcome=p.outcome.value,
+                reason=p.reason,
+                evaluation_id=p.evaluation_id,
+                evaluation_code=p.evaluation_code,
+            )
+            for p in plans
+        ],
+    )
+
+
+@router.post("/bulk-create/preview", response_model=BulkCreateResult)
+def preview_bulk_create(
+    payload: BulkCreateRequest,
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(require_roles(UserRole.hr)),
+) -> BulkCreateResult:
+    """اجرای خشک: دقیقاً می‌گوید برای چه کسانی ارزیابی ساخته می‌شود، چه کسانی رد
+    می‌شوند و چرا — بدون اینکه چیزی نوشته شود (P2-03).
+
+    این مرحله اختیاری نیست بلکه *نقطهٔ تصمیم* است: باز کردن یک چرخه برای دویست
+    نفر کاری است که برگرداندنش دستی و پرزحمت است، پس باید بشود پیش از انجامش
+    دیدش.
+    """
+    return _to_result(plan(db, _to_cohort(payload)), dry_run=True)
+
+
+@router.post("/bulk-create", response_model=BulkCreateResult)
+def run_bulk_create(
+    payload: BulkCreateRequest,
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(require_roles(UserRole.hr)),
+) -> BulkCreateResult:
+    """ساخت دسته‌ای، با گزارش سرنوشت هر نفر.
+
+    منابع انسانی این کار را انجام می‌دهد، نه ارزیاب — و این عمدی است: باز کردن
+    چرخه کارِ HR است، ولی هر پرونده در صف همان ارزیابی می‌نشیند که ردیف دسترسی
+    نامش را برده. یعنی گاردِ «فقط مسئول واحد مربوطه می‌تواند شروع کند» در مسیر
+    تک‌رکوردی سر جایش می‌ماند؛ این‌جا HR *به نمایندگی* چرخه را باز می‌کند و
+    نمره‌دهی همچنان دست خودِ ارزیاب است.
+
+    عملیات idempotent است: اجرای دوباره با همان کوهورت، برای کسانی که پرونده
+    گرفته‌اند «از قبل باز دارد» برمی‌گرداند، نه پروندهٔ دوم.
+    """
+    plans = execute(db, _to_cohort(payload))
+    result = _to_result(plans, dry_run=False)
+    # ساخت دسته‌ای یک تصمیم سازمانی است، نه یک کلیک: چه کوهورتی و با چه نتیجه‌ای،
+    # باید بعداً قابل بازخوانی باشد.
+    log_event(
+        db,
+        actor_user_id=current_user.id,
+        event_type="evaluations_bulk_created",
+        new_value={
+            "cohort": payload.model_dump(mode="json", exclude_none=True),
+            "counts": result.counts,
+        },
+    )
+    db.commit()
+
+    # اعلان فقط به کسانی که واقعاً پرونده‌ای گرفته‌اند، و یکی به‌ازای هر نفر —
+    # نه یکی به‌ازای هر پرونده، چون یک مسئول واحد ممکن است ده نفر بگیرد و ده
+    # اعلانِ پشت‌سرهم یعنی هیچ اعلانی.
+    created_by_assignee: dict[int, int] = {}
+    for person_plan in plans:
+        if person_plan.outcome is BulkOutcome.created and person_plan.assignee_user_id:
+            created_by_assignee[person_plan.assignee_user_id] = (
+                created_by_assignee.get(person_plan.assignee_user_id, 0) + 1
+            )
+    for user_id, count in created_by_assignee.items():
+        notify(
+            db,
+            user_ids=[user_id],
+            type_="bulk_evaluations_assigned",
+            # متن به‌ازای هر گیرنده فرق دارد (تعدادِ خودش)، پس نمی‌شود یک notify
+            # با فهرست گیرنده‌ها فرستاد.
+            message=f"{count} ارزیابی جدید برای شما آغاز شد و منتظر نمره‌دهی است",
+            link="/",
+        )
+    db.commit()
+    return result

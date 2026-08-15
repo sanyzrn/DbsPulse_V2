@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { DEFAULT_APP_CONFIG, type AppConfig, type Indicator, type EvaluationScoreRow } from "../types";
+import { NARROW_QUERY, useMediaQuery } from "../ui/useMediaQuery";
 
 function wordCount(text: string): number {
   return text.split(/\s+/).filter(Boolean).length;
@@ -304,15 +305,93 @@ export function SegmentedScore({
   );
 }
 
-export function ScoreFormTable({
-  section,
-  indicators,
-  drafts,
-  onScoreChange,
-  onEvidenceChange,
-  readOnly = false,
-  config = DEFAULT_APP_CONFIG,
+/** دکمه‌های گسستهٔ ۱ تا ۵ برای موبایل (P2-04).
+ *
+ * روی موبایل، اسلایدر ابزار غلطی است: کشیدنِ یک thumb ۲۲ پیکسلی با انگشت روی خطِ
+ * تولید کار نمی‌کند، و مقیاسِ ۵ مقدارِ *گسسته* اصلاً پیوسته نیست که کشیدن معنا
+ * بدهد. پنج دکمهٔ درشت با نامِ خودشان، هم دقیق‌ترند و هم می‌گویند هر عدد یعنی چه —
+ * چیزی که اسلایدر فقط بعد از انتخاب نشان می‌دهد.
+ *
+ * ارتفاع ۴۴ پیکسل کمینهٔ توصیه‌شدهٔ هدف لمسی است؛ کمتر از آن یعنی انتخابِ اشتباه
+ * روی نمره‌ای که به تمدید قرارداد یک نفر مربوط است.
+ */
+function ScoreButtons({
+  value,
+  onChange,
+  label,
 }: {
+  value: number | null;
+  onChange: (score: number) => void;
+  label: string;
+}) {
+  return (
+    <div role="radiogroup" aria-label={label} className="grid grid-cols-5 gap-1.5">
+      {SCORE_VALUES.map((n) => {
+        const selected = value === n;
+        return (
+          <button
+            key={n}
+            type="button"
+            role="radio"
+            aria-checked={selected}
+            aria-label={`${n.toLocaleString("fa-IR")} — ${SCORE_LABELS[n]}`}
+            onClick={() => onChange(n)}
+            className={`flex min-h-11 flex-col items-center justify-center gap-0.5 rounded-xl border-2 px-1 py-1.5 transition-colors ${
+              selected ? "text-white" : "border-gray-200 bg-white text-gray-600 active:bg-gray-50"
+            }`}
+            style={
+              selected
+                ? { backgroundColor: SCORE_TONE_COLOR[n], borderColor: SCORE_TONE_COLOR[n] }
+                : undefined
+            }
+          >
+            <span className="text-base font-bold tabular-nums leading-none">
+              {n.toLocaleString("fa-IR")}
+            </span>
+            <span className="text-[9px] leading-tight opacity-90">{SCORE_LABELS[n]}</span>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+/** شمارندهٔ واژه — قانونِ سرور را *پیش* از رد شدن نشان می‌دهد.
+ *
+ * قاعده از قبل وجود داشت (نمرهٔ ۱ و ۵ حداقل سه واژه شواهد می‌خواهند) ولی تنها
+ * جایی که دیده می‌شد، پیام خطا هنگام ثبت بود — یعنی بعد از نوشتن بیست شاخص. */
+function WordCounter({
+  count,
+  required,
+  min,
+  max,
+}: {
+  count: number;
+  required: boolean;
+  min: number;
+  max: number;
+}) {
+  const short = required && count < min;
+  return (
+    <p
+      className={`mt-1 text-[10px] tabular-nums ${short ? "text-red-600" : "text-gray-400"}`}
+      aria-live="polite"
+    >
+      {short
+        ? `${(min - count).toLocaleString("fa-IR")} واژهٔ دیگر لازم است`
+        : `${count.toLocaleString("fa-IR")} از ${max.toLocaleString("fa-IR")} واژه`}
+    </p>
+  );
+}
+
+/** سقف نرم واژه‌ها: فقط وقتی از حد گذشت متن کوتاه می‌شود؛ در تایپ عادی متن خام
+ *  رد می‌شود تا فاصله‌ها/تایپ مختل نشود. */
+export function clampEvidence(raw: string, maxWords: number): string {
+  const words = raw.trim().split(/\s+/).filter(Boolean);
+  return words.length > maxWords ? words.slice(0, maxWords).join(" ") : raw;
+}
+
+interface SectionProps {
   section: "general" | "specialized";
   indicators: Indicator[];
   drafts: ScoreDraft[];
@@ -320,20 +399,144 @@ export function ScoreFormTable({
   onEvidenceChange: (indicatorId: number, text: string) => void;
   readOnly?: boolean;
   config?: AppConfig;
-}) {
+}
+
+/** فهرست کارتی — یک شاخص در هر کارت، برای صفحه‌های باریک (P2-04).
+ *
+ * جدول چهارستونی روی موبایل به اسکرول افقی تبدیل می‌شد: ارزیاب باید برای دیدن
+ * «امتیاز» ستون‌ها را کنار می‌زد و شرح شاخص از دید خارج می‌شد. یعنی نمره‌دادن
+ * بدون دیدن چیزی که به آن نمره می‌دهد. کسانی که بیشتر از همه موبایل دارند —
+ * مسئول واحدِ سرِ خط تولید، مدیرِ بین دو جلسه — همان‌هایی‌اند که تأخیرشان کل
+ * زنجیره را می‌خواباند.
+ */
+function ScoreCardList({
+  section,
+  indicators,
+  drafts,
+  onScoreChange,
+  onEvidenceChange,
+  readOnly = false,
+  config = DEFAULT_APP_CONFIG,
+}: SectionProps) {
+  const sectionIndicators = indicators.filter((i) => i.section === section);
+  const draftByIndicator = new Map(drafts.map((d) => [d.indicator_id, d]));
+  const maxWords = config.evidence_max_words ?? 40;
+
+  return (
+    <ol className="space-y-3">
+      {sectionIndicators.map((ind, index) => {
+        const draft = draftByIndicator.get(ind.id);
+        if (!draft) return null;
+        const count = wordCount(draft.evidence_text);
+        const needsEvidence = evidenceIsRequired(draft.score, config);
+        const invalid = needsEvidence && count < config.evidence_min_words;
+        const scoreLabel =
+          draft.score !== null ? SCORE_LABELS[draft.score] : "امتیازی انتخاب نشده";
+
+        return (
+          <li
+            key={ind.id}
+            className={`rounded-2xl border bg-white p-4 shadow-card ${
+              invalid ? "border-red-200" : draft.score === null ? "border-amber-200" : "border-gray-100"
+            }`}
+          >
+            <div className="mb-3">
+              <p className="flex items-baseline gap-2 text-sm font-bold text-gray-900">
+                <span className="shrink-0 text-[11px] font-normal text-gray-400">
+                  {(index + 1).toLocaleString("fa-IR")}/
+                  {sectionIndicators.length.toLocaleString("fa-IR")}
+                </span>
+                {ind.category}
+              </p>
+              <p className="mt-1 text-xs leading-relaxed text-gray-600">{ind.description}</p>
+            </div>
+
+            {readOnly ? (
+              <span
+                className={`inline-flex items-center gap-1.5 rounded-xl px-2.5 py-1 text-sm font-bold ${
+                  draft.score !== null
+                    ? READONLY_TONE[draft.score] ?? "bg-gray-100 text-gray-700"
+                    : "bg-gray-100 text-gray-500"
+                }`}
+              >
+                {draft.score !== null ? draft.score.toLocaleString("fa-IR") : "—"}
+                <span className="text-[11px] font-normal opacity-80">{scoreLabel}</span>
+              </span>
+            ) : (
+              <ScoreButtons
+                value={draft.score}
+                onChange={(score) => onScoreChange(ind.id, score)}
+                label={`امتیاز ${ind.category}`}
+              />
+            )}
+
+            {readOnly ? (
+              draft.evidence_text && (
+                <p className="mt-3 whitespace-pre-wrap border-t border-gray-50 pt-3 text-xs text-gray-700">
+                  {draft.evidence_text}
+                </p>
+              )
+            ) : (
+              <div className="mt-3">
+                <label className="text-[11px] font-medium text-gray-600">
+                  شواهد عینی
+                  {needsEvidence && <span className="text-red-500"> *</span>}
+                  <textarea
+                    className={`mt-1 w-full resize-none rounded-xl border px-3 py-2 text-sm text-gray-800 outline-none transition-colors ${
+                      invalid
+                        ? "border-red-400 bg-red-50 focus:border-red-500"
+                        : "border-gray-200 bg-gray-100 focus:border-pulse-500 focus:bg-white"
+                    }`}
+                    rows={3}
+                    value={draft.evidence_text}
+                    onChange={(e) => onEvidenceChange(ind.id, clampEvidence(e.target.value, maxWords))}
+                    disabled={!needsEvidence}
+                    placeholder={
+                      needsEvidence ? "شرح کوتاه شواهد عینی…" : "برای این امتیاز اختیاری است"
+                    }
+                  />
+                </label>
+                {needsEvidence && (
+                  <WordCounter
+                    count={count}
+                    required
+                    min={config.evidence_min_words}
+                    max={maxWords}
+                  />
+                )}
+              </div>
+            )}
+          </li>
+        );
+      })}
+    </ol>
+  );
+}
+
+/** فرم امتیازدهی یک بخش — کارت روی موبایل، جدول روی صفحهٔ پهن.
+ *
+ * فقط *یکی* از دو نسخه رندر می‌شود، نه اینکه هر دو ساخته و یکی با CSS پنهان شود:
+ * وقتی محتوا فرم است، نسخهٔ پنهان یعنی هر شاخص دو کنترلِ ورودی دارد. */
+export function ScoreFormTable(props: SectionProps) {
+  const narrow = useMediaQuery(NARROW_QUERY);
+  return narrow ? <ScoreCardList {...props} /> : <ScoreFormTableWide {...props} />;
+}
+
+function ScoreFormTableWide({
+  section,
+  indicators,
+  drafts,
+  onScoreChange,
+  onEvidenceChange,
+  readOnly = false,
+  config = DEFAULT_APP_CONFIG,
+}: SectionProps) {
   const sectionIndicators = indicators.filter((i) => i.section === section);
   const draftByIndicator = new Map(drafts.map((d) => [d.indicator_id, d]));
   const maxWords = config.evidence_max_words ?? 40;
 
   function handleEvidenceChange(indicatorId: number, raw: string) {
-    // سقف نرم واژه‌ها: فقط وقتی از حد گذشت متن را به maxWords واژه کوتاه می‌کنیم؛
-    // در تایپ عادی متن خام رد می‌شود تا فاصله‌ها/تایپ مختل نشود.
-    const words = raw.trim().split(/\s+/).filter(Boolean);
-    if (words.length > maxWords) {
-      onEvidenceChange(indicatorId, words.slice(0, maxWords).join(" "));
-    } else {
-      onEvidenceChange(indicatorId, raw);
-    }
+    onEvidenceChange(indicatorId, clampEvidence(raw, maxWords));
   }
 
   return (
@@ -403,6 +606,16 @@ export function ScoreFormTable({
                           ? "شرح کوتاه شواهد عینی…"
                           : "برای این امتیاز اختیاری است"
                       }
+                    />
+                  )}
+                  {/* شمارنده قانونِ سرور را پیش از رد شدن نشان می‌دهد؛ قبلاً تنها
+                      جایی که دیده می‌شد، خطای ثبت بود — بعد از نوشتن بیست شاخص. */}
+                  {!readOnly && needsEvidence && (
+                    <WordCounter
+                      count={count}
+                      required
+                      min={config.evidence_min_words}
+                      max={maxWords}
                     />
                   )}
                 </td>

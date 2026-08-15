@@ -37,6 +37,23 @@ server {
     add_header Referrer-Policy "same-origin" always;
     add_header Strict-Transport-Security $dbspulse_hsts always;
 
+    # nginx در mime.types پیش‌فرضش نگاشتی برای .webmanifest ندارد و آن را
+    # application/octet-stream می‌فرستد؛ در آن حالت کروم مانیفست را نادیده
+    # می‌گیرد و برنامه با اینکه همه‌چیزش درست است «قابل نصب» نمی‌شود (P2-04).
+    types {
+        application/manifest+json  webmanifest;
+    }
+
+    # سرویس‌ورکر هرگز نباید کش شود.
+    # نسخهٔ کش‌شدهٔ sw.js یعنی کاربر روی یک استراتژیِ کشِ قدیمی گیر می‌کند — و چون
+    # خودِ همان ورکر است که تصمیم می‌گیرد چه چیزی از شبکه بیاید، این حالت خودش
+    # خودش را نگه می‌دارد و با استقرار بعدی هم پاک نمی‌شود.
+    location = /sw.js {
+        add_header Cache-Control "no-cache, no-store, must-revalidate" always;
+        add_header X-Content-Type-Options "nosniff" always;
+        add_header Strict-Transport-Security $dbspulse_hsts always;
+    }
+
     # فایل‌های استاتیک با کش طولانی (نام‌گذاری هش‌شده توسط Vite)
     location /assets/ {
         expires 1y;

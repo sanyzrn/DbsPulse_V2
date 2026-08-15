@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from "react";
 import { apiClient, authToken, refreshAccessToken } from "../api/client";
 import type { CurrentUser } from "../types";
+import { clearAppCaches } from "../pwa";
 
 interface AuthContextValue {
   user: CurrentUser | null;
@@ -52,6 +53,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     apiClient.post("/auth/logout").catch(() => {});
     authToken.set(null);
     setUser(null);
+    // کش سرویس‌ورکر فقط پوستهٔ برنامه است و دادهٔ کاربر ندارد (پاسخ‌های /api اصلاً
+    // کش نمی‌شوند)، ولی روی دستگاه مشترک، «هیچ ردی نماند» چیزی است که کاربر حق
+    // دارد از دکمهٔ خروج انتظار داشته باشد.
+    void clearAppCaches();
   }, []);
 
   return (

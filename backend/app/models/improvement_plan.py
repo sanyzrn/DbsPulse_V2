@@ -1,6 +1,6 @@
 from datetime import date, datetime
 
-from sqlalchemy import Boolean, Date, DateTime, Enum, ForeignKey, Integer, String, func
+from sqlalchemy import Boolean, Date, DateTime, Enum, ForeignKey, Index, Integer, String, UniqueConstraint, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.text_limits import PLAN_GOAL_MAX, PLAN_SUMMARY_MAX
@@ -60,6 +60,15 @@ class ImprovementPlan(Base):
     def personnel_full_name(self) -> str:
         return self.personnel.full_name
 
+    # ایندکس‌ها در مایگریشن‌ها ساخته شده‌اند و تا امروز روی مدل اعلام نشده بودند،
+    # پس `alembic revision --autogenerate` آن‌ها را «اضافی» می‌دید و DROP پیشنهاد
+    # می‌داد. اعلامشان این‌جا یعنی autogenerate واقعیتِ دیتابیس را می‌بیند.
+    __table_args__ = (
+        Index("ix_improvement_plans_personnel", "personnel_id"),
+        Index("ix_improvement_plans_status", "status"),
+        Index("ix_improvement_plans_review_date", "review_date"),
+        UniqueConstraint("evaluation_record_id", name="uq_improvement_plan_evaluation"),
+    )
 
 class ImprovementPlanGoal(Base):
     __tablename__ = "improvement_plan_goals"
@@ -72,3 +81,7 @@ class ImprovementPlanGoal(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     plan: Mapped["ImprovementPlan"] = relationship(back_populates="goals")
+
+    __table_args__ = (
+        Index("ix_improvement_plan_goals_plan", "plan_id"),
+    )

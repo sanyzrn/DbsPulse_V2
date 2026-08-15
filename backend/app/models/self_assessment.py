@@ -4,6 +4,7 @@ from sqlalchemy import (
     CheckConstraint,
     DateTime,
     ForeignKey,
+    Index,
     Integer,
     String,
     UniqueConstraint,
@@ -41,6 +42,7 @@ class SelfAssessmentScore(Base):
 
     __table_args__ = (
         CheckConstraint("score BETWEEN 1 AND 5", name="ck_self_assessment_scores_score_range"),
+        Index("ix_self_assessment_scores_record", "evaluation_record_id"),
         UniqueConstraint(
             "evaluation_record_id", "indicator_id", name="uq_self_assessment_record_indicator"
         ),

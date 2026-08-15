@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import DateTime, ForeignKey, String, func
+from sqlalchemy import DateTime, ForeignKey, Index, String, func
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import Base
@@ -35,3 +35,10 @@ class AuthSession(Base):
     # با هر چرخش به‌روز می‌شود؛ «آخرین فعالیت» چیزی است که کاربر با آن نشستِ
     # فراموش‌شده را از نشست جاری تشخیص می‌دهد.
     last_used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+    # ایندکس‌ها در مایگریشن‌ها ساخته شده‌اند و تا امروز روی مدل اعلام نشده بودند،
+    # پس `alembic revision --autogenerate` آن‌ها را «اضافی» می‌دید و DROP پیشنهاد
+    # می‌داد. اعلامشان این‌جا یعنی autogenerate واقعیتِ دیتابیس را می‌بیند.
+    __table_args__ = (
+        Index("ix_auth_sessions_user", "user_id"),
+    )

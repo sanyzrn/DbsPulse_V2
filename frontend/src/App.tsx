@@ -44,6 +44,12 @@ const ImprovementPlanDetailPage = lazy(() =>
     default: m.ImprovementPlanDetailPage,
   }))
 );
+const MyScoringPage = lazy(() =>
+  import("./pages/supervisor/MyScoringPage").then((m) => ({ default: m.MyScoringPage }))
+);
+const ExecutivePage = lazy(() =>
+  import("./pages/ceo/ExecutivePage").then((m) => ({ default: m.ExecutivePage }))
+);
 const SupervisorHomePage = lazy(() =>
   import("./pages/supervisor/SupervisorHomePage").then((m) => ({ default: m.SupervisorHomePage }))
 );
@@ -158,6 +164,18 @@ function App() {
 
             <Route element={<ProtectedRoute allowedRoles={["ceo"]} />}>
               <Route path="/ceo" element={<CeoHomePage />} />
+            </Route>
+
+            {/* P2-01 — تحلیل برای نقش‌هایی غیر از منابع انسانی.
+                «آینهٔ ارزیاب» برای کسانی که نمره می‌دهند (مسئول واحد و معاونت، که
+                در مسیر «مدیر» خودش نمره‌دهندهٔ اول است)؛ «تحلیل سازمان» برای
+                کسانی که تصمیم می‌گیرند. معاونت در هر دو گروه است. */}
+            <Route element={<ProtectedRoute allowedRoles={["unit_supervisor", "deputy"]} />}>
+              <Route path="/my-scoring" element={<MyScoringPage />} />
+            </Route>
+
+            <Route element={<ProtectedRoute allowedRoles={["ceo", "deputy"]} />}>
+              <Route path="/executive" element={<ExecutivePage />} />
             </Route>
 
             <Route element={<ProtectedRoute allowedRoles={["employee"]} />}>

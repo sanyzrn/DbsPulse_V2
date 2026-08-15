@@ -14,6 +14,7 @@ from sqlalchemy.orm import Session
 
 from app.api.routers import (
     admin,
+    analytics,
     audit_log,
     auth,
     config,
@@ -146,6 +147,7 @@ app.include_router(evaluations.router)
 app.include_router(improvement_plans.router)
 app.include_router(me.router)
 app.include_router(dashboard.router)
+app.include_router(analytics.router)
 app.include_router(reports.router)
 app.include_router(audit_log.router)
 app.include_router(notifications.router)

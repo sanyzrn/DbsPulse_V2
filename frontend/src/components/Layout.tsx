@@ -17,6 +17,9 @@ const NAV_BY_ROLE: Record<string, { to: string; label: string }[]> = {
     { to: "/hr/personnel", label: "پرسنل" },
     { to: "/hr/users", label: "کاربران" },
     { to: "/hr/indicators", label: "شاخص‌ها" },
+    // کنار «شاخص‌ها» چون هر دو «فرمِ ارزیابی» را تعریف می‌کنند: یکی چه چیزی
+    // سنجیده می‌شود، دیگری چطور به نتیجه تبدیل می‌شود (P1-04).
+    { to: "/hr/scoring-schemes", label: "طرح نمره‌دهی" },
     { to: "/hr/queue", label: "صف بررسی" },
     // «دوره‌های ارزیابی» پشت پرچم ویژگی — فعلاً غیرفعال (رجوع به appInfo.ts)
     ...(FEATURE_PERIODS_ENABLED

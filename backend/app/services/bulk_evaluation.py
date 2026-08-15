@@ -35,6 +35,7 @@ from app.models.evaluation_access import EvaluationAccess
 from app.models.evaluation_period import EvaluationPeriod
 from app.models.personnel import Personnel
 from app.services.evaluation import next_evaluation_code
+from app.services.scoring_scheme import active_scheme
 from app.services.workflow import IS_OPEN_RECORD
 
 
@@ -207,6 +208,9 @@ def execute(db: Session, cohort: CohortFilter) -> list[PersonPlan]:
     open_period = db.scalar(
         select(EvaluationPeriod).where(EvaluationPeriod.status == PeriodStatus.open)
     )
+    # همان مهرِ طرح نمره‌دهی که مسیر تک‌رکوردی می‌زند (P1-04) — یک‌بار برای کل
+    # دسته خوانده می‌شود، پس همهٔ پرونده‌های یک اجرا زیر یک نسخه‌اند.
+    scheme = active_scheme(db)
     access_by_person = {
         row.personnel_id: row
         for row in db.scalars(
@@ -231,6 +235,7 @@ def execute(db: Session, cohort: CohortFilter) -> list[PersonPlan]:
             deputy_user_id=access.deputy_user_id,
             ceo_user_id=access.ceo_user_id,
             period_id=open_period.id if open_period else None,
+            scoring_scheme_id=scheme.id if scheme else None,
             status=(
                 EvaluationStatus.hr_approved
                 if person_plan.manager_path

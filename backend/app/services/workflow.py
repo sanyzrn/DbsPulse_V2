@@ -21,6 +21,7 @@ from app.models.indicator import Indicator
 from app.schemas.auth import CurrentUser
 from app.services.audit import log_event
 from app.services.evaluation import compute_result, validate_evidence
+from app.services.scoring_scheme import rules_for_record
 
 OPEN_STATUSES: frozenset[EvaluationStatus] = frozenset(
     {
@@ -241,12 +242,18 @@ def finalize_scoring(db: Session, record: EvaluationRecord, current_user: Curren
             detail="باید به تمام شاخص‌های فعال (عمومی و تخصصی) امتیاز داده شود",
         )
 
+    # قواعد از طرحِ *این پرونده* می‌آیند، نه از طرح فعال (P1-04). اگر HR وسط
+    # چرخه وزن‌ها را عوض کند، پرونده‌های باز با همان قواعدی بسته می‌شوند که زیر
+    # آن‌ها باز شده‌اند — وگرنه ارزیابی که نیمه‌کاره رها شده بود، با قواعدی
+    # نهایی می‌شد که ارزیاب هرگز ندیده است.
+    rules = rules_for_record(db, record)
+
     try:
-        validate_evidence(scores, indicators_by_id)
+        validate_evidence(scores, indicators_by_id, rules)
     except ValueError as exc:
         raise HTTPException(status_code=http_status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
 
-    result = compute_result(scores, indicators_by_id)
+    result = compute_result(scores, indicators_by_id, rules)
     record.general_score_pct = result["general_score_pct"]
     record.specialized_score_pct = result["specialized_score_pct"]
     record.final_weighted_pct = result["final_weighted_pct"]

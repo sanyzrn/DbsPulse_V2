@@ -53,6 +53,18 @@ class EvaluationRecord(Base):
     hr_user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
     # دوره‌ای که این ارزیابی در آن انجام شده؛ ارزیابی‌های خارج از دوره NULL می‌مانند
     period_id: Mapped[int | None] = mapped_column(ForeignKey("evaluation_periods.id"), nullable=True)
+    # نسخهٔ طرح نمره‌دهی که این پرونده *زیر آن ساخته شده* (P1-04).
+    #
+    # محاسبه همیشه از این می‌خواند، نه از طرحِ فعال. بدون آن، تغییر وزن‌ها توسط HR
+    # معنای هر پروندهٔ گذشته را بی‌صدا بازنویسی می‌کرد: نمره‌ها ثابت، ولی «نتیجهٔ
+    # پیشنهادی» عوض‌شده. این ستون پایداری تاریخ را به یک خاصیت ساختاری تبدیل
+    # می‌کند، نه چیزی که باید یادت بماند.
+    #
+    # nullable است چون پرونده‌های پیش از این قابلیت طرحی نداشتند؛ مایگریشن آن‌ها
+    # را به نسخهٔ ۱ — که دقیقاً از همان ثابت‌های قبلی ساخته شده — مهر می‌زند.
+    scoring_scheme_id: Mapped[int | None] = mapped_column(
+        ForeignKey("scoring_schemes.id"), nullable=True
+    )
     # ستون stage حذف شد: همیشه ۱:۱ از status قابل استخراج بود و دو منبع حقیقت
     # هم‌معنا خطر واگرایی داشت. مقدار stage در API از status مشتق می‌شود
     # (app/schemas/evaluation.py).

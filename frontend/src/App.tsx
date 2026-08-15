@@ -30,6 +30,9 @@ const QueuePage = lazy(() => import("./pages/hr/QueuePage").then((m) => ({ defau
 const PeriodsPage = lazy(() =>
   import("./pages/hr/PeriodsPage").then((m) => ({ default: m.PeriodsPage }))
 );
+const ScoringSchemesPage = lazy(() =>
+  import("./pages/hr/ScoringSchemesPage").then((m) => ({ default: m.ScoringSchemesPage }))
+);
 const DashboardPage = lazy(() =>
   import("./pages/hr/DashboardPage").then((m) => ({ default: m.DashboardPage }))
 );
@@ -150,6 +153,7 @@ function App() {
                   FEATURE_PERIODS_ENABLED ? <PeriodsPage /> : <DisabledFeature title="دوره‌های ارزیابی" />
                 }
               />
+              <Route path="/hr/scoring-schemes" element={<ScoringSchemesPage />} />
               <Route path="/hr/dashboard" element={<DashboardPage />} />
               <Route path="/hr/audit-log" element={<AuditLogPage />} />
             </Route>

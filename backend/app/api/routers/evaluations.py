@@ -48,6 +48,7 @@ from app.services.evaluation import next_evaluation_code
 from app.services.excel import build_evaluations_workbook
 from app.services.notifications import notify, notify_stage_owner_reassigned
 from app.services.pdf import weasyprint_available
+from app.services.scoring_scheme import active_scheme
 from app.services.self_evaluation import ensure_evaluators_are_not_the_subject
 from app.services.snapshot import build_final_snapshot
 from app.services.workflow import (
@@ -275,6 +276,10 @@ def create_evaluation(
         select(EvaluationPeriod).where(EvaluationPeriod.status == PeriodStatus.open)
     )
 
+    # پرونده به طرح نمره‌دهیِ فعالِ همین لحظه مهر می‌خورد (P1-04). از این پس
+    # محاسبه‌اش همیشه از همین نسخه می‌خواند، حتی اگر HR فردا وزن‌ها را عوض کند.
+    scheme = active_scheme(db)
+
     record = EvaluationRecord(
         evaluation_code=next_evaluation_code(db),
         subject_personnel_id=personnel.id,
@@ -282,6 +287,7 @@ def create_evaluation(
         deputy_user_id=access.deputy_user_id,
         ceo_user_id=access.ceo_user_id,
         period_id=open_period.id if open_period else None,
+        scoring_scheme_id=scheme.id if scheme else None,
         status=record_status,
     )
     db.add(record)

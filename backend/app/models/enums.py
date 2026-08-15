@@ -54,3 +54,15 @@ class ImprovementPlanStatus(str, enum.Enum):
     open = "open"
     completed = "completed"
     cancelled = "cancelled"
+
+
+class SchemeStatus(str, enum.Enum):
+    """چرخهٔ عمر یک طرح نمره‌دهی (P1-04).
+
+    `active` عمداً بازگشت‌پذیر نیست: برای عوض کردن قواعد باید نسخهٔ تازه ساخت.
+    ویرایش درجای یک نسخهٔ فعال، معنای پرونده‌های گذشته را بازنویسی می‌کند.
+    """
+
+    draft = "draft"
+    active = "active"
+    retired = "retired"

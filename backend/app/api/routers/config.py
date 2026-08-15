@@ -1,25 +1,31 @@
+"""قواعد نمره‌دهیِ جاری، برای فرم امتیازدهی در فرانت‌اند.
+
+از طرح *فعال* خوانده می‌شود، نه از ثابت‌ها (P1-04). بدون این، HR می‌توانست
+حداقل کلمات شواهد را عوض کند و فرم همچنان قاعدهٔ قدیمی را اعتبارسنجی کند —
+یعنی کاربر تیک سبز می‌گرفت و بعد سرور ثبت را رد می‌کرد.
+"""
 from fastapi import APIRouter, Depends
+from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user
-from app.core.constants import (
-    EVIDENCE_MAX_WORDS,
-    EVIDENCE_REQUIRED_MIN_WORDS,
-    EVIDENCE_REQUIRED_SCORES,
-    GENERAL_SECTION_WEIGHT,
-    SPECIALIZED_SECTION_WEIGHT,
-)
+from app.db.session import get_db
 from app.schemas.auth import CurrentUser
 from app.schemas.common import AppConfig
+from app.services.scoring_scheme import current_rules
 
 router = APIRouter(prefix="/api/config", tags=["config"])
 
 
 @router.get("", response_model=AppConfig)
-def get_config(current_user: CurrentUser = Depends(get_current_user)) -> AppConfig:
+def get_config(
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(get_current_user),
+) -> AppConfig:
+    rules = current_rules(db)
     return AppConfig(
-        evidence_min_words=EVIDENCE_REQUIRED_MIN_WORDS,
-        evidence_max_words=EVIDENCE_MAX_WORDS,
-        evidence_required_scores=list(EVIDENCE_REQUIRED_SCORES),
-        general_section_weight=GENERAL_SECTION_WEIGHT,
-        specialized_section_weight=SPECIALIZED_SECTION_WEIGHT,
+        evidence_min_words=rules.evidence_min_words,
+        evidence_max_words=rules.evidence_max_words,
+        evidence_required_scores=list(rules.evidence_required_scores),
+        general_section_weight=rules.general_section_weight,
+        specialized_section_weight=rules.specialized_section_weight,
     )

@@ -219,6 +219,10 @@ class MyOpenEvaluation(BaseModel):
     status: EvaluationStatus
     created_at: datetime
     stage_entered_at: datetime
+    #: شاخص‌های همین پرونده (P1-05) — فرم خودارزیابی باید از روی این ساخته شود،
+    #: نه از «شاخص‌های فعالِ امروز». وگرنه کارمند به مجموعه‌ای پاسخ می‌دهد که
+    #: ارزیاب به آن نمره نمی‌دهد، و مقایسهٔ دو دیدگاه بی‌معنا می‌شود.
+    indicator_ids: list[int] = []
 
     @computed_field  # type: ignore[prop-decorator]
     @property

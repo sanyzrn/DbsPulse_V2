@@ -325,3 +325,132 @@ def test_the_impact_preview_separates_frozen_from_movable(client, db_session, ch
     assert impact["frozen_open_records"] == 1
     assert impact["movable_open_records"] == 1
     assert impact["member_count"] == len(active_indicators(db_session))
+
+
+# ── خودارزیابی کارمند هم باید همان مجموعه را ببیند ──────────────────────────
+
+def _employee_of(db_session, chain):
+    from tests.helpers import make_user
+
+    employee = make_user(db_session, "employee", personnel_id=chain["person"].id)
+    db_session.commit()
+    return employee
+
+
+def _open_case_for(client, chain):
+    return client.post(
+        "/api/evaluations",
+        json={"subject_personnel_id": chain["person"].id},
+        headers=auth_header(chain["sup"]),
+    ).json()["id"]
+
+
+def test_a_submitted_self_assessment_freezes_the_case_too(client, db_session, chain):
+    """«دست‌نخورده» دو نویسنده دارد، نه یکی.
+
+    نسخهٔ اول این قاعده فقط امتیاز ارزیاب را می‌دید، پس پرونده‌ای که کارمند
+    خودارزیابی‌اش را در آن ثبت کرده بود همچنان «دست‌نخورده» حساب می‌شد و جابه‌جا
+    می‌شد. نتیجه: کارمند به بیست سؤال جواب می‌داد، ارزیاب به نوزده نمره می‌داد، و
+    یکی از پاسخ‌های کارمند به سؤالی می‌ماند که هیچ‌وقت نمره نخورد — یعنی همان
+    مقایسه‌ای که کل خودارزیابی برایش وجود دارد، بی‌صدا ناقص می‌شد.
+    """
+    employee = _employee_of(db_session, chain)
+    record_id = _open_case_for(client, chain)
+    case_indicators = client.get(
+        "/api/me/evaluations/open", headers=auth_header(employee)
+    ).json()[0]["indicator_ids"]
+
+    submitted = client.post(
+        f"/api/me/evaluations/{record_id}/self-assessment",
+        json={"scores": [{"indicator_id": i, "score": 4} for i in case_indicators]},
+        headers=auth_header(employee),
+    )
+    assert submitted.status_code == 200, submitted.text
+
+    # حالا منابع انسانی یک شاخص را کنار می‌گذارد
+    client.patch(
+        f"/api/indicators/{case_indicators[0]}",
+        json={"is_active": False},
+        headers=auth_header(chain["hr"]),
+    )
+
+    still = client.get("/api/me/evaluations/open", headers=auth_header(employee)).json()[0]
+    assert still["indicator_ids"] == case_indicators, "پرونده نباید جابه‌جا شده باشد"
+
+    # و ارزیاب دقیقاً به همان مجموعه نمره می‌دهد که کارمند جواب داده
+    detail = client.get(
+        f"/api/evaluations/{record_id}", headers=auth_header(chain["sup"])
+    ).json()
+    assert detail["indicator_ids"] == case_indicators
+
+
+def test_self_assessment_is_scored_against_the_case_not_todays_indicators(
+    client, db_session, chain
+):
+    """شاخصی که جزو این پرونده نیست پذیرفته نمی‌شود — حتی اگر امروز فعال باشد."""
+    employee = _employee_of(db_session, chain)
+    record_id = _open_case_for(client, chain)
+    # ارزیاب امتیاز می‌دهد تا پرونده به نسخهٔ خودش قفل شود
+    client.put(
+        f"/api/evaluations/{record_id}/scores",
+        json={"scores": full_valid_scores(active_indicators(db_session))},
+        headers=auth_header(chain["sup"]),
+    )
+    case_indicators = client.get(
+        "/api/me/evaluations/open", headers=auth_header(employee)
+    ).json()[0]["indicator_ids"]
+
+    newcomer = client.post(
+        "/api/indicators",
+        json={
+            "section": "general",
+            "category": "تازه",
+            "description": "بعد از باز شدن پرونده",
+            "display_order": 99,
+        },
+        headers=auth_header(chain["hr"]),
+    ).json()["id"]
+
+    refused = client.post(
+        f"/api/me/evaluations/{record_id}/self-assessment",
+        json={
+            "scores": [
+                {"indicator_id": i, "score": 4} for i in [*case_indicators, newcomer]
+            ]
+        },
+        headers=auth_header(employee),
+    )
+    assert refused.status_code == 400
+    assert str(newcomer) in refused.json()["detail"]
+
+
+def test_a_retired_question_can_still_be_self_assessed(client, db_session, chain):
+    """و جهت مخالف: سؤالی که کنار گذاشته شده ولی هنوز جزو این پرونده است.
+
+    بدون این، کارمندِ پرونده‌ای که وسط کارش شاخصی بازنشسته شده، موقع ثبت
+    «شاخص معتبر نیست» می‌گرفت — همان خرابیِ مسیر ارزیاب، یک در آن‌طرف‌تر.
+    """
+    employee = _employee_of(db_session, chain)
+    record_id = _open_case_for(client, chain)
+    client.put(
+        f"/api/evaluations/{record_id}/scores",
+        json={"scores": full_valid_scores(active_indicators(db_session))},
+        headers=auth_header(chain["sup"]),
+    )
+    case_indicators = client.get(
+        "/api/me/evaluations/open", headers=auth_header(employee)
+    ).json()[0]["indicator_ids"]
+
+    client.patch(
+        f"/api/indicators/{case_indicators[0]}",
+        json={"is_active": False},
+        headers=auth_header(chain["hr"]),
+    )
+
+    submitted = client.post(
+        f"/api/me/evaluations/{record_id}/self-assessment",
+        json={"scores": [{"indicator_id": i, "score": 4} for i in case_indicators]},
+        headers=auth_header(employee),
+    )
+    assert submitted.status_code == 200, submitted.text
+    assert len(submitted.json()["scores"]) == len(case_indicators)

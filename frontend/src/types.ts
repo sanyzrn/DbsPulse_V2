@@ -156,6 +156,8 @@ export interface MyOpenEvaluation {
   created_at: string;
   stage_entered_at: string;
   stage_label: string;
+  /** شاخص‌های همین پرونده (P1-05) — فرم خودارزیابی از روی این ساخته می‌شود. */
+  indicator_ids: number[];
 }
 
 export interface SelfAssessmentScoreRow {

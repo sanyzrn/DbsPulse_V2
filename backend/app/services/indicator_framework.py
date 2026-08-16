@@ -100,6 +100,25 @@ def indicators_for_record(db: Session, record: EvaluationRecord) -> dict[int, In
     return {i.id: i for i in rows}
 
 
+def _is_untouched():
+    """شرط «هیچ‌کس هنوز چیزی در این پرونده ننوشته».
+
+    *دو* نویسنده دارد، نه یکی. اولین نسخهٔ این شرط فقط امتیاز ارزیاب را می‌دید و
+    پرونده‌ای را که کارمند خودارزیابی‌اش را در آن ثبت کرده بود «دست‌نخورده»
+    می‌شمرد. نتیجه‌اش این می‌شد: کارمند به بیست سؤال جواب می‌داد، منابع انسانی
+    یکی را کنار می‌گذاشت، پرونده به نسخهٔ تازه می‌رفت، و ارزیاب به نوزده سؤال
+    نمره می‌داد — یعنی یکی از پاسخ‌های کارمند به سؤالی بود که هیچ‌وقت نمره نخورد،
+    و آن مقایسه‌ای که کل خودارزیابی برایش وجود دارد، بی‌صدا ناقص می‌شد.
+    """
+    scored = (
+        select(EvaluationScore.evaluation_record_id)
+        .where(EvaluationScore.evaluation_record_id == EvaluationRecord.id)
+        .exists()
+    )
+    self_assessed = EvaluationRecord.self_assessment_submitted_at.isnot(None)
+    return ~scored & ~self_assessed
+
+
 def impact_of_membership_change(db: Session) -> dict:
     """چه چیزی تحت تأثیر قرار می‌گیرد اگر همین حالا عضویت عوض شود.
 
@@ -107,40 +126,31 @@ def impact_of_membership_change(db: Session) -> dict:
     خرابی هم بی‌صدا بود، معمولاً اولین کسی که می‌فهمید ارزیابی بود که فردا
     «ثبت»‌اش کار نمی‌کرد.
     """
-    scored_subquery = (
-        select(EvaluationScore.evaluation_record_id)
-        .where(EvaluationScore.evaluation_record_id == EvaluationRecord.id)
-        .exists()
-    )
+    untouched = _is_untouched()
     open_records = select(EvaluationRecord).where(EvaluationRecord.status.in_(OPEN_STATUSES))
 
     frozen = db.scalar(
-        select(func.count()).select_from(open_records.where(scored_subquery).subquery())
+        select(func.count()).select_from(open_records.where(~untouched).subquery())
     )
     movable = db.scalar(
-        select(func.count()).select_from(open_records.where(~scored_subquery).subquery())
+        select(func.count()).select_from(open_records.where(untouched).subquery())
     )
     return {"frozen_open_records": frozen or 0, "movable_open_records": movable or 0}
 
 
 def rebind_untouched_open_records(db: Session, framework: IndicatorFramework) -> int:
-    """پرونده‌های بازی که هنوز هیچ امتیازی نخورده‌اند را به نسخهٔ تازه می‌برد.
+    """پرونده‌های بازی که هنوز هیچ‌کس چیزی در آن‌ها ننوشته را به نسخهٔ تازه می‌برد.
 
-    این کار بی‌خطر است *دقیقاً چون* امتیازی وجود ندارد که بشکند، و همان چیزی است
+    این کار بی‌خطر است *دقیقاً چون* چیزی وجود ندارد که بشکند، و همان چیزی است
     که منابع انسانی انتظار دارد: پرونده‌ای که هیچ‌کس دستش نزده باید سؤال‌های
     امروز را بپرسد. پرونده‌ای که نیمه‌کاره پر شده دست نمی‌خورد — همان‌جاست که
     پایداری اهمیت دارد.
     """
-    scored = (
-        select(EvaluationScore.evaluation_record_id)
-        .where(EvaluationScore.evaluation_record_id == EvaluationRecord.id)
-        .exists()
-    )
     untouched = db.scalars(
         select(EvaluationRecord).where(
             EvaluationRecord.status.in_(OPEN_STATUSES),
             EvaluationRecord.indicator_framework_id != framework.id,
-            ~scored,
+            _is_untouched(),
         )
     ).all()
     for record in untouched:

@@ -16,7 +16,6 @@ from app.db.session import get_db
 from app.models.enums import EvaluationStatus, ImprovementPlanStatus, UserRole
 from app.models.evaluation import EvaluationRecord
 from app.models.improvement_plan import ImprovementPlan
-from app.models.indicator import Indicator
 from app.models.self_assessment import SelfAssessmentScore
 from app.schemas.auth import CurrentUser
 from app.schemas.evaluation import (
@@ -30,6 +29,7 @@ from app.schemas.evaluation import (
 )
 from app.schemas.improvement_plan import ImprovementPlanDetail
 from app.services.audit import log_event
+from app.services.indicator_framework import indicator_ids_for_record
 from app.services.notifications import notify
 from app.services.workflow import IS_OPEN_RECORD
 
@@ -76,7 +76,12 @@ def my_open_evaluation(
         )
         .order_by(EvaluationRecord.created_at.desc())
     )
-    return [MyOpenEvaluation.model_validate(r) for r in records]
+    return [
+        MyOpenEvaluation.model_validate(r).model_copy(
+            update={"indicator_ids": sorted(indicator_ids_for_record(db, r))}
+        )
+        for r in records
+    ]
 
 
 @router.get("/improvement-plans", response_model=list[ImprovementPlanDetail])
@@ -146,13 +151,20 @@ def submit_self_assessment(
             detail="خودارزیابی شما قبلاً ثبت شده و قابل تغییر نیست",
         )
 
-    active = {i.id for i in db.scalars(select(Indicator).where(Indicator.is_active.is_(True)))}
+    # شاخص‌های *این پرونده*، نه مجموعهٔ فعالِ امروز (P1-05).
+    #
+    # دو دلیل، و دومی مهم‌تر است. اول: اگر منابع انسانی وسط چرخه شاخصی را کنار
+    # بگذارد، ثبت خودارزیابی با «شاخص معتبر نیست» رد می‌شد — همان خرابی‌ای که در
+    # مسیر ارزیاب بسته شد، از این در باز مانده بود. دوم: کل ارزشِ خودارزیابی در
+    # کنار هم گذاشتنِ دو دیدگاه دربارهٔ *یک* پرسش است؛ اگر کارمند به مجموعه‌ای
+    # پاسخ بدهد که ارزیاب به آن نمره نمی‌دهد، مقایسه بی‌معنا می‌شود.
+    allowed = indicator_ids_for_record(db, record)
     seen: set[int] = set()
     for item in payload.scores:
-        if item.indicator_id not in active:
+        if item.indicator_id not in allowed:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"شاخص #{item.indicator_id} معتبر یا فعال نیست",
+                detail=f"شاخص #{item.indicator_id} جزو شاخص‌های این ارزیابی نیست",
             )
         if item.indicator_id in seen:
             raise HTTPException(

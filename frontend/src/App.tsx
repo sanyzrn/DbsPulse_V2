@@ -180,15 +180,16 @@ function App() {
               <Route path="/hr/periods" element={<ModuleRoute module="periods" title="دوره‌های ارزیابی"><PeriodsPage /></ModuleRoute>} />
               <Route path="/hr/scoring-schemes" element={<ScoringSchemesPage />} />
               <Route path="/hr/dashboard" element={<DashboardPage />} />
-              <Route path="/hr/audit-log" element={<AuditLogPage />} />
             </Route>
 
             {/* مدیریت سامانه پشت گاردِ hr نیست: حساب «پشتیبانی فنی» نقش hr
                 ندارد و باید به این‌جا برسد. محدودیت واقعی مجوز است، که هم
                 سمت سرور اعمال می‌شود و هم داخل خودِ صفحه. */}
             <Route path="/administration" element={<AdministrationPage />} />
-            <Route element={<ProtectedRoute allowedRoles={["hr"]} />}>
-            </Route>
+            {/* لاگ ممیزی هم منابع انسانی لازمش دارد (کارِ خودش) و هم پشتیبانی
+                فنی (عیب‌یابی). دامنهٔ دید را سرور تعیین می‌کند: پشتیبانی فقط
+                رویدادهای سامانه‌ای را می‌بیند، بدون هیچ ردی از محتوای پرونده. */}
+            <Route path="/hr/audit-log" element={<AuditLogPage />} />
 
             <Route element={<ProtectedRoute allowedRoles={["unit_supervisor"]} />}>
               <Route path="/supervisor" element={<SupervisorHomePage />} />

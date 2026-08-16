@@ -13,6 +13,7 @@
 import pytest
 from sqlalchemy import select
 
+from app.api.routers.audit_log import SYSTEM_EVENT_TYPES
 from app.core.modules import MODULES_BY_KEY
 from app.models.capability import UserCapability
 from app.models.enums import Capability
@@ -388,3 +389,82 @@ def test_separation_needs_manage_users(client, support):
     assert client.get(
         "/api/administration/separation", headers=auth_header(support)
     ).status_code == 403
+
+
+# ── لاگ ممیزی: یک صفحه، دو دامنهٔ دید ───────────────────────────────────────
+
+def test_support_sees_system_events_but_no_evaluation_content(client, db_session, support):
+    """لاگ ممیزی نباید به پنل پشتیبانی «منتقل» شود — باید *تفکیک* شود.
+
+    این لاگ هر دو نوع رویداد را با هم دارد: هم «چه کسی این بخش را خاموش کرد»
+    که پشتیبانی برای عیب‌یابی لازمش دارد، و هم ردیف‌هایی که عیناً امتیاز و
+    نتیجهٔ نهایی یک نفر را در خود نگه می‌دارند. انتقال کامل، همان چیزی را به
+    پشتیبانی می‌داد که کل این تفکیک برای ممنوع‌کردنش ساخته شد.
+    """
+    hr = make_user(db_session, "hr")
+    sup = make_user(db_session, "unit_supervisor")
+    dep = make_user(db_session, "deputy")
+    ceo = make_user(db_session, "ceo")
+    person = make_personnel(db_session, full_name="سوژهٔ لاگ")
+    from tests.helpers import active_indicators, full_valid_scores, make_access
+
+    make_access(db_session, person, sup, dep, ceo)
+    db_session.commit()
+
+    record_id = client.post(
+        "/api/evaluations",
+        json={"subject_personnel_id": person.id},
+        headers=auth_header(sup),
+    ).json()["id"]
+    client.put(
+        f"/api/evaluations/{record_id}/scores",
+        json={"scores": full_valid_scores(active_indicators(db_session))},
+        headers=auth_header(sup),
+    )
+    client.post(f"/api/evaluations/{record_id}/submit", headers=auth_header(sup))
+    # یک رویداد سامانه‌ای هم بسازیم
+    client.put(
+        "/api/administration/modules/periods",
+        json={"enabled": False},
+        headers=auth_header(hr),
+    )
+
+    hr_view = client.get(
+        "/api/audit-log", params={"limit": 200}, headers=auth_header(hr)
+    ).json()
+    support_response = client.get(
+        "/api/audit-log", params={"limit": 200}, headers=auth_header(support)
+    )
+    assert support_response.status_code == 200, "پشتیبانی باید برای عیب‌یابی دسترسی داشته باشد"
+    support_view = support_response.json()
+
+    hr_types = {e["event_type"] for e in hr_view["items"]}
+    support_types = {e["event_type"] for e in support_view["items"]}
+
+    # پشتیبانی رویداد سامانه‌ای را می‌بیند
+    assert "module_toggled" in support_types
+    # ولی هیچ رویدادی از محتوای پرونده را نه
+    assert "score_submitted" not in support_types
+    assert "scores_draft_saved" not in support_types
+    assert "status_changed" not in support_types
+    assert support_types <= SYSTEM_EVENT_TYPES
+    # و منابع انسانی همه را می‌بیند
+    assert {"score_submitted", "module_toggled"} <= hr_types
+
+    # هیچ ردیفی نباید به پرونده‌ای گره خورده باشد یا نمره‌ای در خود داشته باشد
+    assert all(e["evaluation_record_id"] is None for e in support_view["items"])
+    assert "سوژهٔ لاگ" not in support_response.text
+    assert "final_weighted_pct" not in support_response.text
+
+
+def test_a_new_event_type_is_hidden_from_support_by_default(client, support):
+    """فهرست allowlist است، نه blocklist.
+
+    اگر روزی رویداد تازه‌ای اضافه شود و کسی یادش برود این‌جا بیاوردش، از دید
+    پشتیبانی پنهان می‌ماند — نه اینکه ناخواسته افشا شود. همان درسی که در
+    دامنهٔ دید پرونده‌ها گرفتیم.
+    """
+    assert "score_submitted" not in SYSTEM_EVENT_TYPES
+    assert "evaluation_returned" not in SYSTEM_EVENT_TYPES
+    assert "pdf_downloaded" not in SYSTEM_EVENT_TYPES
+    assert "personnel_created" not in SYSTEM_EVENT_TYPES

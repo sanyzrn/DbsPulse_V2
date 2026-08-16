@@ -52,7 +52,7 @@ const NAV_BY_ROLE: Record<string, { to: string; label: string; module?: string }
   employee: [{ to: "/me", label: "کارنامه من" }],
   // پشتیبانی فنی هیچ صف کاری‌ای ندارد. تنها لینکش («مدیریت سامانه») از روی
   // مجوز اضافه می‌شود، نه از این جدول — چون همان لینک برای HR دارای مجوز هم هست.
-  support: [],
+  support: [{ to: "/hr/audit-log", label: "گزارش رویدادها" }],
 };
 
 export function Layout() {

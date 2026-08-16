@@ -13,6 +13,11 @@ class UserRole(str, enum.Enum):
     ceo = "ceo"
     # کارمند عادی: فقط نتیجه نهایی ارزیابی خودش را می‌بیند و «رؤیت» می‌زند
     employee = "employee"
+    # پشتیبانی فنی: *هیچ* جایی در زنجیرهٔ ارزیابی ندارد و در هیچ گاردِ گردش‌کاری
+    # فهرست نشده — یعنی روی همهٔ آن‌ها به‌صورت پیش‌فرض ۴۰۳ می‌گیرد. اختیاراتش
+    # فقط از مجوزهای اداری می‌آید (models/capability.py). کسی که سامانه را نگه
+    # می‌دارد لازم نیست نمرهٔ کسی را ببیند.
+    support = "support"
 
 
 class IndicatorSection(str, enum.Enum):
@@ -87,3 +92,22 @@ class DeliveryStatus(str, enum.Enum):
     sent = "sent"
     failed = "failed"
     abandoned = "abandoned"
+
+
+class Capability(str, enum.Enum):
+    """اختیارات اداری، مستقل از نقش (نیمهٔ دوم P0-03).
+
+    عمداً ریز است: «مدیر سامانه» یک مجوز نیست، چند مجوز است. یک مجوزِ همه‌کاره
+    دقیقاً همان مشکلی را می‌سازد که این تفکیک برای حلش آمده.
+    """
+
+    #: ساخت، ویرایش و غیرفعال‌کردن کاربر، و دادن/گرفتن همین مجوزها
+    manage_users = "manage_users"
+    #: شاخص‌های فرم ارزیابی و طرح نمره‌دهی
+    manage_scoring = "manage_scoring"
+    #: تنظیمات ایمیل/پیامک و آزمودن اتصال
+    manage_integrations = "manage_integrations"
+    #: روشن و خاموش کردن بخش‌های سامانه
+    manage_modules = "manage_modules"
+    #: سلامت سامانه، صف تحویل، وضعیت مایگریشن — خواندنی
+    view_diagnostics = "view_diagnostics"

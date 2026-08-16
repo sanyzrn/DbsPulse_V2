@@ -3,10 +3,10 @@ from fastapi.responses import Response
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from app.api.deps import require_roles
+from app.api.deps import require_capability
 from app.core.security import hash_password
 from app.db.session import get_db
-from app.models.enums import UserRole
+from app.models.enums import Capability, UserRole
 from app.models.personnel import Personnel
 from app.models.user import User
 from app.schemas.auth import CurrentUser
@@ -37,7 +37,7 @@ def list_users(
     limit: int = Query(default=50, ge=1, le=1000),
     offset: int = Query(default=0, ge=0),
     db: Session = Depends(get_db),
-    current_user: CurrentUser = Depends(require_roles(UserRole.hr)),
+    current_user: CurrentUser = Depends(require_capability(Capability.manage_users)),
 ) -> UserPage:
     query = _apply_user_filters(select(User), role=role, q=q, is_active=is_active)
     total = db.scalar(select(func.count()).select_from(query.subquery())) or 0
@@ -51,7 +51,7 @@ def export_users_excel(
     q: str | None = None,
     is_active: bool | None = None,
     db: Session = Depends(get_db),
-    current_user: CurrentUser = Depends(require_roles(UserRole.hr)),
+    current_user: CurrentUser = Depends(require_capability(Capability.manage_users)),
 ) -> Response:
     """خروجی Excel از فهرست کاربران (فقط HR) با همان فیلترهای فهرست."""
     query = _apply_user_filters(select(User), role=role, q=q, is_active=is_active)
@@ -80,7 +80,7 @@ def export_users_excel(
 def create_user(
     payload: UserCreate,
     db: Session = Depends(get_db),
-    current_user: CurrentUser = Depends(require_roles(UserRole.hr)),
+    current_user: CurrentUser = Depends(require_capability(Capability.manage_users)),
 ) -> User:
     existing = db.scalar(select(User).where(User.username == payload.username))
     if existing is not None:
@@ -116,7 +116,7 @@ def update_user(
     user_id: int,
     payload: UserUpdate,
     db: Session = Depends(get_db),
-    current_user: CurrentUser = Depends(require_roles(UserRole.hr)),
+    current_user: CurrentUser = Depends(require_capability(Capability.manage_users)),
 ) -> User:
     user = db.get(User, user_id)
     if user is None:

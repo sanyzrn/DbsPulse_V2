@@ -2,9 +2,9 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from app.api.deps import require_roles
+from app.api.deps import require_capability
 from app.db.session import get_db
-from app.models.enums import DeliveryStatus, UserRole
+from app.models.enums import Capability, DeliveryStatus
 from app.models.notification_delivery import NotificationDelivery
 from app.schemas.auth import CurrentUser
 from app.schemas.notification import DeliveryQueueSummary, DeliveryRow
@@ -20,7 +20,7 @@ router = APIRouter(prefix="/api/admin", tags=["admin"])
 @router.post("/run-scheduled-jobs")
 def run_scheduled_jobs(
     db: Session = Depends(get_db),
-    current_user: CurrentUser = Depends(require_roles(UserRole.hr)),
+    current_user: CurrentUser = Depends(require_capability(Capability.view_diagnostics)),
 ) -> dict[str, int]:
     """اجرای دستی sweep های اعلان (انقضای قرارداد + تأخیر مراحل). برای ops و آزمون؛
     زمان‌بند خودکار هم همین‌ها را دوره‌ای اجرا می‌کند.
@@ -51,7 +51,7 @@ def run_scheduled_jobs(
 def scheduler_runs(
     limit: int = Query(default=20, ge=1, le=100),
     db: Session = Depends(get_db),
-    current_user: CurrentUser = Depends(require_roles(UserRole.hr)),
+    current_user: CurrentUser = Depends(require_capability(Capability.view_diagnostics)),
 ) -> list[SchedulerRunRead]:
     """تاریخچهٔ اجرای کارهای زمان‌بندی‌شده.
 
@@ -65,7 +65,7 @@ def scheduler_runs(
 @router.get("/delivery-queue", response_model=DeliveryQueueSummary)
 def delivery_queue(
     db: Session = Depends(get_db),
-    current_user: CurrentUser = Depends(require_roles(UserRole.hr)),
+    current_user: CurrentUser = Depends(require_capability(Capability.view_diagnostics)),
 ) -> DeliveryQueueSummary:
     """وضعیت صندوق خروجی اعلان‌ها (P1-03).
 

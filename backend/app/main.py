@@ -14,6 +14,7 @@ from sqlalchemy.orm import Session
 
 from app.api.routers import (
     admin,
+    administration,
     analytics,
     audit_log,
     auth,
@@ -139,6 +140,7 @@ app.add_middleware(
 
 app.include_router(auth.router)
 app.include_router(admin.router)
+app.include_router(administration.router)
 app.include_router(config.router)
 app.include_router(personnel.router)
 app.include_router(evaluation_access.router)

@@ -10,6 +10,7 @@ import '@fontsource/vazirmatn/700.css'
 import './index.css'
 import App from './App.tsx'
 import { AuthProvider } from './auth/AuthContext.tsx'
+import { PermissionsProvider } from './auth/PermissionsContext.tsx'
 import { ErrorBoundary } from './components/ErrorBoundary.tsx'
 import { ToastProvider } from './components/Toast.tsx'
 import { ConfirmProvider } from './components/ConfirmDialog.tsx'
@@ -33,9 +34,11 @@ createRoot(document.getElementById('root')!).render(
         <ToastProvider>
           <ConfirmProvider>
             <AuthProvider>
-              <ErrorBoundary title="مشکلی در بارگذاری برنامه پیش آمد">
-                <App />
-              </ErrorBoundary>
+              <PermissionsProvider>
+                <ErrorBoundary title="مشکلی در بارگذاری برنامه پیش آمد">
+                  <App />
+                </ErrorBoundary>
+              </PermissionsProvider>
             </AuthProvider>
           </ConfirmProvider>
         </ToastProvider>

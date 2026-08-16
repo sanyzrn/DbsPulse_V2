@@ -1,4 +1,12 @@
-export type UserRole = "unit_supervisor" | "hr" | "deputy" | "ceo" | "employee";
+// `support` عمداً هیچ جایگاهی در زنجیرهٔ ارزیابی ندارد؛ اختیاراتش فقط از
+// مجوزهای اداری می‌آید (نیمهٔ دوم P0-03).
+export type UserRole =
+  | "unit_supervisor"
+  | "hr"
+  | "deputy"
+  | "ceo"
+  | "employee"
+  | "support";
 
 export const ROLE_LABELS: Record<UserRole, string> = {
   unit_supervisor: "مسئول واحد",
@@ -6,6 +14,7 @@ export const ROLE_LABELS: Record<UserRole, string> = {
   deputy: "معاونت",
   ceo: "مدیرعامل",
   employee: "کارمند",
+  support: "پشتیبانی فنی",
 };
 
 export interface CurrentUser {

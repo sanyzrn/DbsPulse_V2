@@ -24,9 +24,9 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.api.deps import require_roles
+from app.api.deps import require_capability
 from app.db.session import get_db
-from app.models.enums import EvaluationStatus, SchemeStatus, UserRole
+from app.models.enums import Capability, EvaluationStatus, SchemeStatus
 from app.models.evaluation import EvaluationRecord, EvaluationScore
 from app.models.indicator import Indicator
 from app.models.personnel import Personnel
@@ -88,7 +88,7 @@ def _to_read(db: Session, scheme: ScoringScheme) -> SchemeRead:
 @router.get("", response_model=list[SchemeRead])
 def list_schemes(
     db: Session = Depends(get_db),
-    current_user: CurrentUser = Depends(require_roles(UserRole.hr)),
+    current_user: CurrentUser = Depends(require_capability(Capability.manage_scoring)),
 ) -> list[SchemeRead]:
     """همهٔ نسخه‌ها، تازه‌ترین اول — تاریخچهٔ قواعدِ سازمان."""
     schemes = db.scalars(select(ScoringScheme).order_by(ScoringScheme.version.desc())).all()
@@ -99,7 +99,7 @@ def list_schemes(
 def create_scheme(
     payload: SchemeInput,
     db: Session = Depends(get_db),
-    current_user: CurrentUser = Depends(require_roles(UserRole.hr)),
+    current_user: CurrentUser = Depends(require_capability(Capability.manage_scoring)),
 ) -> SchemeRead:
     """یک پیش‌نویس تازه. تا فعال نشده هیچ اثری روی هیچ پرونده‌ای ندارد."""
     scheme = ScoringScheme(
@@ -134,7 +134,7 @@ def preview_scheme(
     payload: SchemeInput,
     limit: int = Query(default=PREVIEW_LIMIT, ge=1, le=PREVIEW_LIMIT),
     db: Session = Depends(get_db),
-    current_user: CurrentUser = Depends(require_roles(UserRole.hr)),
+    current_user: CurrentUser = Depends(require_capability(Capability.manage_scoring)),
 ) -> SchemePreview:
     """طرح پیشنهادی را روی پرونده‌های نهایی‌شدهٔ اخیر اجرا می‌کند — بدون نوشتن.
 
@@ -206,7 +206,7 @@ def preview_scheme(
 def activate_scheme(
     scheme_id: int,
     db: Session = Depends(get_db),
-    current_user: CurrentUser = Depends(require_roles(UserRole.hr)),
+    current_user: CurrentUser = Depends(require_capability(Capability.manage_scoring)),
 ) -> SchemeRead:
     """پیش‌نویس را فعال می‌کند و نسخهٔ فعلی را بازنشسته.
 
@@ -256,7 +256,7 @@ def activate_scheme(
 def delete_draft(
     scheme_id: int,
     db: Session = Depends(get_db),
-    current_user: CurrentUser = Depends(require_roles(UserRole.hr)),
+    current_user: CurrentUser = Depends(require_capability(Capability.manage_scoring)),
 ) -> None:
     """حذف یک پیش‌نویس. فقط پیش‌نویس — نسخهٔ فعال یا بازنشسته سند تاریخ است."""
     scheme = db.get(ScoringScheme, scheme_id)

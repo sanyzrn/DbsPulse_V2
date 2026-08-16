@@ -23,7 +23,7 @@ from app.models.notification import Notification
 from app.models.notification_delivery import NotificationDelivery
 from app.services import channels
 from app.services.channels.base import DeliveryError, Message
-from app.services.delivery import OUTBOUND_TYPES, enqueue_for, run_delivery_sweep
+from app.services.delivery import OUTBOUND_TYPES, run_delivery_sweep
 from app.services.notifications import notify
 from tests.helpers import make_user
 

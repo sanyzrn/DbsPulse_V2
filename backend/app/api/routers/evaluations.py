@@ -417,22 +417,37 @@ def list_evaluations(
     current_user: CurrentUser = Depends(get_current_user),
 ) -> EvaluationPage:
     query = select(EvaluationRecord)
-    if current_user.role == UserRole.unit_supervisor:
+    # دامنهٔ دید، به‌صورت allowlist و نه زنجیرهٔ if/elif با پیش‌فرضِ باز.
+    #
+    # نسخهٔ قبلی با `# hr می‌بیند همه را` تمام می‌شد، یعنی *هر* نقشی که در
+    # شاخه‌ها نبود همه‌چیز را می‌دید. نقش `support` (نیمهٔ دوم P0-03) دقیقاً در
+    # همان تله افتاد: حسابی که قرار بود به هیچ پرونده‌ای دسترسی نداشته باشد،
+    # کل پایگاه پرونده‌ها را می‌دید. کامنتِ شاخهٔ employee همین خطر را از قبل
+    # هشدار داده بود.
+    #
+    # حالا فقط hr صراحتاً همه را می‌بیند و هر نقشِ ناشناخته هیچ — پس نقش بعدی
+    # هم به‌صورت پیش‌فرض بسته است، نه باز.
+    if current_user.role == UserRole.hr:
+        pass
+    elif current_user.role == UserRole.unit_supervisor:
         query = query.where(EvaluationRecord.unit_supervisor_user_id == current_user.id)
     elif current_user.role == UserRole.deputy:
         query = query.where(EvaluationRecord.deputy_user_id == current_user.id)
     elif current_user.role == UserRole.ceo:
         query = query.where(EvaluationRecord.ceo_user_id == current_user.id)
     elif current_user.role == UserRole.employee:
-        # کارمند فقط ارزیابی‌های نهایی‌شده خودش را می‌بیند (رابط اصلی‌اش /api/me است؛
-        # این شاخه صریح مانع از افتادن نقش جدید در مسیر «HR همه را می‌بیند» است)
+        # کارمند فقط ارزیابی‌های نهایی‌شده خودش را می‌بیند (رابط اصلی‌اش /api/me است)
         if current_user.personnel_id is None:
             return EvaluationPage(total=0, items=[])
         query = query.where(
             EvaluationRecord.subject_personnel_id == current_user.personnel_id,
             EvaluationRecord.status == EvaluationStatus.finalized,
         )
-    # hr می‌بیند همه را
+    else:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="این نقش به پرونده‌های ارزیابی دسترسی ندارد",
+        )
 
     query = _apply_evaluation_filters(
         query,

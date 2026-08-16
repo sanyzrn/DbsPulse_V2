@@ -2,9 +2,9 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_current_user, require_roles
+from app.api.deps import get_current_user, require_capability
 from app.db.session import get_db
-from app.models.enums import IndicatorSection, UserRole
+from app.models.enums import Capability, IndicatorSection
 from app.models.evaluation import EvaluationScore
 from app.models.indicator import Indicator
 from app.schemas.auth import CurrentUser
@@ -39,7 +39,7 @@ def list_indicators(
 def create_indicator(
     payload: IndicatorCreate,
     db: Session = Depends(get_db),
-    current_user: CurrentUser = Depends(require_roles(UserRole.hr)),
+    current_user: CurrentUser = Depends(require_capability(Capability.manage_scoring)),
 ) -> Indicator:
     # display_order به‌صورت خودکار به انتهای همان بخش اضافه می‌شود؛ ورودی کاربر نادیده
     # گرفته می‌شود تا HR مجبور به مدیریت دستی شماره‌ها نباشد (ترتیب با drag تغییر می‌کند).
@@ -71,7 +71,7 @@ def create_indicator(
 def reorder_indicators(
     payload: IndicatorReorder,
     db: Session = Depends(get_db),
-    current_user: CurrentUser = Depends(require_roles(UserRole.hr)),
+    current_user: CurrentUser = Depends(require_capability(Capability.manage_scoring)),
 ) -> None:
     """ترتیب شاخص‌های یک بخش را بر اساس ترتیب drag کاربر بازنویسی می‌کند. ordered_ids
     باید دقیقاً همان مجموعهٔ شناسه‌های آن بخش باشد (نه کم، نه زیاد، بدون تکرار)."""
@@ -103,7 +103,7 @@ def reorder_indicators(
 def delete_indicator(
     indicator_id: int,
     db: Session = Depends(get_db),
-    current_user: CurrentUser = Depends(require_roles(UserRole.hr)),
+    current_user: CurrentUser = Depends(require_capability(Capability.manage_scoring)),
 ) -> None:
     """حذف کامل یک شاخص — فقط وقتی مجاز است که در هیچ ارزیابی‌ای امتیاز نخورده باشد؛
     در غیر این صورت داده‌های تاریخی می‌شکنند و باید به‌جای حذف، «غیرفعال» شود (۴۰۹)."""
@@ -145,7 +145,7 @@ def update_indicator(
     indicator_id: int,
     payload: IndicatorUpdate,
     db: Session = Depends(get_db),
-    current_user: CurrentUser = Depends(require_roles(UserRole.hr)),
+    current_user: CurrentUser = Depends(require_capability(Capability.manage_scoring)),
 ) -> Indicator:
     indicator = db.get(Indicator, indicator_id)
     if indicator is None:

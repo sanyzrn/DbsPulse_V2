@@ -1,7 +1,8 @@
 import { Navigate, NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { AnimatePresence, motion } from "motion/react";
 import { useAuth } from "../auth/AuthContext";
-import { APP_NAME, APP_NAME_FA, FEATURE_PERIODS_ENABLED } from "../appInfo";
+import { APP_NAME, APP_NAME_FA } from "../appInfo";
+import { usePermissions } from "../auth/PermissionsContext";
 import { BrandMark } from "./Brand";
 import { ErrorBoundary } from "./ErrorBoundary";
 import { Footer } from "./Footer";
@@ -10,7 +11,9 @@ import { ProfileMenu } from "./ProfileMenu";
 import { EASE_SOFT } from "../ui/motion";
 import { AnimatedGridBackground } from "./AnimatedGridBackground";
 
-const NAV_BY_ROLE: Record<string, { to: string; label: string }[]> = {
+/** `module` اختیاری: اگر آن بخش خاموش باشد، لینک اصلاً ساخته نمی‌شود.
+ *  لینکی که کلیکش به «این بخش غیرفعال است» برسد، بدتر از نبودنش است. */
+const NAV_BY_ROLE: Record<string, { to: string; label: string; module?: string }[]> = {
   hr: [
     // داشبورد صفحهٔ فرودِ HR است (خلاصهٔ وضعیت)، پس اول فهرست می‌آید.
     { to: "/hr/dashboard", label: "داشبورد" },
@@ -21,11 +24,8 @@ const NAV_BY_ROLE: Record<string, { to: string; label: string }[]> = {
     // سنجیده می‌شود، دیگری چطور به نتیجه تبدیل می‌شود (P1-04).
     { to: "/hr/scoring-schemes", label: "طرح نمره‌دهی" },
     { to: "/hr/queue", label: "صف بررسی" },
-    // «دوره‌های ارزیابی» پشت پرچم ویژگی — فعلاً غیرفعال (رجوع به appInfo.ts)
-    ...(FEATURE_PERIODS_ENABLED
-      ? [{ to: "/hr/periods", label: "دوره‌های ارزیابی" }]
-      : []),
-    { to: "/improvement-plans", label: "برنامه‌های بهبود" },
+    { to: "/hr/periods", label: "دوره‌های ارزیابی", module: "periods" },
+    { to: "/improvement-plans", label: "برنامه‌های بهبود", module: "improvement_plans" },
     { to: "/hr/audit-log", label: "گزارش رویدادها" },
   ],
   // مسئول واحد و معاونت ممکن است «مسئول پیگیریِ» یک برنامهٔ بهبود باشند (P1-10).
@@ -35,25 +35,29 @@ const NAV_BY_ROLE: Record<string, { to: string; label: string }[]> = {
     { to: "/supervisor", label: "افراد زیرمجموعه" },
     // P2-01: تا پیش از این، ارزیاب هیچ راهی نداشت بفهمد نمره‌دهی‌اش نسبت به
     // بقیه کجاست — و این مفیدترین بازخوردی است که یک نمره‌دهنده می‌گیرد.
-    { to: "/my-scoring", label: "نمره‌دهی من" },
+    { to: "/my-scoring", label: "نمره‌دهی من", module: "role_analytics" },
     { to: "/improvement-plans", label: "برنامه‌های بهبود" },
   ],
   // معاونت هم نمره می‌دهد (مسیر «مدیر») و هم تصمیم‌گیر است، پس هر دو نما را دارد.
   deputy: [
     { to: "/deputy", label: "پرونده‌های در انتظار" },
-    { to: "/my-scoring", label: "نمره‌دهی من" },
-    { to: "/executive", label: "تحلیل سازمان" },
+    { to: "/my-scoring", label: "نمره‌دهی من", module: "role_analytics" },
+    { to: "/executive", label: "تحلیل سازمان", module: "role_analytics" },
     { to: "/improvement-plans", label: "برنامه‌های بهبود" },
   ],
   ceo: [
     { to: "/ceo", label: "پرونده‌های در انتظار" },
-    { to: "/executive", label: "تحلیل سازمان" },
+    { to: "/executive", label: "تحلیل سازمان", module: "role_analytics" },
   ],
   employee: [{ to: "/me", label: "کارنامه من" }],
+  // پشتیبانی فنی هیچ صف کاری‌ای ندارد. تنها لینکش («مدیریت سامانه») از روی
+  // مجوز اضافه می‌شود، نه از این جدول — چون همان لینک برای HR دارای مجوز هم هست.
+  support: [],
 };
 
 export function Layout() {
   const { user, logout } = useAuth();
+  const { can, moduleEnabled } = usePermissions();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -62,7 +66,9 @@ export function Layout() {
   if (user.must_change_password && location.pathname !== "/change-password") {
     return <Navigate to="/change-password" replace />;
   }
-  const links = NAV_BY_ROLE[user.role] ?? [];
+  const links = (NAV_BY_ROLE[user.role] ?? []).filter(
+    (link) => link.module === undefined || moduleEnabled(link.module),
+  );
 
   function handleLogout() {
     logout();
@@ -120,6 +126,15 @@ export function Layout() {
                   </NavLink>
                 </li>
               ))}
+              {/* مدیریت سامانه بر پایهٔ مجوز است نه نقش — حساب پشتیبانی فنی
+                  نقش hr ندارد ولی باید این‌جا را ببیند. */}
+              {(can("manage_users") || can("manage_modules")) && (
+                <li>
+                  <NavLink to="/administration" className={navLinkClass}>
+                    مدیریت سامانه
+                  </NavLink>
+                </li>
+              )}
             </ul>
           </nav>
         </header>

@@ -156,6 +156,13 @@ class EvaluationDetail(EvaluationRead):
     # خودارزیابی کنار امتیاز ارزیاب دیده می‌شود تا فاصله‌ها موضوع گفت‌وگو شوند.
     # عمداً در محاسبه نقشی ندارد — جدولش هم جداست (models/self_assessment.py).
     self_assessment: "SelfAssessmentRead | None" = None
+    # شاخص‌های *این* پرونده و نسخهٔ چارچوبی که زیر آن باز شده (P1-05).
+    #
+    # بدون این، فرم از روی «شاخص‌های فعالِ امروز» ساخته می‌شد و همان خرابیِ
+    # سمت سرور را در مرورگر تکرار می‌کرد: ارزیاب سؤالی را می‌دید که پرونده‌اش
+    # نمی‌خواست، یا سؤالی را نمی‌دید که برای ثبت لازم بود.
+    indicator_ids: list[int] = []
+    indicator_framework_version: int | None = None
 
 
 class EvaluationPage(BaseModel):

@@ -71,6 +71,19 @@ export interface Indicator {
   is_active: boolean;
   created_at: string;
   updated_at: string;
+  // به این شاخص در چند ارزیابی نمره داده شده (P1-05). تفاوت «۰» و «۲۳۰» تفاوت
+  // یک ویرایش بی‌ضرر و بازنویسی معنای دو سال تاریخ است.
+  usage_count: number;
+}
+
+/** نسخهٔ چارچوب شاخص‌ها و اثرِ تغییر بعدی (P1-05). */
+export interface FrameworkImpact {
+  version: number;
+  member_count: number;
+  /** پرونده‌های بازی که امتیاز خورده‌اند — با نسخهٔ فعلی خودشان بسته می‌شوند */
+  frozen_open_records: number;
+  /** پرونده‌های بازِ دست‌نخورده — به نسخهٔ تازه منتقل می‌شوند */
+  movable_open_records: number;
 }
 
 export type EvaluationStage =
@@ -181,6 +194,13 @@ export interface EvaluationDetail extends EvaluationRecord {
   comments: EvaluationCommentRow[];
   // دیدگاه خودِ فرد، کنار امتیاز ارزیاب. null یعنی چیزی ثبت نکرده (کاملاً مجاز).
   self_assessment: SelfAssessment | null;
+  // شاخص‌های *این* پرونده، نه شاخص‌های فعالِ امروز (P1-05).
+  //
+  // فرم باید از روی این ساخته شود. فیلترکردن با `is_active` — کاری که پیش از
+  // این می‌کردیم — همان خرابیِ سمت سرور را در مرورگر تکرار می‌کند: ارزیاب
+  // سؤالی می‌بیند که پرونده‌اش نمی‌خواهد، یا سؤالی نمی‌بیند که برای ثبت لازم است.
+  indicator_ids: number[];
+  indicator_framework_version: number | null;
 }
 
 export const STAGE_LABELS: Record<EvaluationStage, string> = {

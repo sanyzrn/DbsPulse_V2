@@ -20,6 +20,7 @@ from app.models.enums import (
 from app.models.evaluation import EvaluationComment, EvaluationRecord, EvaluationScore
 from app.models.evaluation_access import EvaluationAccess
 from app.models.evaluation_period import EvaluationPeriod
+from app.models.indicator_framework import IndicatorFramework
 from app.models.personnel import Personnel
 from app.models.self_assessment import SelfAssessmentScore
 from app.models.user import User
@@ -46,6 +47,11 @@ from app.services.audit import log_event
 from app.services.documents import archive_final_pdf, archive_final_pdf_detached
 from app.services.evaluation import next_evaluation_code
 from app.services.excel import build_evaluations_workbook
+from app.services.indicator_framework import (
+    ensure_framework,
+    indicator_ids_for_record,
+    indicators_for_record,
+)
 from app.services.notifications import notify, notify_stage_owner_reassigned
 from app.services.pdf import weasyprint_available
 from app.services.scoring_scheme import active_scheme
@@ -54,7 +60,6 @@ from app.services.snapshot import build_final_snapshot
 from app.services.workflow import (
     IS_OPEN_RECORD,
     OPEN_STATUSES,
-    active_indicators_by_id,
     apply_transition,
     finalize_scoring,
     is_manager_path,
@@ -149,10 +154,17 @@ def _self_assessment_of(db: Session, record: EvaluationRecord) -> SelfAssessment
 
 
 def _to_detail(db: Session, record: EvaluationRecord) -> EvaluationDetail:
+    framework = (
+        db.get(IndicatorFramework, record.indicator_framework_id)
+        if record.indicator_framework_id is not None
+        else None
+    )
     return EvaluationDetail.model_validate(record).model_copy(
         update={
             "was_returned": _was_returned(db, record.id),
             "self_assessment": _self_assessment_of(db, record),
+            "indicator_ids": sorted(indicator_ids_for_record(db, record)),
+            "indicator_framework_version": framework.version if framework else None,
         }
     )
 
@@ -172,14 +184,17 @@ def _persisted_scores(db: Session, record: EvaluationRecord) -> list[ScoreRead]:
 
 
 def _replace_scores(db: Session, record: EvaluationRecord, payload: ScoresUpsert) -> list[dict]:
-    indicators_by_id = active_indicators_by_id(db)
+    # شاخص‌های همین پرونده، نه مجموعهٔ فعال (P1-05): ارزیابی که وسط کار سؤالش
+    # غیرفعال شده باشد، باید بتواند نمرهٔ همان سؤال را ذخیره کند — وگرنه ذخیرهٔ
+    # خودکارِ فرم روی یک ۴۰۰ گیر می‌کند و کارِ نیمه‌تمام از دست می‌رود.
+    indicators_by_id = indicators_for_record(db, record)
     indicator_ids_seen = set()
     rows = []
     for item in payload.scores:
         if item.indicator_id not in indicators_by_id:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"شاخص #{item.indicator_id} معتبر یا فعال نیست",
+                detail=f"شاخص #{item.indicator_id} جزو شاخص‌های این ارزیابی نیست",
             )
         if item.indicator_id in indicator_ids_seen:
             raise HTTPException(
@@ -279,6 +294,8 @@ def create_evaluation(
     # پرونده به طرح نمره‌دهیِ فعالِ همین لحظه مهر می‌خورد (P1-04). از این پس
     # محاسبه‌اش همیشه از همین نسخه می‌خواند، حتی اگر HR فردا وزن‌ها را عوض کند.
     scheme = active_scheme(db)
+    # و به نسخهٔ چارچوب شاخص‌ها (P1-05) — یعنی *چه سؤال‌هایی* پرسیده می‌شود.
+    framework = ensure_framework(db)
 
     record = EvaluationRecord(
         evaluation_code=next_evaluation_code(db),
@@ -288,6 +305,7 @@ def create_evaluation(
         ceo_user_id=access.ceo_user_id,
         period_id=open_period.id if open_period else None,
         scoring_scheme_id=scheme.id if scheme else None,
+        indicator_framework_id=framework.id,
         status=record_status,
     )
     db.add(record)

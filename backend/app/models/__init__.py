@@ -7,6 +7,7 @@ from app.models.evaluation_document import EvaluationDocument
 from app.models.evaluation_period import EvaluationPeriod
 from app.models.improvement_plan import ImprovementPlan, ImprovementPlanGoal
 from app.models.indicator import Indicator
+from app.models.indicator_framework import IndicatorFramework
 from app.models.login_attempt import LoginAttempt
 from app.models.module import ModuleSetting
 from app.models.notification import Notification
@@ -30,6 +31,7 @@ __all__ = [
     "ImprovementPlan",
     "ImprovementPlanGoal",
     "Indicator",
+    "IndicatorFramework",
     "ModuleSetting",
     "LoginAttempt",
     "Notification",

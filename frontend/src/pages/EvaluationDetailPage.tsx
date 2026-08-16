@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
@@ -44,6 +44,17 @@ export function EvaluationDetailPage() {
   } = useEvaluationDetail(evaluationId);
   const { data: personnel } = usePersonnelDetail(evaluation?.subject_personnel_id ?? null);
   const { data: indicators = [] } = useIndicators({ includeInactive: true });
+
+  // شاخص‌های *این پرونده* (P1-05) — نه هرچه امروز فعال است.
+  //
+  // پیش از این فرم با `is_active` فیلتر می‌شد، پس اگر منابع انسانی وسط چرخه
+  // سؤالی اضافه یا کم می‌کرد، ارزیاب فرمی می‌دید که با آنچه سرور برای «ثبت»
+  // لازم داشت یکی نبود — و پیام خطا هم دربارهٔ سؤالی بود که او هرگز ندیده بود.
+  const caseIndicators = useMemo(() => {
+    if (!evaluation) return [];
+    const wanted = new Set(evaluation.indicator_ids);
+    return indicators.filter((i) => wanted.has(i.id));
+  }, [evaluation, indicators]);
 
   const [evaluatorComment, setEvaluatorComment] = useState("");
   const [newComment, setNewComment] = useState("");
@@ -260,7 +271,7 @@ export function EvaluationDetailPage() {
           key={`${evaluation.id}-${evaluation.status}`}
           config={config}
           evaluationId={evaluation.id}
-          indicators={indicators.filter((i) => i.is_active)}
+          indicators={caseIndicators}
           existing={evaluation.scores}
           evaluatorComment={evaluatorComment}
           setEvaluatorComment={setEvaluatorComment}

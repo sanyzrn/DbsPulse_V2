@@ -13,6 +13,7 @@ function indicator(id: number, section: "general" | "specialized" = "general"): 
     is_active: true,
     created_at: "",
     updated_at: "",
+    usage_count: 0,
   };
 }
 

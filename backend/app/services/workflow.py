@@ -17,10 +17,10 @@ from sqlalchemy.orm import Session
 from app.core.metrics import workflow_transitions
 from app.models.enums import EvaluationStatus, UserRole
 from app.models.evaluation import EvaluationRecord, EvaluationScore
-from app.models.indicator import Indicator
 from app.schemas.auth import CurrentUser
 from app.services.audit import log_event
 from app.services.evaluation import compute_result, validate_evidence
+from app.services.indicator_framework import indicators_for_record
 from app.services.scoring_scheme import rules_for_record
 
 OPEN_STATUSES: frozenset[EvaluationStatus] = frozenset(
@@ -214,9 +214,9 @@ def is_manager_path(record: EvaluationRecord) -> bool:
     return record.unit_supervisor_user_id is None
 
 
-def active_indicators_by_id(db: Session) -> dict[int, Indicator]:
-    indicators = db.scalars(select(Indicator).where(Indicator.is_active.is_(True)))
-    return {i.id: i for i in indicators}
+# `active_indicators_by_id` عمداً حذف شد (P1-05). هر جا که پرسیده می‌شود «این
+# پرونده به چه شاخص‌هایی نمره می‌دهد»، باید از `indicators_for_record` بپرسد.
+# گذاشتنِ نسخهٔ «فعالِ امروز» کنارش، یعنی همان اشتباه یک import دورتر است.
 
 
 def scores_as_dicts(db: Session, record: EvaluationRecord) -> list[dict]:
@@ -232,14 +232,17 @@ def scores_as_dicts(db: Session, record: EvaluationRecord) -> list[dict]:
 def finalize_scoring(db: Session, record: EvaluationRecord, current_user: CurrentUser) -> None:
     """اعتبارسنجی شواهد + کامل بودن شاخص‌ها + محاسبه درصدها؛ مشترک بین submit (مسئول واحد) و
     deputy-approve مسیر «مدیر» که در آن معاونت خودش نمره‌دهنده اول است."""
-    indicators_by_id = active_indicators_by_id(db)
+    # شاخص‌های *این پرونده*، نه مجموعهٔ فعالِ امروز (P1-05). تفاوتشان همان چیزی
+    # بود که پیش‌نویس‌های در جریان را قفل می‌کرد: ارزیاب فرم را کامل پر می‌کرد،
+    # منابع انسانی سؤالی اضافه یا کم می‌کرد، و «ثبت» فردا کار نمی‌کرد.
+    indicators_by_id = indicators_for_record(db, record)
     scores = scores_as_dicts(db, record)
 
     scored_ids = {row["indicator_id"] for row in scores}
     if scored_ids != set(indicators_by_id.keys()):
         raise HTTPException(
             status_code=http_status.HTTP_400_BAD_REQUEST,
-            detail="باید به تمام شاخص‌های فعال (عمومی و تخصصی) امتیاز داده شود",
+            detail="باید به تمام شاخص‌های این ارزیابی (عمومی و تخصصی) امتیاز داده شود",
         )
 
     # قواعد از طرحِ *این پرونده* می‌آیند، نه از طرح فعال (P1-04). اگر HR وسط

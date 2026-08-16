@@ -65,6 +65,18 @@ class EvaluationRecord(Base):
     scoring_scheme_id: Mapped[int | None] = mapped_column(
         ForeignKey("scoring_schemes.id"), nullable=True
     )
+    # نسخهٔ چارچوب شاخص‌ها که این پرونده زیر آن باز شده (P1-05) — یعنی *چه
+    # سؤال‌هایی* پرسیده شد، در حالی که ستون بالا می‌گوید *با چه قاعده‌ای* حساب شد.
+    #
+    # «کامل بودن» با همین نسخه سنجیده می‌شود، نه با مجموعهٔ فعالِ امروز. بدون آن،
+    # هر افزودن یا غیرفعال‌کردن شاخص، هر پیش‌نویسِ در جریان را غیرقابل‌ثبت می‌کرد
+    # و کسی که ویرایش می‌کرد هیچ‌وقت خبردار نمی‌شد.
+    #
+    # nullable است به همان دلیل ستون بالا؛ مایگریشن پرونده‌های موجود را به نسخهٔ ۱
+    # مهر می‌زند که دقیقاً از مجموعهٔ فعالِ همان لحظه ساخته می‌شود.
+    indicator_framework_id: Mapped[int | None] = mapped_column(
+        ForeignKey("indicator_frameworks.id"), nullable=True
+    )
     # ستون stage حذف شد: همیشه ۱:۱ از status قابل استخراج بود و دو منبع حقیقت
     # هم‌معنا خطر واگرایی داشت. مقدار stage در API از status مشتق می‌شود
     # (app/schemas/evaluation.py).

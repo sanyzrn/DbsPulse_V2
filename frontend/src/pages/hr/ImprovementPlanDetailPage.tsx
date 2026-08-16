@@ -109,7 +109,9 @@ export function ImprovementPlanDetailPage() {
   async function cancel() {
     const ok = await confirm({
       title: "لغو برنامه بهبود؟",
-      description: "برنامه لغو می‌شود و از فهرست فعال خارج خواهد شد.",
+      danger: true,
+      description:
+        "برنامه لغو می‌شود و از فهرست فعال خارج خواهد شد. اهداف ثبت‌شده و پیشرفتشان برای سابقه می‌مانند، ولی برنامه دوباره باز نمی‌شود.",
       confirmLabel: "لغو برنامه",
     });
     if (!ok) return;

@@ -29,7 +29,12 @@ export function ToastProvider({ children }: { children: ReactNode }) {
     (kind: ToastKind, message: string) => {
       const id = nextId.current++;
       setToasts((prev) => [...prev, { id, kind, message }]);
-      setTimeout(() => remove(id), 4000);
+      // موفقیت خودش می‌رود، خطا نه.
+      //
+      // پیام خطا معمولاً تنها جایی است که می‌گوید *دقیقاً* چه چیزی غلط بود —
+      // «شاخص ۳ شواهد ندارد». چهار ثانیه برای خواندن یک جملهٔ فارسی و فهمیدنش
+      // کافی نیست، و کاربری که نتوانست بخواند همان کار را دوباره تکرار می‌کند.
+      if (kind === "success") setTimeout(() => remove(id), 4000);
     },
     [remove]
   );
@@ -51,11 +56,24 @@ export function ToastProvider({ children }: { children: ReactNode }) {
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: 12, scale: 0.95 }}
               transition={SPRING_SOFT}
-              className={`pointer-events-auto flex items-center gap-2.5 rounded-2xl px-4 py-2.5 text-sm font-medium shadow-float ring-1 ring-black/5 ${
-                t.kind === "success" ? "bg-green-600 text-white" : "bg-pulse-600 text-white"
+              // زمینهٔ خطا عمداً قرمزِ برند نیست.
+              //
+              // قرمزِ pulse رنگِ *هر دکمهٔ اصلی* سامانه است؛ وقتی همان رنگ پیام
+              // خطا هم باشد، قرمز دیگر خبری نمی‌دهد. زمینهٔ تیره خطا را از هر
+              // چیز برندی جدا می‌کند و قرمز را به همان‌جایی برمی‌گرداند که باید
+              // باشد: نشانهٔ داخلِ پیام.
+              className={`pointer-events-auto flex max-w-[min(92vw,34rem)] items-start gap-2.5 rounded-2xl px-4 py-2.5 text-sm font-medium shadow-float ring-1 ${
+                t.kind === "success"
+                  ? "bg-green-600 text-white ring-black/5"
+                  : "bg-charcoal-900 text-white ring-white/10"
               }`}
             >
-              <span aria-hidden className="flex h-5 w-5 items-center justify-center rounded-full bg-white/20">
+              <span
+                aria-hidden
+                className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full ${
+                  t.kind === "success" ? "bg-white/20" : "bg-pulse-500"
+                }`}
+              >
                 {t.kind === "success" ? (
                   <svg viewBox="0 0 20 20" className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M5 10l3 3 7-7" />
@@ -64,7 +82,19 @@ export function ToastProvider({ children }: { children: ReactNode }) {
                   <span className="text-xs font-bold">!</span>
                 )}
               </span>
-              {t.message}
+              <span className="leading-relaxed">{t.message}</span>
+              {t.kind === "error" && (
+                <button
+                  type="button"
+                  onClick={() => remove(t.id)}
+                  aria-label="بستن پیام خطا"
+                  className="-me-1 mt-0.5 shrink-0 cursor-pointer rounded-lg p-0.5 text-white/60 transition-colors hover:bg-white/10 hover:text-white"
+                >
+                  <svg viewBox="0 0 20 20" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                    <path d="M5 5l10 10M15 5L5 15" />
+                  </svg>
+                </button>
+              )}
             </motion.div>
           ))}
         </AnimatePresence>

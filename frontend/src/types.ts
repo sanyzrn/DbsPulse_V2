@@ -203,6 +203,19 @@ export interface EvaluationDetail extends EvaluationRecord {
   indicator_framework_version: number | null;
 }
 
+/** وضعیت → مرحله. آینهٔ `_STAGE_BY_STATUS` در `schemas/evaluation.py`.
+ *
+ * `cancelled` عمداً این‌جا نیست: پروندهٔ لغوشده در هیچ مرحله‌ای «نیست» و
+ * نسبت‌دادن یک مرحله به آن گمراه‌کننده است.
+ */
+export const STAGE_BY_STATUS: Partial<Record<EvaluationStatus, EvaluationStage>> = {
+  draft: "supervisor_scoring",
+  submitted: "hr_review",
+  hr_approved: "deputy_review",
+  deputy_approved: "ceo_final",
+  finalized: "ceo_final",
+};
+
 export const STAGE_LABELS: Record<EvaluationStage, string> = {
   supervisor_scoring: "امتیازدهی مسئول واحد",
   hr_review: "بررسی منابع انسانی",

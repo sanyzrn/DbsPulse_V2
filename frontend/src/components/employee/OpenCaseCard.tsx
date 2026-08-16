@@ -11,6 +11,7 @@ import { motion } from "motion/react";
 import { apiClient, extractErrorMessage } from "../../api/client";
 import { useIndicators } from "../../api/queries";
 import { useToast } from "../../components/Toast";
+import { WorkflowStepper } from "../WorkflowStepper";
 import { Button } from "../../ui/Button";
 import { Card } from "../../ui/Card";
 import { formatDateTime } from "../../utils/dates";
@@ -42,6 +43,10 @@ export function OpenCaseCard({ item, index }: { item: MyOpenEvaluation; index: n
           </span>
         }
       >
+        {/* کارمند تا امروز فقط نام مرحله را می‌دید؛ اینکه «چند مرحله مانده»
+            هیچ‌جا نبود. جعبهٔ سیاه، حتی وقتی محتوایش درست است، جعبهٔ سیاه است. */}
+        <WorkflowStepper status={item.status} className="mb-4" />
+
         <p className="text-sm text-gray-600">
           ارزیابی شما از {formatDateTime(item.created_at)} آغاز شده و از{" "}
           {formatDateTime(item.stage_entered_at)} در مرحلهٔ فعلی است.

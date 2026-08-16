@@ -121,8 +121,15 @@ export function ScoringSchemesPage() {
   async function activate(scheme: Scheme) {
     const ok = await confirm({
       title: `فعال‌سازی نسخهٔ ${faInt(scheme.version)}؟`,
+      danger: true,
       description:
         "از این پس ارزیابی‌های جدید با این قواعد ساخته می‌شوند. پرونده‌های موجود دست‌نخورده می‌مانند — هرکدام با همان نسخه‌ای که زیرش باز شده حساب می‌شود.",
+      consequence: (
+        <>
+          نسخهٔ فعال برای کل سازمان عوض می‌شود. نسخهٔ فعلی بازنشسته می‌شود و
+          برای برگرداندنش باید نسخهٔ تازه‌ای ساخت — فعال‌سازی، بازگشت‌پذیر نیست.
+        </>
+      ),
       confirmLabel: "فعال کن",
     });
     if (!ok) return;

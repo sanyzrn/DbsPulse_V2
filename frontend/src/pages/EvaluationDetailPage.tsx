@@ -16,6 +16,7 @@ import { ObjectionPanel } from "../components/ObjectionPanel";
 import { SelfAssessmentPanel } from "../components/SelfAssessmentPanel";
 import { ScoreFormTable, computePreview, scoredRows, useScoreForm } from "../components/ScoreForm";
 import { StatusBadge } from "../components/StatusBadge";
+import { WorkflowStepper } from "../components/WorkflowStepper";
 import { useToast } from "../components/Toast";
 import { Button } from "../ui/Button";
 import { PctBadge, PctBar, ScoreRing } from "../ui/Meters";
@@ -23,9 +24,13 @@ import { formatDateTime } from "../utils/dates";
 import {
   STAGE_LABELS,
   type AppConfig,
+  type EvaluationCommentRow,
   type EvaluationDetail,
   type Indicator,
 } from "../types";
+
+/** پیشوندی که سرور موقع برگشت پرونده جلوی کامنت می‌گذارد (routers/evaluations.py). */
+const RETURN_COMMENT_PREFIX = "برگشت پرونده";
 
 export function EvaluationDetailPage() {
   const { id } = useParams();
@@ -55,6 +60,20 @@ export function EvaluationDetailPage() {
     const wanted = new Set(evaluation.indicator_ids);
     return indicators.filter((i) => wanted.has(i.id));
   }, [evaluation, indicators]);
+
+  // آخرین دلیلِ برگشت.
+  //
+  // سرور موقع برگشت، دلیل را اجباری می‌گیرد و به‌شکل یک کامنت ثبت می‌کند — پس
+  // دلیل همیشه وجود دارد. مشکل این بود که ارزیاب یک نشان کوچک «برگشتی» می‌دید
+  // با راهنمای «کامنت‌های پایین صفحه را ببینید»: تنها چیزی که *باید* بخواند،
+  // کم‌دیده‌ترین چیز صفحه بود.
+  const returnReason = useMemo(
+    () =>
+      evaluation?.comments
+        ?.filter((c) => c.comment_text.startsWith(RETURN_COMMENT_PREFIX))
+        .at(-1) ?? null,
+    [evaluation]
+  );
 
   const [evaluatorComment, setEvaluatorComment] = useState("");
   const [newComment, setNewComment] = useState("");
@@ -216,7 +235,7 @@ export function EvaluationDetailPage() {
               {evaluation.was_returned && (
                 <span
                   className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-[11px] font-medium text-amber-700"
-                  title="این پرونده در طول رسیدگی دست‌کم یک‌بار برگشت خورده است؛ کامنت‌های پایین صفحه را ببینید"
+                  title="این پرونده در طول رسیدگی دست‌کم یک‌بار برگشت خورده است"
                 >
                   <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-amber-500" />
                   برگشتی
@@ -230,12 +249,19 @@ export function EvaluationDetailPage() {
             {evaluation.acknowledged_at && (
               <p className="mt-1 text-xs">
                 <span className="rounded-full bg-green-50 px-2 py-0.5 font-medium text-green-700">
-                  رؤیت کارمند: {formatDateTime(evaluation.acknowledged_at)}
+                  کارمند نتیجه را دیده: {formatDateTime(evaluation.acknowledged_at)}
                 </span>
               </p>
             )}
           </div>
         </div>
+
+        <WorkflowStepper
+          status={evaluation.status}
+          returned={evaluation.was_returned}
+          className="mt-4"
+        />
+
         {evaluation.final_weighted_pct !== null && (
           <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
             <div className="rounded-xl bg-gray-50 p-3">
@@ -265,6 +291,8 @@ export function EvaluationDetailPage() {
           </p>
         )}
       </div>
+
+      {isEditableScoring && returnReason && <ReturnReasonBanner comment={returnReason} />}
 
       {isEditableScoring ? (
         <EditableScoring
@@ -483,10 +511,32 @@ export function EvaluationDetailPage() {
             label="تأیید نهایی"
             busy={busy}
             onClick={async () => {
+              // پرمعناترین کلیک کل سامانه: سند رسمیِ هش‌دار و قابل‌استعلام صادر
+              // می‌شود و دیگر ویرایش نمی‌شود. پس دیالوگش هم نباید شبیه بقیه باشد
+              // — نام فرد و نمرهٔ نهایی باید جلوی چشم باشد، نه در صفحهٔ پشت سر.
               const ok = await confirm({
                 title: "تأیید نهایی این ارزیابی؟",
-                description: "پس از این کار، پرونده نهایی و غیرقابل‌ویرایش می‌شود.",
-                confirmLabel: "تأیید نهایی",
+                danger: true,
+                description:
+                  "با این کار سند رسمی ارزیابی صادر می‌شود؛ سندی که هش و کد استعلام دارد و بعداً قابل ویرایش نیست. برای اصلاح، تنها راه باز کردن پروندهٔ تازه است.",
+                consequence: (
+                  <>
+                    نتیجهٔ نهایی{" "}
+                    <b>
+                      {evaluation.final_weighted_pct != null
+                        ? `${evaluation.final_weighted_pct.toLocaleString("fa-IR")}٪`
+                        : "—"}
+                    </b>{" "}
+                    برای <b>{evaluation.subject_full_name}</b>
+                    {evaluation.recommendation && (
+                      <>
+                        {" "}
+                        — «{evaluation.recommendation}»
+                      </>
+                    )}
+                  </>
+                ),
+                confirmLabel: "صدور سند نهایی",
               });
               if (!ok) return;
               setBusy(true);
@@ -545,6 +595,30 @@ export function EvaluationDetailPage() {
           </button>
         )}
       </div>
+    </div>
+  );
+}
+
+/** دلیلِ برگشت، بالای فرم — همان‌جایی که کار از آن شروع می‌شود.
+ *
+ * قبلاً این متن ته صفحه بین بقیهٔ کامنت‌ها بود و ارزیاب باید پیدایش می‌کرد.
+ * نتیجه‌اش رفت‌وبرگشت اضافه بود: پرونده دوباره ثبت می‌شد بدون اینکه چیزی که
+ * بازبین خواسته بود عوض شده باشد.
+ */
+function ReturnReasonBanner({ comment }: { comment: EvaluationCommentRow }) {
+  return (
+    <div className="rounded-2xl border border-amber-200 bg-amber-50/60 p-5">
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <p className="text-sm font-bold text-amber-900">این پرونده برای اصلاح برگشته است</p>
+        <p className="text-xs text-amber-900/60">
+          {comment.commenter_username && <span dir="ltr">{comment.commenter_username}</span>}
+          {comment.commenter_username && " · "}
+          {formatDateTime(comment.created_at)}
+        </p>
+      </div>
+      <p className="mt-2 text-sm leading-relaxed text-amber-900">
+        {comment.comment_text.replace(/^برگشت پرونده\s*—\s*دلیل:\s*/, "")}
+      </p>
     </div>
   );
 }

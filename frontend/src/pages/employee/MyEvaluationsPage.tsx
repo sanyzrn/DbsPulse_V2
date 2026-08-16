@@ -20,11 +20,21 @@ function MyEvaluationCard({ item, index }: { item: MyEvaluation; index: number }
   const [busy, setBusy] = useState(false);
 
   async function acknowledge() {
+    // «رؤیت» در گفتار اداری یعنی «دیدم»، ولی خیلی‌ها آن را «قبول دارم»
+    // می‌خوانند. سامانه این دو را عمداً از هم جدا کرده — پس خودِ دکمه هم باید
+    // جدایشان کند، وگرنه کارمند یا فکر می‌کند دارد نتیجه را تأیید می‌کند، یا از
+    // ترسِ از دست دادن حق اعتراض اصلاً کلیک نمی‌کند و پرونده معلق می‌ماند.
     const ok = await confirm({
-      title: "تأیید رؤیت نتیجه ارزیابی؟",
+      title: "ثبت مشاهدهٔ نتیجه؟",
       description:
-        "با تأیید، به‌صورت رسمی ثبت می‌شود که نتیجه این ارزیابی به شما ابلاغ شده است. این عمل قابل بازگشت نیست.",
-      confirmLabel: "رؤیت شد",
+        "ثبت می‌شود که نتیجهٔ این ارزیابی را دیده‌اید. این کار قابل بازگشت نیست.",
+      consequence: (
+        <>
+          <b>مشاهده به معنی پذیرش نتیجه نیست.</b> اگر به نتیجه اعتراض دارید، دقیقاً
+          پس از همین ثبت است که راه اعتراض برایتان باز می‌شود.
+        </>
+      ),
+      confirmLabel: "نتیجه را دیدم",
     });
     if (!ok) return;
     setBusy(true);
@@ -33,7 +43,7 @@ function MyEvaluationCard({ item, index }: { item: MyEvaluation; index: number }
       await queryClient.invalidateQueries({ queryKey: ["me", "evaluations"] });
       // کارت «در انتظار رؤیت شما» در خلاصهٔ نقش باید فوراً کم شود
       await queryClient.invalidateQueries({ queryKey: ["dashboard"] });
-      showSuccess("رؤیت شما ثبت شد");
+      showSuccess("ثبت شد که نتیجه را دیده‌اید");
     } catch (err) {
       showError(extractErrorMessage(err));
     } finally {
@@ -53,11 +63,11 @@ function MyEvaluationCard({ item, index }: { item: MyEvaluation; index: number }
           item.acknowledged_at ? (
             <span className="inline-flex items-center gap-1.5 rounded-full bg-green-50 px-3 py-1 text-xs font-medium text-green-700">
               <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-green-500" />
-              رؤیت شد — {formatDateTime(item.acknowledged_at)}
+              مشاهده شد — {formatDateTime(item.acknowledged_at)}
             </span>
           ) : (
             <Button onClick={acknowledge} loading={busy}>
-              رؤیت شد
+              نتیجه را دیدم
             </Button>
           )
         }
@@ -79,10 +89,15 @@ function MyEvaluationCard({ item, index }: { item: MyEvaluation; index: number }
             </div>
           </dl>
         </div>
+        {/* «پیشنهاد سامانه» بود، که مثل حکمِ یک ماشین خوانده می‌شد — دربارهٔ
+            آیندهٔ شغلی خودِ خواننده. در واقع خروجی جدول آستانه‌هایی است که
+            سازمان تصویب کرده؛ گفتنِ همین، آن را از حکم به قاعده تبدیل می‌کند. */}
         {item.recommendation && (
-          <p className="mt-3 flex items-center gap-2 rounded-xl bg-amber-50/70 px-3 py-2 text-sm">
-            <span aria-hidden>💡</span>
-            <span><span className="text-xs text-gray-500">پیشنهاد سامانه: </span>{item.recommendation}</span>
+          <p className="mt-3 rounded-xl bg-amber-50/70 px-3 py-2 text-sm">
+            <span className="text-xs text-gray-500">
+              بر اساس بازهٔ امتیاز شما در جدول مصوب سازمان، نتیجهٔ ثبت‌شده:{" "}
+            </span>
+            {item.recommendation}
           </p>
         )}
 
@@ -158,8 +173,18 @@ function ObjectionSection({ item }: { item: MyEvaluation }) {
     );
   }
 
-  // اعتراض فقط پس از رؤیت معنا دارد: اول باید نتیجه را دیده باشید
-  if (!item.acknowledged_at) return null;
+  // اعتراض فقط پس از مشاهده معنا دارد. ولی *پنهان‌کردنِ* کامل این راه، بدترین
+  // شکل اعمالش بود: کارمندی که مخالف نتیجه است هیچ نشانه‌ای نمی‌دید که اصلاً
+  // راهی وجود دارد، و منطقی‌ترین کارش این بود که «دیدم» را نزند تا حقی را از
+  // دست ندهد — یعنی همان گارد، پرونده را معلق می‌کرد.
+  if (!item.acknowledged_at) {
+    return (
+      <p className="mt-3 text-xs text-gray-400">
+        اگر به این نتیجه اعتراض دارید، پس از ثبت مشاهده می‌توانید اعتراضتان را
+        این‌جا وارد کنید.
+      </p>
+    );
+  }
 
   return (
     <div className="mt-3">
@@ -267,7 +292,7 @@ export function MyEvaluationsPage() {
     <div className="space-y-4">
       <PageHeader
         title="کارنامه من"
-        subtitle="نتایج نهایی‌شده ارزیابی عملکرد شما. با دکمه «رؤیت شد» ابلاغ رسمی نتیجه ثبت می‌شود."
+        subtitle="نتایج نهایی‌شدهٔ ارزیابی عملکرد شما. ثبت مشاهده یعنی نتیجه را دیده‌اید — نه اینکه آن را پذیرفته‌اید."
       />
       <RoleOverviewCards />
 

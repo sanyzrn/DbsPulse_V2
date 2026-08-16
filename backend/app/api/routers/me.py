@@ -254,7 +254,7 @@ def file_objection(
     if record.acknowledged_at is None:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="ابتدا نتیجه را رؤیت کنید، سپس در صورت لزوم اعتراض ثبت کنید",
+            detail="ابتدا مشاهدهٔ نتیجه را ثبت کنید، سپس در صورت لزوم اعتراض بگذارید",
         )
     if record.objection_at is not None:
         raise HTTPException(
@@ -267,7 +267,7 @@ def file_objection(
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=(
-                f"مهلت اعتراض ({settings.objection_window_days} روز پس از رؤیت) "
+                f"مهلت اعتراض ({settings.objection_window_days} روز پس از مشاهدهٔ نتیجه) "
                 "به پایان رسیده است"
             ),
         )
@@ -314,12 +314,12 @@ def acknowledge_evaluation(
     if record.status != EvaluationStatus.finalized:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="فقط ارزیابی نهایی‌شده قابل رؤیت است",
+            detail="فقط ارزیابی نهایی‌شده را می‌توان مشاهده‌شده ثبت کرد",
         )
     if record.acknowledged_at is not None:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="این ارزیابی قبلاً رؤیت شده است",
+            detail="مشاهدهٔ این ارزیابی قبلاً ثبت شده است",
         )
 
     record.acknowledged_at = datetime.now(UTC)
@@ -345,7 +345,7 @@ def acknowledge_evaluation(
         type_="evaluation_acknowledged",
         message=(
             f"کارمند {record.subject.full_name} نتیجه پرونده "
-            f"{record.evaluation_code} را رؤیت کرد"
+            f"{record.evaluation_code} را دید"
         ),
         evaluation_record_id=record.id,
         link=f"/evaluations/{record.id}",

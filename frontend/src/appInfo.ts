@@ -7,8 +7,11 @@ export const APP_NAME = "DbsPulse";
 export const APP_NAME_FA = "سامانه ارزیابی عملکرد سازمانی";
 export const APP_TAGLINE =
   "پایش هوشمند عملکرد سازمان؛ از امتیازدهی شاخص‌ها تا زنجیره تأیید و تصمیم تمدید قرارداد";
-export const APP_VERSION = "0.2.0";
-export const DEVELOPER_NAME = "DbsGraphic";
+/** نسخه در زمان بیلد از `package.json` تزریق می‌شود (`vite.config.ts`).
+ *  پیش از این در دو جا نوشته شده بود و باید دستی همگام می‌ماند — که نماند. */
+export const APP_VERSION = __APP_VERSION__;
+export const DEVELOPER_NAME = "DbsStudio";
+export const DEVELOPER_URL = "https://saeedzarrini.ir/en";
 
 /** پرچم‌های ویژگی — برای روشن/خاموش کردن بخش‌ها بدون حذف کد.
  *

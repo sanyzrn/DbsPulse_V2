@@ -5,7 +5,9 @@ import { PageHeader } from "../../ui/Card";
 export function CeoHomePage() {
   return (
     <div className="space-y-4">
-      <PageHeader title="داشبورد مدیرعامل" subtitle="نمای سریع پرونده‌های در انتظار تأیید نهایی شما" />
+      {/* «داشبورد» بود، ولی این صفحه یک صف است نه داشبورد — تحلیل سازمان صفحهٔ
+          جداگانهٔ خودش را دارد. یک کلمه برای دو چیز، انتظار غلط می‌سازد. */}
+      <PageHeader title="صندوق تأیید نهایی" subtitle="پرونده‌هایی که منتظر امضای شما هستند" />
       <RoleOverviewCards />
       <EvaluationList
         title="پرونده‌های ارزیابی"

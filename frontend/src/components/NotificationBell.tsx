@@ -13,11 +13,16 @@ export function NotificationBell() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const containerRef = useRef<HTMLDivElement>(null);
+  const bellRef = useRef<HTMLButtonElement>(null);
 
   const unread = data?.unread ?? 0;
   const items = data?.items ?? [];
 
-  // بستن پنل با کلیک بیرون از آن
+  // بستن پنل با کلیک بیرون از آن — یا با Escape.
+  //
+  // تا امروز فقط راه اولی بود، یعنی کاربر صفحه‌کلید هیچ راهی برای بستنِ پنل
+  // نداشت جز اینکه با Tab از تمام اعلان‌ها رد شود. فوکوس هم به خودِ زنگوله
+  // برمی‌گردد، وگرنه بعد از بسته شدن، مکان‌نما روی عنصری می‌ماند که دیگر نیست.
   useEffect(() => {
     if (!open) return;
     function onClickOutside(e: MouseEvent) {
@@ -25,8 +30,17 @@ export function NotificationBell() {
         setOpen(false);
       }
     }
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key !== "Escape") return;
+      setOpen(false);
+      bellRef.current?.focus();
+    }
     document.addEventListener("mousedown", onClickOutside);
-    return () => document.removeEventListener("mousedown", onClickOutside);
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("mousedown", onClickOutside);
+      document.removeEventListener("keydown", onKeyDown);
+    };
   }, [open]);
 
   async function invalidate() {
@@ -53,6 +67,7 @@ export function NotificationBell() {
   return (
     <div ref={containerRef} className="relative">
       <button
+        ref={bellRef}
         onClick={() => setOpen((v) => !v)}
         aria-label={`اعلان‌ها${unread > 0 ? ` (${unread.toLocaleString("fa-IR")} خوانده‌نشده)` : ""}`}
         aria-expanded={open}

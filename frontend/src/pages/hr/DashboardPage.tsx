@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { motion } from "motion/react";
+import { useSearchParams } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { apiClient, extractErrorMessage } from "../../api/client";
 import { useDashboardOverview, useExpiringContracts, usePipeline } from "../../api/queries";
@@ -33,9 +34,48 @@ const ANALYSIS_SUBTABS = [
   { key: "person" as const, label: "کارنامهٔ فرد" },
 ];
 
+type DashboardTab = "overview" | "analysis";
+type AnalysisTab = "org" | "reports" | "person";
+
+const IS_TAB = (v: string | null): v is DashboardTab => v === "overview" || v === "analysis";
+const IS_ANALYSIS_TAB = (v: string | null): v is AnalysisTab =>
+  v === "org" || v === "reports" || v === "person";
+
 export function DashboardPage() {
-  const [tab, setTab] = useState<"overview" | "analysis">("overview");
-  const [analysisTab, setAnalysisTab] = useState<"org" | "reports" | "person">("org");
+  // تب در نشانی صفحه زندگی می‌کند، نه در state.
+  //
+  // تحلیلگری که «گزارش‌های تحلیلی» را باز کرده و نشانی را برای مدیرش می‌فرستد،
+  // نباید طرف مقابل روی «نمای کلی» بیفتد. رفرش کردن صفحه هم همین‌طور.
+  const [params, setParams] = useSearchParams();
+  const rawTab = params.get("tab");
+  const rawAnalysis = params.get("view");
+  const tab: DashboardTab = IS_TAB(rawTab) ? rawTab : "overview";
+  const analysisTab: AnalysisTab = IS_ANALYSIS_TAB(rawAnalysis) ? rawAnalysis : "org";
+
+  // `replace` تا دکمهٔ «بازگشت» مرورگر پر از تب‌های میانی نشود؛ کاربر انتظار
+  // دارد بازگشت او را از صفحه بیرون ببرد، نه یک تب عقب.
+  const setTab = (next: DashboardTab) =>
+    setParams(
+      (prev) => {
+        const p = new URLSearchParams(prev);
+        if (next === "overview") p.delete("tab");
+        else p.set("tab", next);
+        return p;
+      },
+      { replace: true }
+    );
+
+  const setAnalysisTab = (next: AnalysisTab) =>
+    setParams(
+      (prev) => {
+        const p = new URLSearchParams(prev);
+        p.set("tab", "analysis");
+        if (next === "org") p.delete("view");
+        else p.set("view", next);
+        return p;
+      },
+      { replace: true }
+    );
 
   const { data: overview, error: overviewError } = useDashboardOverview();
 

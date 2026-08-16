@@ -11,6 +11,7 @@ import { Table } from "../ui/Table";
 import { EmptyState } from "../ui/Card";
 import { JalaliDatePicker } from "../ui/JalaliDatePicker";
 import { EASE_SOFT, TAB_TRANSITION } from "../ui/motion";
+import { SearchInput } from "../ui/SearchInput";
 
 /** پیش‌فرض تعداد در هر صفحه؛ کاربر می‌تواند از نوار پایین عوضش کند. */
 const DEFAULT_PAGE_SIZE = 10;
@@ -107,21 +108,15 @@ export function EvaluationList({
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <h2 className="text-base font-bold text-gray-900">{title}</h2>
         <div className="flex flex-wrap items-center gap-2">
-          <div className="relative">
-            <svg viewBox="0 0 20 20" className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
-              <circle cx="9" cy="9" r="6" />
-              <path d="M14 14l3 3" />
-            </svg>
-            <input
-              className="w-full rounded-xl border border-gray-200 bg-gray-100 py-1.5 pr-9 pl-3 text-sm text-gray-700 outline-none transition-colors duration-150 focus:border-pulse-500 focus:bg-white sm:w-64"
-              placeholder="جست‌وجو (نام پرسنل، کد ارزیابی)…"
-              value={search}
-              onChange={(e) => {
-                setSearch(e.target.value);
-                setPage(0);
-              }}
-            />
-          </div>
+          <SearchInput
+            widthClass="sm:w-64"
+            placeholder="جست‌وجو (نام پرسنل، کد ارزیابی)…"
+            value={search}
+            onChange={(e) => {
+              setSearch(e.target.value);
+              setPage(0);
+            }}
+          />
           {enableAdvancedFilters && (
             <button
               type="button"

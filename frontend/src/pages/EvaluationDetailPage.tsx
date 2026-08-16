@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { apiClient, extractErrorMessage } from "../api/client";
 import {
@@ -96,6 +96,22 @@ export function EvaluationDetailPage() {
     // (مثلاً «در انتظار تأیید من» باید فوراً کم شود)؛ کل فضای dashboard را باطل می‌کنیم.
     await queryClient.invalidateQueries({ queryKey: ["dashboard"] });
   }
+
+  // «بازگشت» به کجا؟
+  //
+  // `navigate(-1)` وقتی درست است که کاربر از داخل برنامه آمده باشد. ولی این صفحه
+  // نشانیِ داخلِ اعلان‌هاست: کسی که از ایمیل یا اعلان مستقیم وارد شده، تاریخچهٔ
+  // مرورگرش خالی است و «بازگشت» او را از برنامه بیرون می‌برد — یعنی دکمه‌ای که
+  // ادعا می‌کند یک قدم عقب می‌رود، در عمل کاربر را می‌اندازد بیرون.
+  //
+  // `location.key === "default"` یعنی این اولین ورودِ همین تب است. در آن حالت
+  // به «/» می‌رویم که خودش بر اساس نقش به صفحهٔ فرودِ درست هدایت می‌کند — نقشهٔ
+  // نقش‌ها یک‌جا در `HomeRedirect` است و کپی دومش دیر یا زود با اصل فرق می‌کند.
+  const location = useLocation();
+  const goBack = () => {
+    if (location.key !== "default") navigate(-1);
+    else navigate("/", { replace: true });
+  };
 
   const loadError = evaluationError != null ? extractErrorMessage(evaluationError) : null;
 
@@ -211,7 +227,7 @@ export function EvaluationDetailPage() {
 
   return (
     <div className="space-y-4">
-      <button onClick={() => navigate(-1)} className="inline-flex items-center gap-1 text-sm font-medium text-gray-500 transition-colors hover:text-gray-700">
+      <button onClick={goBack} className="inline-flex items-center gap-1 text-sm font-medium text-gray-500 transition-colors hover:text-gray-700">
         {/* RTL: فلش «بازگشت» به سمت راست است */}
         <svg viewBox="0 0 20 20" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
           <path d="M7 5l5 5-5 5" />

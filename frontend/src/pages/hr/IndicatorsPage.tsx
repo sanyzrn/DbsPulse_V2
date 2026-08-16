@@ -14,8 +14,11 @@ import type { FrameworkImpact, Indicator, IndicatorSection } from "../../types";
 const inputClass =
   "w-full rounded-xl border border-gray-200 bg-gray-100 px-3 py-2 text-sm text-gray-900 outline-none transition-colors duration-150 focus:border-pulse-500 focus:bg-white";
 
-/** «در ۲۳ ارزیابی استفاده شده» — یا سکوت، وقتی هنوز جایی استفاده نشده. */
-function useCountLabel(ind: Indicator): string {
+/** «در ۲۳ ارزیابی استفاده شده» — یا سکوت، وقتی هنوز جایی استفاده نشده.
+ *
+ * «use…» نامش نیست: این یک هوک نیست، فقط یک رشته می‌سازد — و نامِ هوک‌مانند،
+ * هم قواعد هوک را روی آن تحمیل می‌کند و هم خواننده را گمراه. */
+function usageLabel(ind: Indicator): string {
   return ind.usage_count > 0
     ? `این شاخص در ${ind.usage_count.toLocaleString("fa-IR")} ارزیابی ثبت‌شده استفاده شده است؛ آن‌ها دست‌نخورده می‌مانند.`
     : "این شاخص هنوز در هیچ ارزیابی‌ای استفاده نشده است.";
@@ -76,7 +79,7 @@ export function IndicatorsPage() {
         title: `غیرفعال کردن «${ind.category}»؟`,
         description:
           "این شاخص از فرم‌های ارزیابی جدید برداشته می‌شود. " +
-          `${useCountLabel(ind)} و پرونده‌های بازی که قبلاً امتیاز خورده‌اند همچنان همین سؤال را می‌پرسند — ` +
+          `${usageLabel(ind)} و پرونده‌های بازی که قبلاً امتیاز خورده‌اند همچنان همین سؤال را می‌پرسند — ` +
           "پس هیچ ارزیابیِ نیمه‌کاره‌ای قفل نمی‌شود.",
         confirmLabel: "غیرفعال کن",
       });
@@ -96,7 +99,7 @@ export function IndicatorsPage() {
       title: `حذف «${ind.category}»؟`,
       description:
         ind.usage_count > 0
-          ? `${useCountLabel(ind)} به همین دلیل حذف مجاز نیست و درخواست رد می‌شود؛ برای کنار گذاشتنش از فرم‌های جدید، «غیرفعال»‌اش کنید.`
+          ? `${usageLabel(ind)} به همین دلیل حذف مجاز نیست و درخواست رد می‌شود؛ برای کنار گذاشتنش از فرم‌های جدید، «غیرفعال»‌اش کنید.`
           : "این شاخص برای همیشه حذف می‌شود. چون هنوز جایی استفاده نشده، هیچ داده‌ای از دست نمی‌رود.",
       confirmLabel: "حذف کن",
     });
@@ -411,7 +414,7 @@ function EditIndicatorModal({
         {used ? (
           <div className="space-y-3 rounded-xl bg-amber-50/60 p-4 ring-1 ring-amber-100">
             <p className="text-xs leading-relaxed text-amber-900">
-              {useCountLabel(indicator)} پس این ویرایش می‌تواند معنای گذشته را عوض کند.
+              {usageLabel(indicator)} پس این ویرایش می‌تواند معنای گذشته را عوض کند.
               کدام‌یک است؟
             </p>
             <label className="flex cursor-pointer items-start gap-2 text-xs text-amber-900">

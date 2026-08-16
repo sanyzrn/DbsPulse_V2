@@ -1,12 +1,13 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { apiClient, extractConflictEvaluationId, extractErrorMessage } from "../../api/client";
-import { useEvaluations, usePersonnelList } from "../../api/queries";
+import { useDebouncedValue, useEvaluations, usePersonnelList } from "../../api/queries";
 import { EmployeeProfileModal } from "../../components/EmployeeProfileModal";
 import { EvaluationActionButton } from "../../components/EvaluationActionButton";
 import { EvaluationList } from "../../components/EvaluationList";
 import { RoleOverviewCards } from "../../components/RoleOverviewCards";
 import { PageHeader, TableSkeleton } from "../../ui/Card";
+import { SearchInput } from "../../ui/SearchInput";
 import { Table } from "../../ui/Table";
 import type { Personnel } from "../../types";
 
@@ -16,8 +17,14 @@ export function SupervisorHomePage() {
   const [startingId, setStartingId] = useState<number | null>(null);
   const [profilePerson, setProfilePerson] = useState<Personnel | null>(null);
   const navigate = useNavigate();
+  // مسئول واحدی که شصت نفر زیرمجموعه دارد، تا امروز باید در یک جدولِ بی‌فیلتر
+  // اسکرول می‌کرد تا اسم را پیدا کند — در حالی که فهرست ارزیابی‌ها درست پایین‌تر
+  // جست‌وجوی کامل داشت. نقطهٔ *شروع* کار، تنها جایی بود که ابزار نداشت.
+  const [search, setSearch] = useState("");
+  const debouncedSearch = useDebouncedValue(search);
   const { data, error: loadError, isPending } = usePersonnelList({
     accessible_to_me: true,
+    q: debouncedSearch || undefined,
     limit: 1000,
     offset: 0,
   });
@@ -61,7 +68,15 @@ export function SupervisorHomePage() {
       <PageHeader title="افراد زیرمجموعه" subtitle="شروع ارزیابی جدید برای افراد زیرمجموعه شما" />
       <RoleOverviewCards />
       <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-card">
-        <h2 className="mb-4 text-base font-bold text-gray-900">فهرست افراد</h2>
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+          <h2 className="text-base font-bold text-gray-900">فهرست افراد</h2>
+          <SearchInput
+            widthClass="sm:w-64"
+            placeholder="جست‌وجو (نام، کد پرسنلی، عنوان شغلی، واحد)…"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+        </div>
         {loadError != null && (
           <p className="mb-2 text-sm text-red-600">{extractErrorMessage(loadError)}</p>
         )}
@@ -73,7 +88,7 @@ export function SupervisorHomePage() {
           bordered={false}
           headers={["نام", "عنوان شغلی", "واحد", ""]}
           rowKeys={personnel.map((p) => p.id)}
-          emptyMessage="فردی زیرمجموعه شما نیست."
+          emptyMessage={search ? "کسی با این مشخصات پیدا نشد." : "فردی زیرمجموعه شما نیست."}
           rows={personnel.map((p) => [
             <button
               key="name"

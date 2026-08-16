@@ -35,13 +35,13 @@ const NAV_BY_ROLE: Record<string, { to: string; label: string; module?: string }
     { to: "/supervisor", label: "افراد زیرمجموعه" },
     // P2-01: تا پیش از این، ارزیاب هیچ راهی نداشت بفهمد نمره‌دهی‌اش نسبت به
     // بقیه کجاست — و این مفیدترین بازخوردی است که یک نمره‌دهنده می‌گیرد.
-    { to: "/my-scoring", label: "نمره‌دهی من", module: "role_analytics" },
+    { to: "/my-scoring", label: "الگوی نمره‌دهی من", module: "role_analytics" },
     { to: "/improvement-plans", label: "برنامه‌های بهبود" },
   ],
   // معاونت هم نمره می‌دهد (مسیر «مدیر») و هم تصمیم‌گیر است، پس هر دو نما را دارد.
   deputy: [
     { to: "/deputy", label: "پرونده‌های در انتظار" },
-    { to: "/my-scoring", label: "نمره‌دهی من", module: "role_analytics" },
+    { to: "/my-scoring", label: "الگوی نمره‌دهی من", module: "role_analytics" },
     { to: "/executive", label: "تحلیل سازمان", module: "role_analytics" },
     { to: "/improvement-plans", label: "برنامه‌های بهبود" },
   ],

@@ -318,3 +318,73 @@ def test_my_permissions_is_open_to_everyone(client, db_session):
 
     body = client.get("/api/administration/my-permissions", headers=auth_header(employee)).json()
     assert body["capabilities"] == []
+
+
+# ── آیا تفکیک واقعاً برقرار است، یا فقط ممکن شده ────────────────────────────
+
+def test_separation_reports_not_separated_while_hr_still_holds_everything(client, admin):
+    """حالتِ روزِ اول: مایگریشن همه‌چیز را به HR داد تا استقراری نشکند.
+
+    این تست همان چیزی را تثبیت می‌کند که در کار من جا افتاده بود: سازوکاری
+    ساخته شد و خاموش ماند، بی‌آنکه چیزی این را بگوید. سازوکارِ خاموش از همه بدتر
+    است — از بیرون «انجام‌شده» به‌نظر می‌رسد.
+    """
+    body = client.get("/api/administration/separation", headers=auth_header(admin)).json()
+
+    assert body["separated"] is False
+    assert [u["username"] for u in body["overlapping_users"]] == [admin.username]
+    # فقط مجوزهای «قاعده‌ساز» گزارش می‌شوند، نه هر مجوزی
+    assert set(body["overlapping_users"][0]["capabilities"]) == {
+        Capability.manage_users.value,
+        Capability.manage_scoring.value,
+    }
+
+
+def test_separation_becomes_true_once_rule_changing_moves_off_the_chain(
+    client, db_session, admin, support
+):
+    """و وقتی واقعاً تفکیک شد، باید بگوید شد.
+
+    وگرنه بنری می‌ماند که هیچ‌وقت خاموش نمی‌شود و مثل هر هشدارِ همیشه‌روشنی،
+    خوانده نمی‌شود.
+    """
+    client.put(
+        f"/api/administration/capabilities/{support.id}",
+        json={"capabilities": ALL},
+        headers=auth_header(admin),
+    )
+    client.put(
+        f"/api/administration/capabilities/{admin.id}",
+        json={"capabilities": []},
+        headers=auth_header(admin),
+    )
+
+    body = client.get("/api/administration/separation", headers=auth_header(support)).json()
+
+    assert body["separated"] is True
+    assert body["overlapping_users"] == []
+    assert body["dedicated_admin_count"] == 1
+
+
+def test_separation_ignores_inactive_and_non_rule_changing_holders(client, db_session, admin):
+    """دو چیزی که نباید بنر را روشن نگه دارند.
+
+    حساب غیرفعال کاری نمی‌کند، و مجوز `view_diagnostics` قاعده‌ای را عوض
+    نمی‌کند. اگر این‌ها هم بشمارند، بنر عملاً همیشه روشن است و معنایش را از
+    دست می‌دهد.
+    """
+    stale = make_user(db_session, "hr", capabilities=[Capability.manage_users])
+    stale.is_active = False
+    make_user(db_session, "deputy", capabilities=[Capability.view_diagnostics])
+    db_session.commit()
+
+    body = client.get("/api/administration/separation", headers=auth_header(admin)).json()
+
+    assert [u["username"] for u in body["overlapping_users"]] == [admin.username]
+
+
+def test_separation_needs_manage_users(client, support):
+    """پشتیبانیِ بدون مجوزِ کاربران نباید نقشهٔ اختیارات را ببیند."""
+    assert client.get(
+        "/api/administration/separation", headers=auth_header(support)
+    ).status_code == 403

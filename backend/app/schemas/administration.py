@@ -50,3 +50,24 @@ class ModuleState(BaseModel):
 
 class ModuleToggle(BaseModel):
     enabled: bool
+
+
+class OverlappingUser(BaseModel):
+    """حسابی که هم در زنجیرهٔ ارزیابی جایگاه دارد و هم قواعد را عوض می‌کند."""
+
+    username: str
+    role: UserRole
+    capabilities: list[str]
+
+
+class SeparationStatus(BaseModel):
+    """آیا تفکیک وظایف واقعاً برقرار است.
+
+    `separated=False` خطا نیست — حالتِ پیش‌فرضِ سازگار با گذشته است. ولی باید
+    *دیده* شود، وگرنه سازوکاری ساخته‌ایم که هیچ‌وقت روشن نمی‌شود.
+    """
+
+    separated: bool
+    overlapping_users: list[OverlappingUser]
+    #: چند حساب اختصاصیِ مدیریت (نقش پشتیبانی با مجوز) وجود دارد
+    dedicated_admin_count: int

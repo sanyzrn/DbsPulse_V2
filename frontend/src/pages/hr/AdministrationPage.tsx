@@ -40,6 +40,12 @@ const CAPABILITY_INFO: Record<Capability, { label: string; scope: string }> = {
 
 const CAPABILITY_ORDER = Object.keys(CAPABILITY_INFO) as Capability[];
 
+interface SeparationStatus {
+  separated: boolean;
+  overlapping_users: { username: string; role: UserRole; capabilities: Capability[] }[];
+  dedicated_admin_count: number;
+}
+
 export function AdministrationPage() {
   const { can } = usePermissions();
 
@@ -49,6 +55,7 @@ export function AdministrationPage() {
         title="مدیریت سامانه"
         subtitle="چه کسی می‌تواند خودِ سامانه را عوض کند، و کدام بخش‌ها فعال‌اند"
       />
+      {can("manage_users") && <SeparationCard />}
       {can("manage_users") && <CapabilitiesCard />}
       {can("manage_modules") && <ModulesCard />}
       {!can("manage_users") && !can("manage_modules") && (
@@ -59,6 +66,77 @@ export function AdministrationPage() {
           </EmptyState>
         </Card>
       )}
+    </div>
+  );
+}
+
+/** آیا تفکیک وظایف واقعاً برقرار است، یا فقط ممکن شده؟
+ *
+ * این کارت وجود دارد چون سازوکارِ خاموش بدترین حالت است: از بیرون «انجام‌شده»
+ * به‌نظر می‌رسد و خیال راحت می‌دهد، در حالی که هیچ چیز عوض نشده. مایگریشن عمداً
+ * همهٔ مجوزها را به کاربران منابع انسانی داد تا استقراری نشکند — ولی آن حالت،
+ * حالتِ *پیش‌فرض* است نه حالتِ *انتخاب‌شده*، و کسی باید بداند.
+ */
+function SeparationCard() {
+  const { data } = useQuery({
+    queryKey: ["administration", "separation"],
+    queryFn: async () =>
+      (await apiClient.get<SeparationStatus>("/administration/separation")).data,
+  });
+
+  if (!data) return null;
+
+  if (data.separated) {
+    return (
+      <div className="rounded-2xl border border-green-200 bg-green-50/50 p-5">
+        <p className="text-sm font-bold text-green-800">تفکیک وظایف برقرار است</p>
+        <p className="mt-1 text-xs leading-relaxed text-green-900/70">
+          هیچ حسابی هم‌زمان در زنجیرهٔ ارزیابی نیست و قواعد را عوض نمی‌کند. اگر روزی
+          نتیجه‌ای زیر سؤال برود، می‌شود نشان داد کسی که تصمیم گرفته همان کسی نبوده
+          که قاعده را نوشته.
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="rounded-2xl border border-amber-200 bg-amber-50/50 p-5">
+      <p className="text-sm font-bold text-amber-900">تفکیک وظایف هنوز برقرار نیست</p>
+      <p className="mt-1 text-xs leading-relaxed text-amber-900/80">
+        این حساب‌ها هم در زنجیرهٔ ارزیابی جایگاه دارند و هم می‌توانند قواعد را عوض
+        کنند. یعنی همان کسی که پرونده‌ها را تأیید می‌کند، شاخص‌ها و قواعد نمره‌دهی را
+        هم تعیین می‌کند:
+      </p>
+      <ul className="mt-3 flex flex-wrap gap-2">
+        {data.overlapping_users.map((user) => (
+          <li
+            key={user.username}
+            className="rounded-lg bg-white px-2.5 py-1 text-xs text-amber-900 ring-1 ring-amber-200"
+          >
+            {user.username}
+            <span className="text-amber-900/50"> · {ROLE_LABELS[user.role] ?? user.role}</span>
+          </li>
+        ))}
+      </ul>
+      <p className="mt-3 border-t border-amber-200 pt-3 text-xs leading-relaxed text-amber-900/80">
+        {data.dedicated_admin_count > 0 ? (
+          <>
+            حساب اختصاصی مدیریت از قبل ساخته شده است. برای کامل‌کردن تفکیک، در جدول
+            پایین مجوز «کاربران و مجوزها» و «شاخص‌ها و طرح نمره‌دهی» را از حساب‌های
+            بالا بردارید.
+          </>
+        ) : (
+          <>
+            برای تفکیک: یک کاربر با نقش «پشتیبانی فنی» بسازید، مجوزهای اداری را به او
+            بدهید، و سپس از حساب‌های بالا بگیرید. سامانه نمی‌گذارد آخرین حسابِ
+            مجوزدهنده خودش را حذف کند، پس بن‌بست پیش نمی‌آید.
+          </>
+        )}
+      </p>
+      <p className="mt-2 text-[11px] text-amber-900/60">
+        این وضعیت عمدی و سازگار با گذشته است — نه خطا. ولی تا وقتی برقرار نشده،
+        سامانه آن را ادعا نمی‌کند.
+      </p>
     </div>
   );
 }

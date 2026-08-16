@@ -21,6 +21,8 @@ from app.schemas.administration import (
     ModuleState,
     ModuleToggle,
     MyPermissions,
+    OverlappingUser,
+    SeparationStatus,
 )
 from app.schemas.auth import CurrentUser
 from app.services.audit import log_event
@@ -52,6 +54,58 @@ def my_permissions(
     return MyPermissions(
         capabilities=sorted(c.value for c in capabilities_of(db, current_user.id)),
         modules=module_states(db),
+    )
+
+
+#: نقش‌هایی که در زنجیرهٔ ارزیابی جایگاه دارند. حسابی که هم این‌جاست و هم مجوز
+#: اداری دارد، همان چیزی است که تفکیک وظایف برای حذفش وجود دارد.
+_CHAIN_ROLES = (UserRole.hr, UserRole.unit_supervisor, UserRole.deputy, UserRole.ceo)
+
+#: مجوزهایی که «تغییرِ قواعدِ بازی» محسوب می‌شوند. داشتنِ این‌ها به‌همراه نقشی در
+#: زنجیره یعنی همان کسی که تصمیم می‌گیرد، قاعده را هم می‌نویسد.
+_RULE_CHANGING = (Capability.manage_scoring, Capability.manage_users)
+
+
+@router.get("/separation", response_model=SeparationStatus)
+def separation_status(
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(require_capability(Capability.manage_users)),
+) -> SeparationStatus:
+    """آیا تفکیک وظایف واقعاً برقرار است، یا فقط ممکن شده؟
+
+    این endpoint وجود دارد چون سازوکارِ خاموش، بدترین حالت است: از بیرون
+    «انجام‌شده» به‌نظر می‌رسد و خیال راحت می‌دهد، در حالی که هیچ چیز عوض نشده.
+    مایگریشن عمداً همهٔ مجوزها را به HRهای موجود داد تا استقراری نشکند — ولی
+    کسی باید بداند که این حالت، حالتِ *پیش‌فرض* است نه حالتِ *انتخاب‌شده*.
+    """
+    held: dict[int, set[Capability]] = {}
+    for row in db.scalars(select(UserCapability)):
+        held.setdefault(row.user_id, set()).add(row.capability)
+
+    users = db.scalars(select(User).where(User.is_active.is_(True))).all()
+    overlapping = [
+        user
+        for user in users
+        if user.role in _CHAIN_ROLES
+        and any(c in held.get(user.id, set()) for c in _RULE_CHANGING)
+    ]
+    dedicated = [
+        user for user in users if user.role is UserRole.support and held.get(user.id)
+    ]
+
+    return SeparationStatus(
+        separated=not overlapping,
+        overlapping_users=[
+            OverlappingUser(
+                username=user.username,
+                role=user.role,
+                capabilities=sorted(
+                    c.value for c in held.get(user.id, set()) if c in _RULE_CHANGING
+                ),
+            )
+            for user in overlapping
+        ],
+        dedicated_admin_count=len(dedicated),
     )
 
 

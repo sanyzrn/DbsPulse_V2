@@ -7,6 +7,7 @@ import { BrandMark } from "./Brand";
 import { ErrorBoundary } from "./ErrorBoundary";
 import { Footer } from "./Footer";
 import { NotificationBell } from "./NotificationBell";
+import { ThemeToggle } from "../ui/ThemeToggle";
 import { ProfileMenu } from "./ProfileMenu";
 import { EASE_SOFT } from "../ui/motion";
 import { AnimatedGridBackground } from "./AnimatedGridBackground";
@@ -83,7 +84,9 @@ export function Layout() {
   return (
     <div className="flex min-h-screen flex-col">
       <AnimatedGridBackground />
-      <div className="pointer-events-none fixed inset-0 -z-10 bg-[radial-gradient(circle_at_top_left,rgba(191,191,191,1),transparent_20%)]" />
+      {/* درخششِ گوشهٔ صفحه. رنگش از متغیر می‌آید نه از مقدار ثابت: خاکستریِ روشنی
+          که روی زمینهٔ کرمی «نور» بود، روی سرمه‌ای یک لکهٔ کدر می‌شد. */}
+      <div className="pointer-events-none fixed inset-0 -z-10 bg-[radial-gradient(circle_at_top_left,var(--page-glow),transparent_20%)]" />
       {/* پرش به محتوای اصلی: کاربر کیبورد/screen reader مجبور نیست هر بار کل هدر
           (برند، زنگوله، منوی کاربر، ناوبری نقش) را Tab بزند تا به محتوای صفحه برسد */}
       <a
@@ -109,6 +112,7 @@ export function Layout() {
             </NavLink>
 
             <div className="flex items-center gap-2">
+              <ThemeToggle />
               <NotificationBell />
               <ProfileMenu user={user} onLogout={handleLogout} />
             </div>

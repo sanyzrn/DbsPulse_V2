@@ -33,7 +33,7 @@ const RING_STOP_COLOR: Record<Tone, string> = {
   green: "#10b981",
   amber: "#f59e0b",
   red: "#ef4444",
-  gray: "#d1d5db",
+  gray: "var(--plot-rail)",
 };
 
 export function formatPct(value: number | null): string {
@@ -158,7 +158,7 @@ export function ScoreRing({
             cy={size / 2}
             r={radius}
             fill="none"
-            stroke="#f1f3f6"
+            stroke="var(--plot-rail)"
             strokeWidth={stroke}
           />
           {/* مسیر پیشرفت — با انیمیشن */}

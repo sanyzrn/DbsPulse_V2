@@ -28,16 +28,16 @@ import {
 } from "recharts";
 import type { RadarPoint, TrendPoint } from "../types";
 
-const SERIES_COLOR = "#b61615";
-const GRID_STROKE = "#eef0f4";
-const AXIS_STROKE = "#e5e7eb";
-const TICK_STYLE = { fontSize: 11, fill: "#6b7280", fontFamily: "Vazirmatn, Tahoma, sans-serif" };
+const SERIES_COLOR = "var(--chart-series)";
+const GRID_STROKE = "var(--chart-grid)";
+const AXIS_STROKE = "var(--chart-axis)";
+const TICK_STYLE = { fontSize: 11, fill: "var(--chart-tick)", fontFamily: "Vazirmatn, Tahoma, sans-serif" };
 const TOOLTIP_STYLE = {
   direction: "rtl" as const,
   fontFamily: "Vazirmatn, Tahoma, sans-serif",
   fontSize: 12,
   borderRadius: 12,
-  border: "1px solid #eef0f4",
+  border: "1px solid var(--chart-grid)",
   boxShadow: "0 12px 40px rgba(0,0,0,0.12)",
   background: "rgba(255,255,255,0.97)",
 };

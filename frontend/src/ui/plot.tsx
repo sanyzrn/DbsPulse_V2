@@ -15,13 +15,18 @@
  */
 import type { ReactNode } from "react";
 
-export const RAIL = "#f1f2f4";
-export const LEAD_STRONG = "#f49f9f";
-export const LEAD_SOFT = "#facaca";
-export const DOT_STRONG = "#b61615";
-export const DOT_SOFT = "#eb4847";
+/* رنگ‌ها از متغیرهای CSS خوانده می‌شوند، نه از ثابتِ hex.
+ *
+ * این‌ها را SVG و style مستقیم مصرف می‌کنند، پس کلاس Tailwind به آن‌ها نمی‌رسد و
+ * تم شب از کنارشان رد می‌شد: نمودارِ روشن روی صفحهٔ سرمه‌ای. `var()` در همان‌جا
+ * کار می‌کند و با عوض شدن تم، خودش می‌چرخد. */
+export const RAIL = "var(--plot-rail)";
+export const LEAD_STRONG = "var(--plot-lead-strong)";
+export const LEAD_SOFT = "var(--plot-lead-soft)";
+export const DOT_STRONG = "var(--plot-dot-strong)";
+export const DOT_SOFT = "var(--plot-dot-soft)";
 /** رنگ دوم فقط برای مقایسهٔ دو مقدار روی یک ریل (فرد در برابر واحد) */
-export const DOT_COMPARE = "#6b7280";
+export const DOT_COMPARE = "var(--plot-dot-compare)";
 
 export const faInt = (value: number) => value.toLocaleString("fa-IR");
 export const fa1 = (value: number) =>

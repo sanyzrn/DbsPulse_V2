@@ -19,6 +19,28 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <meta name="apple-mobile-web-app-title" content="DbsPulse" />
     <title>DbsPulse — سامانه ارزیابی عملکرد</title>
+    <!-- تم پیش از اولین رنگ‌آمیزی تعیین می‌شود.
+         اگر منتظر بارگذاری React بمانیم، کاربرِ تم شب یک لحظه صفحهٔ سفید
+         می‌بیند و بعد سرمه‌ای — همان «پرش» که آدم را از یک تم تیره بیزار می‌کند.
+         عمداً inline و همگام است؛ همین یک کار را می‌کند و منطقش در
+         `src/ui/theme.ts` تکرار شده که مرجع است. -->
+    <script>
+      (function () {
+        try {
+          var stored = localStorage.getItem("dbspulse:theme");
+          var dark =
+            stored === "dark" ||
+            (stored !== "light" &&
+              window.matchMedia &&
+              window.matchMedia("(prefers-color-scheme: dark)").matches);
+          document.documentElement.setAttribute("data-theme", dark ? "dark" : "light");
+          var meta = document.querySelector('meta[name="theme-color"]');
+          if (meta) meta.setAttribute("content", dark ? "#0b0e17" : "#b61615");
+        } catch (e) {
+          document.documentElement.setAttribute("data-theme", "light");
+        }
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

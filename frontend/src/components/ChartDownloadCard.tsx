@@ -43,7 +43,9 @@ export function ChartDownloadCard({
     if (heading) heading.style.paddingInlineEnd = "0px";
     try {
       const dataUrl = await toPng(node, {
-        backgroundColor: "#ffffff",
+        backgroundColor: getComputedStyle(document.documentElement)
+          .getPropertyValue("--chart-surface")
+          .trim() || "#ffffff",
         pixelRatio: 2,
         // html-to-image دقیقاً به اندازهٔ جعبهٔ عنصر می‌بُرد. بدون این دو، سایهٔ
         // نقطه‌ها و لبهٔ ریل درست روی مرز تصویر می‌افتند.

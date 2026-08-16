@@ -15,6 +15,7 @@ import { AnimatedGridBackground } from "../components/AnimatedGridBackground";
 import { BrandMark } from "../components/Brand";
 import { Footer } from "../components/Footer";
 import { Button } from "../ui/Button";
+import { PublicInfoLinks } from "../components/PublicInfoDialogs";
 
 interface PupilsProps {
   size?: number;
@@ -641,7 +642,8 @@ export function LoginPage() {
           </motion.section>
         </div>
 
-        <div className="mt-4">
+        <div className="mt-4 space-y-3">
+          <PublicInfoLinks />
           <Footer />
         </div>
       </div>

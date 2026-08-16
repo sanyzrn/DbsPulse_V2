@@ -1,4 +1,4 @@
-import { APP_NAME, APP_VERSION, DEVELOPER_NAME } from "../appInfo";
+import { APP_NAME, APP_VERSION, DEVELOPER_NAME, DEVELOPER_URL } from "../appInfo";
 import { BrandMark, DevMark } from "./Brand";
 
 /** فوتر سراسری: نام و نسخه برنامه + توسعه‌دهنده؛ کارت شناور مشابه هدر، در همه صفحات. */
@@ -12,10 +12,16 @@ export function Footer() {
           v{APP_VERSION}
         </span>
       </div>
-      <div dir="ltr" className="flex items-center gap-1.5">
+      <a
+        dir="ltr"
+        href={DEVELOPER_URL}
+        target="_blank"
+        rel="noreferrer noopener"
+        className="flex items-center gap-1.5 rounded-lg transition-colors hover:text-gray-700"
+      >
         <span>Developed by {DEVELOPER_NAME}</span>
         <DevMark className="h-4 w-4" />
-      </div>
+      </a>
     </footer>
   );
 }

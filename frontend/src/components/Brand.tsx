@@ -1,7 +1,11 @@
 import { useState } from "react";
 import { motion } from "motion/react";
 
-const DEV_LOGO_URL = "./logo/Dbs_logo_single.png";
+// مسیر مطلق، نه نسبی. با `./logo/…` این نشانی از صفحه‌ای مثل `/hr/dashboard`
+// به `/hr/logo/…` حل می‌شد و ۴۰۴ می‌گرفت — یعنی لوگوی واقعی هیچ‌وقت دیده نشده
+// بود و همیشه نشانِ جایگزین رندر می‌شد.
+const DEV_LOGO_URL = "/logo/Dbs_logo_single.png";
+const DEV_LOGO_URL_DARK = "/logo/Dbs_logo_single_w.png";
 
 /** نشان‌های موقت برنامه و توسعه‌دهنده — قرمز برند، تک‌رنگ.
  * نشان اصلی شامل موج پالس متحرک است که هویت «DbsPulse» را منتقل می‌کند. */
@@ -42,20 +46,33 @@ export function BrandMark({ className = "h-9 w-9" }: { className?: string }) {
 }
 
 export function DevMark({ className = "h-4 w-4" }: { className?: string }) {
-  // لوگوی رسمی توسعه‌دهنده از دامنهٔ dbsgraphic بارگذاری می‌شود؛ اگر در دسترس نبود،
-  // به نشان تک‌رنگ محلی به‌عنوان جایگزین برمی‌گردیم تا هیچ‌وقت تصویر شکسته دیده نشود.
+  // دو فایل، چون لوگو تک‌رنگ نیست: نسخهٔ اصلی نیمهٔ مشکی دارد که روی تم شب
+  // ناپدید می‌شود، و نسخهٔ `_w` همان شکل است با رنگ روشن.
+  //
+  // انتخاب با CSS انجام می‌شود نه با state: تم پیش از رندرِ React روی `<html>`
+  // نشسته، پس با CSS هیچ لحظه‌ای لوگوی اشتباه دیده نمی‌شود.
   const [failed, setFailed] = useState(false);
   if (!failed) {
     return (
-      <img
-        src={DEV_LOGO_URL}
-        alt="dbs"
-        className={`${className} object-contain`}
-        loading="lazy"
-        decoding="async"
-        referrerPolicy="no-referrer"
-        onError={() => setFailed(true)}
-      />
+      <span className={`${className} inline-block`}>
+        <img
+          src={DEV_LOGO_URL}
+          alt="DbsStudio"
+          className="h-full w-full object-contain dark-hidden"
+          loading="lazy"
+          decoding="async"
+          onError={() => setFailed(true)}
+        />
+        <img
+          src={DEV_LOGO_URL_DARK}
+          alt=""
+          aria-hidden
+          className="h-full w-full object-contain light-hidden"
+          loading="lazy"
+          decoding="async"
+          onError={() => setFailed(true)}
+        />
+      </span>
     );
   }
   return (

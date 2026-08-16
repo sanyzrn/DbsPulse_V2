@@ -156,6 +156,13 @@ class EvaluationDetail(EvaluationRead):
     # خودارزیابی کنار امتیاز ارزیاب دیده می‌شود تا فاصله‌ها موضوع گفت‌وگو شوند.
     # عمداً در محاسبه نقشی ندارد — جدولش هم جداست (models/self_assessment.py).
     self_assessment: "SelfAssessmentRead | None" = None
+    # شاخص‌های *این* پرونده و نسخهٔ چارچوبی که زیر آن باز شده (P1-05).
+    #
+    # بدون این، فرم از روی «شاخص‌های فعالِ امروز» ساخته می‌شد و همان خرابیِ
+    # سمت سرور را در مرورگر تکرار می‌کرد: ارزیاب سؤالی را می‌دید که پرونده‌اش
+    # نمی‌خواست، یا سؤالی را نمی‌دید که برای ثبت لازم بود.
+    indicator_ids: list[int] = []
+    indicator_framework_version: int | None = None
 
 
 class EvaluationPage(BaseModel):
@@ -212,6 +219,10 @@ class MyOpenEvaluation(BaseModel):
     status: EvaluationStatus
     created_at: datetime
     stage_entered_at: datetime
+    #: شاخص‌های همین پرونده (P1-05) — فرم خودارزیابی باید از روی این ساخته شود،
+    #: نه از «شاخص‌های فعالِ امروز». وگرنه کارمند به مجموعه‌ای پاسخ می‌دهد که
+    #: ارزیاب به آن نمره نمی‌دهد، و مقایسهٔ دو دیدگاه بی‌معنا می‌شود.
+    indicator_ids: list[int] = []
 
     @computed_field  # type: ignore[prop-decorator]
     @property

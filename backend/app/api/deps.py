@@ -4,9 +4,10 @@ from sqlalchemy.orm import Session
 
 from app.core.security import decode_token
 from app.db.session import get_db
-from app.models.enums import UserRole
+from app.models.enums import Capability, UserRole
 from app.models.user import User
 from app.schemas.auth import CurrentUser
+from app.services.authorization import capabilities_of, is_module_enabled
 
 bearer_scheme = HTTPBearer(auto_error=False)
 
@@ -79,3 +80,73 @@ def require_roles(*allowed_roles: UserRole):
         return current_user
 
     return dependency
+
+
+def require_capability(*required: Capability):
+    """گاردِ مجوز اداری، مستقل از نقش (نیمهٔ دوم P0-03).
+
+    عمداً نقش را نگاه نمی‌کند: `hr` هم اگر مجوز نداشته باشد رد می‌شود. تنها راهِ
+    داشتنِ اختیار، داشتنِ خودِ مجوز است — همان چیزی که «مدیر سامانه» را از
+    «کاربر پرمشغله» جدا می‌کند.
+
+    مایگریشن این قابلیت، همهٔ مجوزها را به کاربران HR موجود داده تا هیچ استقراری
+    نشکند؛ سازمانی که می‌خواهد تفکیک کند، از HR می‌گیرد و به حساب پشتیبانی می‌دهد.
+    """
+
+    def dependency(
+        current_user: CurrentUser = Depends(get_current_user),
+        db: Session = Depends(get_db),
+    ) -> CurrentUser:
+        held = capabilities_of(db, current_user.id)
+        missing = [c for c in required if c not in held]
+        if missing:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="برای این کار مجوز لازم را ندارید؛ از مدیر سامانه بخواهید آن را به شما بدهد",
+            )
+        return current_user
+
+    return dependency
+
+
+def require_module(key: str):
+    """گاردِ ماژول خاموش‌شده.
+
+    روی نوشتن‌ها می‌نشیند نه خواندن‌ها: خاموش‌کردن یک ماژول نباید دادهٔ موجود را
+    از دسترس خارج کند — فقط جلوی *افزودن* تازه را می‌گیرد. سوییچی که داده را
+    ناپیدا کند، سوییچ نیست.
+    """
+
+    def dependency(db: Session = Depends(get_db)) -> None:
+        if not is_module_enabled(db, key):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="این بخش توسط مدیر سامانه غیرفعال شده است",
+            )
+
+    return dependency
+
+
+def hr_or_diagnostics(
+    current_user: CurrentUser = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> CurrentUser:
+    """دو راهِ مشروعِ رسیدن به لاگ ممیزی.
+
+    منابع انسانی به‌عنوان کارِ خودش («چه کسی این پرونده را برگرداند و چرا»)، و
+    پشتیبانی فنی برای عیب‌یابی («چرا فلانی نمی‌تواند وارد شود»). این گارد فقط
+    می‌گوید *حق ورود داری*؛ این‌که *چه چیزی می‌بینی* را خودِ endpoint تعیین
+    می‌کند — پشتیبانی تنها رویدادهای سامانه‌ای را.
+
+    صریح نوشته شده و نه با یک `require_any` عمومی: نسخهٔ عمومی باید امضای هر
+    گارد را با گرفتنِ TypeError حدس می‌زد، که تا روزی کار می‌کند که یکی از
+    گاردها به دلیل دیگری TypeError بدهد و بی‌صدا از گارد رد شود.
+    """
+    if current_user.role is UserRole.hr:
+        return current_user
+    if Capability.view_diagnostics in capabilities_of(db, current_user.id):
+        return current_user
+    raise HTTPException(
+        status_code=status.HTTP_403_FORBIDDEN,
+        detail="شما اجازه دسترسی به این بخش را ندارید",
+    )

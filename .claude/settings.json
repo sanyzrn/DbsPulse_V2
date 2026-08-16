@@ -1,0 +1,83 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "permissions": {
+    "allow": [
+      "Read",
+      "Glob",
+      "Grep",
+
+      "Bash(cd *)",
+      "Bash(ls *)",
+      "Bash(cat *)",
+      "Bash(head *)",
+      "Bash(tail *)",
+      "Bash(wc *)",
+      "Bash(grep *)",
+      "Bash(find *)",
+      "Bash(echo *)",
+      "Bash(which *)",
+      "Bash(export *)",
+      "Bash(mkdir *)",
+      "Bash(cp *)",
+      "Bash(mv *)",
+      "Bash(sed *)",
+      "Bash(diff *)",
+      "Bash(sort *)",
+      "Bash(uniq *)",
+
+      "Bash(python *)",
+      "Bash(python3 *)",
+      "Bash(pytest *)",
+      "Bash(ruff *)",
+      "Bash(alembic *)",
+      "Bash(PYTHONUTF8=1 *)",
+      "Bash(PYTHONIOENCODING=utf-8 *)",
+
+      "Bash(node *)",
+      "Bash(npx *)",
+      "Bash(npm run *)",
+      "Bash(npm install *)",
+      "Bash(npm ci *)",
+
+      "Bash(git status*)",
+      "Bash(git log*)",
+      "Bash(git diff*)",
+      "Bash(git show*)",
+      "Bash(git ls-files*)",
+      "Bash(git rev-parse*)",
+      "Bash(git check-ignore*)",
+      "Bash(git branch*)",
+      "Bash(git add *)",
+      "Bash(git commit *)",
+      "Bash(git restore *)",
+      "Bash(git stash*)",
+      "Bash(git rm *)",
+      "Bash(git mv *)",
+
+      "PowerShell(Get-*)",
+      "PowerShell(Test-Path *)",
+      "PowerShell(Select-*)",
+      "PowerShell(Measure-*)"
+    ],
+    "ask": [
+      "Bash(git checkout *)",
+      "Bash(git reset *)",
+      "Bash(git revert *)",
+      "Bash(git rebase *)",
+      "Bash(git clean *)",
+      "Bash(rm *)",
+      "Bash(dropdb *)",
+      "Bash(psql *)",
+      "PowerShell(Stop-Process *)",
+      "PowerShell(Remove-Item *)"
+    ],
+    "deny": [
+      "Bash(git push*)",
+      "Bash(gh pr create*)",
+      "Bash(gh repo*)",
+      "Bash(rm -rf /*)",
+      "Bash(rm -rf ~*)",
+      "Bash(git reset --hard*)"
+    ]
+  }
+}

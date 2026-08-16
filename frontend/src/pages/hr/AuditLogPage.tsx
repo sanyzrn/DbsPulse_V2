@@ -17,8 +17,10 @@ import { formatDateTime } from "../../utils/dates";
 import { AUDIT_EVENT_LABELS, ROLE_LABELS } from "../../types";
 import { AuditDetails } from "../../components/AuditDetails";
 import { PersonPicker } from "../../components/PersonPicker";
+import { useAuth } from "../../auth/AuthContext";
 
-const PAGE_SIZE = 20;
+/** پیش‌فرض تعداد در هر صفحه؛ کاربر می‌تواند از نوار پایین عوضش کند. */
+const DEFAULT_PAGE_SIZE = 20;
 
 const EVENT_TYPES = Object.keys(AUDIT_EVENT_LABELS);
 
@@ -56,9 +58,11 @@ function todayIso(): string {
  * پرسنل مشخص و واحد سازمانی — تا HR بتواند سابقهٔ یک واحد، یک نفر یا یک کاربر خاص
  * را دقیق و جدا مرور کند، نه فقط اسکرول کل رویدادها. */
 export function AuditLogPage() {
+  const { user } = useAuth();
   const [filters, setFilters] = useState<Filters>(EMPTY_FILTERS);
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [page, setPage] = useState(0);
+  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
 
   const { data: orgUnits = [] } = useOrgUnits(true);
   const { data: usersPage } = useUsersList({ limit: 200 });
@@ -77,13 +81,13 @@ export function AuditLogPage() {
 
   const { data, error: queryError, isPending } = useAuditLog({
     ...requestParams,
-    limit: PAGE_SIZE,
-    offset: page * PAGE_SIZE,
+    limit: pageSize,
+    offset: page * pageSize,
   });
   const error = queryError != null ? extractErrorMessage(queryError) : null;
 
   const total = data?.total ?? 0;
-  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  const totalPages = Math.max(1, Math.ceil(total / pageSize));
   const items = data?.items ?? [];
 
   const activeFilterCount = Object.values(filters).filter((v) => v !== "").length;
@@ -97,13 +101,20 @@ export function AuditLogPage() {
     setPage(0);
   }
 
+  // پشتیبانی فنی همین صفحه را می‌بیند ولی *دامنهٔ دیدش* را سرور محدود می‌کند:
+  // فقط رویدادهای سامانه‌ای، بدون هیچ ردی از محتوای پرونده. تأیید یکپارچگی و
+  // خروجی اکسل کل زنجیره را لمس می‌کنند، پس همچنان مالِ منابع انسانی‌اند.
+  const isHr = user?.role === "hr";
+
   return (
     <Card
       title="گزارش رویدادها (Audit Log)"
       actions={
         <div className="flex flex-wrap items-center gap-2">
-          <AuditIntegrityBadge />
-          <ExcelExportButton url="/audit-log/export.xlsx" filename="audit-log.xlsx" params={requestParams} />
+          {isHr && <AuditIntegrityBadge />}
+          {isHr && (
+            <ExcelExportButton url="/audit-log/export.xlsx" filename="audit-log.xlsx" params={requestParams} />
+          )}
           <button
             type="button"
             onClick={() => setFiltersOpen((v) => !v)}
@@ -126,6 +137,13 @@ export function AuditLogPage() {
         </div>
       }
     >
+      {!isHr && (
+        <p className="mb-4 rounded-xl bg-gray-50 px-4 py-3 text-xs leading-relaxed text-gray-600">
+          شما رویدادهای <b>سامانه‌ای</b> را می‌بینید: ورود و خروج، قفل حساب، تغییر
+          مجوزها، روشن و خاموش کردن بخش‌ها، و اجرای کارهای زمان‌بندی‌شده. رویدادهای
+          مربوط به پرونده‌های ارزیابی — از جمله امتیازها — در این نما نیستند.
+        </p>
+      )}
       <AnimatePresence initial={false}>
         {filtersOpen && (
           <motion.div
@@ -318,7 +336,11 @@ export function AuditLogPage() {
             page={page}
             totalPages={totalPages}
             totalCount={total}
-            pageSize={PAGE_SIZE}
+            pageSize={pageSize}
+            onPageSizeChange={(size) => {
+              setPageSize(size);
+              setPage(0);
+            }}
             onPageChange={setPage}
           />
         </>

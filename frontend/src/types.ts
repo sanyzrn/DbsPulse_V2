@@ -1,4 +1,12 @@
-export type UserRole = "unit_supervisor" | "hr" | "deputy" | "ceo" | "employee";
+// `support` عمداً هیچ جایگاهی در زنجیرهٔ ارزیابی ندارد؛ اختیاراتش فقط از
+// مجوزهای اداری می‌آید (نیمهٔ دوم P0-03).
+export type UserRole =
+  | "unit_supervisor"
+  | "hr"
+  | "deputy"
+  | "ceo"
+  | "employee"
+  | "support";
 
 export const ROLE_LABELS: Record<UserRole, string> = {
   unit_supervisor: "مسئول واحد",
@@ -6,6 +14,7 @@ export const ROLE_LABELS: Record<UserRole, string> = {
   deputy: "معاونت",
   ceo: "مدیرعامل",
   employee: "کارمند",
+  support: "پشتیبانی فنی",
 };
 
 export interface CurrentUser {
@@ -62,6 +71,19 @@ export interface Indicator {
   is_active: boolean;
   created_at: string;
   updated_at: string;
+  // به این شاخص در چند ارزیابی نمره داده شده (P1-05). تفاوت «۰» و «۲۳۰» تفاوت
+  // یک ویرایش بی‌ضرر و بازنویسی معنای دو سال تاریخ است.
+  usage_count: number;
+}
+
+/** نسخهٔ چارچوب شاخص‌ها و اثرِ تغییر بعدی (P1-05). */
+export interface FrameworkImpact {
+  version: number;
+  member_count: number;
+  /** پرونده‌های بازی که امتیاز خورده‌اند — با نسخهٔ فعلی خودشان بسته می‌شوند */
+  frozen_open_records: number;
+  /** پرونده‌های بازِ دست‌نخورده — به نسخهٔ تازه منتقل می‌شوند */
+  movable_open_records: number;
 }
 
 export type EvaluationStage =
@@ -134,6 +156,8 @@ export interface MyOpenEvaluation {
   created_at: string;
   stage_entered_at: string;
   stage_label: string;
+  /** شاخص‌های همین پرونده (P1-05) — فرم خودارزیابی از روی این ساخته می‌شود. */
+  indicator_ids: number[];
 }
 
 export interface SelfAssessmentScoreRow {
@@ -172,7 +196,27 @@ export interface EvaluationDetail extends EvaluationRecord {
   comments: EvaluationCommentRow[];
   // دیدگاه خودِ فرد، کنار امتیاز ارزیاب. null یعنی چیزی ثبت نکرده (کاملاً مجاز).
   self_assessment: SelfAssessment | null;
+  // شاخص‌های *این* پرونده، نه شاخص‌های فعالِ امروز (P1-05).
+  //
+  // فرم باید از روی این ساخته شود. فیلترکردن با `is_active` — کاری که پیش از
+  // این می‌کردیم — همان خرابیِ سمت سرور را در مرورگر تکرار می‌کند: ارزیاب
+  // سؤالی می‌بیند که پرونده‌اش نمی‌خواهد، یا سؤالی نمی‌بیند که برای ثبت لازم است.
+  indicator_ids: number[];
+  indicator_framework_version: number | null;
 }
+
+/** وضعیت → مرحله. آینهٔ `_STAGE_BY_STATUS` در `schemas/evaluation.py`.
+ *
+ * `cancelled` عمداً این‌جا نیست: پروندهٔ لغوشده در هیچ مرحله‌ای «نیست» و
+ * نسبت‌دادن یک مرحله به آن گمراه‌کننده است.
+ */
+export const STAGE_BY_STATUS: Partial<Record<EvaluationStatus, EvaluationStage>> = {
+  draft: "supervisor_scoring",
+  submitted: "hr_review",
+  hr_approved: "deputy_review",
+  deputy_approved: "ceo_final",
+  finalized: "ceo_final",
+};
 
 export const STAGE_LABELS: Record<EvaluationStage, string> = {
   supervisor_scoring: "امتیازدهی مسئول واحد",

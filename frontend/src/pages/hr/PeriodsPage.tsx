@@ -70,6 +70,7 @@ export function PeriodsPage() {
 
     const ok = await confirm({
       title: `بستن دوره «${period.name}»؟`,
+      danger: true,
       description: [
         "پس از بستن، ارزیابی‌های جدید دیگر به این دوره برچسب نمی‌خورند.",
         ...warnings,

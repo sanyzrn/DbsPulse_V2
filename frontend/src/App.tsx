@@ -1,7 +1,7 @@
 import { lazy, Suspense } from "react";
 import { Navigate, Route, Routes, useParams } from "react-router-dom";
-import { FEATURE_PERIODS_ENABLED } from "./appInfo";
 import { useAuth } from "./auth/AuthContext";
+import { usePermissions } from "./auth/PermissionsContext";
 import { ProtectedRoute } from "./auth/ProtectedRoute";
 import { Layout } from "./components/Layout";
 import { LoginPage } from "./pages/LoginPage";
@@ -12,6 +12,11 @@ import { LoginPage } from "./pages/LoginPage";
 const VerifyPage = lazy(() => import("./pages/VerifyPage").then((m) => ({ default: m.VerifyPage })));
 const ChangePasswordPage = lazy(() =>
   import("./pages/ChangePasswordPage").then((m) => ({ default: m.ChangePasswordPage }))
+);
+const NotificationPreferencesPage = lazy(() =>
+  import("./pages/NotificationPreferencesPage").then((m) => ({
+    default: m.NotificationPreferencesPage,
+  }))
 );
 const SessionsPage = lazy(() =>
   import("./pages/SessionsPage").then((m) => ({ default: m.SessionsPage }))
@@ -29,6 +34,12 @@ const IndicatorsPage = lazy(() =>
 const QueuePage = lazy(() => import("./pages/hr/QueuePage").then((m) => ({ default: m.QueuePage })));
 const PeriodsPage = lazy(() =>
   import("./pages/hr/PeriodsPage").then((m) => ({ default: m.PeriodsPage }))
+);
+const ScoringSchemesPage = lazy(() =>
+  import("./pages/hr/ScoringSchemesPage").then((m) => ({ default: m.ScoringSchemesPage }))
+);
+const AdministrationPage = lazy(() =>
+  import("./pages/hr/AdministrationPage").then((m) => ({ default: m.AdministrationPage }))
 );
 const DashboardPage = lazy(() =>
   import("./pages/hr/DashboardPage").then((m) => ({ default: m.DashboardPage }))
@@ -95,6 +106,25 @@ export function LegacyImprovementPlanRedirect() {
   return <Navigate to={`/improvement-plans/${id}`} replace />;
 }
 
+/** مسیری که پشت یک ماژول قابل خاموش‌شدن است.
+ *
+ * جای `FEATURE_PERIODS_ENABLED` را می‌گیرد: آن یک ثابت در کد بود و روشن‌کردنش
+ * تغییر کد و استقرار می‌خواست. حالا از دیتابیس می‌آید (نیمهٔ دوم P0-03).
+ */
+function ModuleRoute({
+  module,
+  title,
+  children,
+}: {
+  module: string;
+  title: string;
+  children: React.ReactNode;
+}) {
+  const { moduleEnabled, loading } = usePermissions();
+  if (loading) return <PageFallback />;
+  return moduleEnabled(module) ? <>{children}</> : <DisabledFeature title={title} />;
+}
+
 function HomeRedirect() {
   const { user } = useAuth();
   if (!user) return <Navigate to="/login" replace />;
@@ -104,6 +134,8 @@ function HomeRedirect() {
     deputy: "/deputy",
     ceo: "/ceo",
     employee: "/me",
+    // پشتیبانی فنی هیچ صف کاری‌ای ندارد؛ صفحهٔ فرودش همان جایی است که کار می‌کند
+    support: "/administration",
   };
   return <Navigate to={targetByRole[user.role] ?? "/login"} replace />;
 }
@@ -123,6 +155,7 @@ function App() {
             <Route path="/" element={<HomeRedirect />} />
             <Route path="/change-password" element={<ChangePasswordPage />} />
             <Route path="/sessions" element={<SessionsPage />} />
+            <Route path="/notification-preferences" element={<NotificationPreferencesPage />} />
             <Route path="/evaluations/:id" element={<EvaluationDetailPage />} />
             {/* برنامه‌های بهبود پشت گاردِ hr نیستند چون «مسئول پیگیری» هم باید
                 بتواند برنامهٔ سپرده‌شده به خودش را باز کند — زمان‌بند دقیقاً همین
@@ -144,15 +177,19 @@ function App() {
               <Route path="/hr/users" element={<UsersPage />} />
               <Route path="/hr/indicators" element={<IndicatorsPage />} />
               <Route path="/hr/queue" element={<QueuePage />} />
-              <Route
-                path="/hr/periods"
-                element={
-                  FEATURE_PERIODS_ENABLED ? <PeriodsPage /> : <DisabledFeature title="دوره‌های ارزیابی" />
-                }
-              />
+              <Route path="/hr/periods" element={<ModuleRoute module="periods" title="دوره‌های ارزیابی"><PeriodsPage /></ModuleRoute>} />
+              <Route path="/hr/scoring-schemes" element={<ScoringSchemesPage />} />
               <Route path="/hr/dashboard" element={<DashboardPage />} />
-              <Route path="/hr/audit-log" element={<AuditLogPage />} />
             </Route>
+
+            {/* مدیریت سامانه پشت گاردِ hr نیست: حساب «پشتیبانی فنی» نقش hr
+                ندارد و باید به این‌جا برسد. محدودیت واقعی مجوز است، که هم
+                سمت سرور اعمال می‌شود و هم داخل خودِ صفحه. */}
+            <Route path="/administration" element={<AdministrationPage />} />
+            {/* لاگ ممیزی هم منابع انسانی لازمش دارد (کارِ خودش) و هم پشتیبانی
+                فنی (عیب‌یابی). دامنهٔ دید را سرور تعیین می‌کند: پشتیبانی فقط
+                رویدادهای سامانه‌ای را می‌بیند، بدون هیچ ردی از محتوای پرونده. */}
+            <Route path="/hr/audit-log" element={<AuditLogPage />} />
 
             <Route element={<ProtectedRoute allowedRoles={["unit_supervisor"]} />}>
               <Route path="/supervisor" element={<SupervisorHomePage />} />

@@ -1,4 +1,4 @@
-import { useEffect, useRef, type ReactNode } from "react";
+import { useEffect, useRef, type ReactNode, type RefObject } from "react";
 import { createPortal } from "react-dom";
 import { AnimatePresence, motion } from "motion/react";
 import { EASE_SOFT, SPRING_SOFT } from "./motion";
@@ -28,12 +28,19 @@ export function Modal({
   size = "md",
   children,
   footer,
+  initialFocusRef,
 }: {
   title: ReactNode;
   onClose: () => void;
   size?: ModalSize;
   children: ReactNode;
   footer?: ReactNode;
+  /** عنصری که باید هنگام باز شدن فوکوس بگیرد؛ پیش‌فرض، اولین عنصر فوکوس‌پذیر.
+   *
+   * بدون این، هر کسی که می‌خواست فوکوس اولیه را جای دیگری ببرد مجبور بود در
+   * effect خودش دوباره focus() صدا بزند — و دو جا که سرِ فوکوس دعوا کنند،
+   * برنده‌اش به ترتیب اجرای effectها بستگی دارد، نه به تصمیم کسی. */
+  initialFocusRef?: RefObject<HTMLElement | null>;
 }) {
   const dialogRef = useRef<HTMLDivElement>(null);
   // onClose در ref نگه داشته می‌شود تا این effect فقط یک‌بار (هنگام mount) اجرا شود.
@@ -49,7 +56,7 @@ export function Modal({
 
     const dialog = dialogRef.current;
     const firstFocusable = dialog?.querySelector<HTMLElement>(FOCUSABLE_SELECTOR);
-    (firstFocusable ?? dialog)?.focus();
+    (initialFocusRef?.current ?? firstFocusable ?? dialog)?.focus();
 
     function onKeyDown(e: KeyboardEvent) {
       if (e.key === "Escape") {

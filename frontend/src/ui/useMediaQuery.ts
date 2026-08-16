@@ -31,3 +31,13 @@ export function useMediaQuery(query: string): boolean {
 
 /** هم‌مرز با نقطهٔ شکست `md` در Tailwind — تا CSS و JS یک جا را مرز بدانند. */
 export const NARROW_QUERY = "(max-width: 767px)";
+
+/** کاربر خواسته حرکت کمتری ببیند.
+ *
+ * `index.css` این تنظیم را برای انیمیشن‌های CSS اعمال می‌کند، ولی آن قاعده به
+ * انیمیشنی که در جاوااسکریپت با `requestAnimationFrame` نوشته شده کاری ندارد —
+ * پس شمارندهٔ بالارونده تا امروز این تنظیم را نادیده می‌گرفت. کسی که به‌خاطر
+ * سرگیجه یا حساسیت این گزینه را روشن کرده، بدترین حالت را می‌دید: بقیهٔ صفحه
+ * آرام و فقط عددها در حال دویدن.
+ */
+export const REDUCED_MOTION_QUERY = "(prefers-reduced-motion: reduce)";

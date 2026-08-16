@@ -4,6 +4,8 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.security import create_access_token, hash_password
+from app.models.capability import UserCapability
+from app.models.enums import Capability
 from app.models.evaluation_access import EvaluationAccess
 from app.models.indicator import Indicator
 from app.models.personnel import Personnel
@@ -18,8 +20,20 @@ def _unique(prefix: str) -> str:
 
 
 def make_user(
-    db: Session, role: str, username: str | None = None, personnel_id: int | None = None
+    db: Session,
+    role: str,
+    username: str | None = None,
+    personnel_id: int | None = None,
+    capabilities: "list | None" = None,
 ) -> User:
+    """کاربر آزمایشی.
+
+    کاربر `hr` به‌طور پیش‌فرض همهٔ مجوزهای اداری را می‌گیرد — دقیقاً همان کاری که
+    مایگریشن با حساب‌های موجود می‌کند. بدون این، هر تستی که HR داشت با گاردهای
+    تازهٔ P0-03 می‌شکست و تفکیک وظایف شبیه یک رگرسیون به‌نظر می‌رسید.
+
+    برای آزمودنِ خودِ تفکیک، `capabilities=[]` بدهید تا حساب بدون مجوز بماند.
+    """
     user = User(
         username=username or _unique(f"{role}_"),
         password_hash=hash_password("Test1234!"),
@@ -28,6 +42,11 @@ def make_user(
         is_active=True,
     )
     db.add(user)
+    db.flush()
+
+    granted = list(Capability) if (capabilities is None and role == "hr") else (capabilities or [])
+    for capability in granted:
+        db.add(UserCapability(user_id=user.id, capability=capability))
     db.flush()
     return user
 

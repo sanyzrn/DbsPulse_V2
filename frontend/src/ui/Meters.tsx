@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { motion } from "motion/react";
+import { REDUCED_MOTION_QUERY, useMediaQuery } from "./useMediaQuery";
 
 /** نمایش مدرن درصدها و امتیازها: نشان درصدی، نوار پیشرفت و حلقه امتیاز.
  * رنگ‌بندی معنایی (وضعیت): سبز = مطلوب، کهربایی = میانه، قرمز = نیازمند توجه.
@@ -32,7 +33,7 @@ const RING_STOP_COLOR: Record<Tone, string> = {
   green: "#10b981",
   amber: "#f59e0b",
   red: "#ef4444",
-  gray: "#d1d5db",
+  gray: "var(--plot-rail)",
 };
 
 export function formatPct(value: number | null): string {
@@ -52,6 +53,9 @@ export function CountUp({
   prefix?: string;
 }) {
   const [display, setDisplay] = useState(0);
+  // قاعدهٔ `prefers-reduced-motion` در CSS فقط انیمیشن‌های CSS را می‌گیرد؛ این
+  // شمارنده با requestAnimationFrame نوشته شده و از آن قاعده رد می‌شد.
+  const reducedMotion = useMediaQuery(REDUCED_MOTION_QUERY);
 
   // انیمیشن با تغییر مقدار/mount اجرا می‌شود، نه با ورود به دید (whileInView/useInView).
   // اتکا به رویداد تقاطع دید باعث می‌شد وقتی مقدار پس از mount و بدون اسکرول تازه
@@ -59,6 +63,10 @@ export function CountUp({
   useEffect(() => {
     if (value === null) return;
     const target = value;
+    if (reducedMotion) {
+      setDisplay(target);
+      return;
+    }
     const start = performance.now();
     let raf = 0;
     function tick(now: number) {
@@ -70,7 +78,7 @@ export function CountUp({
     }
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
-  }, [value, duration]);
+  }, [value, duration, reducedMotion]);
 
   if (value === null) {
     return <span>—</span>;
@@ -150,7 +158,7 @@ export function ScoreRing({
             cy={size / 2}
             r={radius}
             fill="none"
-            stroke="#f1f3f6"
+            stroke="var(--plot-rail)"
             strokeWidth={stroke}
           />
           {/* مسیر پیشرفت — با انیمیشن */}

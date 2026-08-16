@@ -19,13 +19,15 @@ import { Modal } from "../../ui/Modal";
 import { Table } from "../../ui/Table";
 import { JalaliDatePicker } from "../../ui/JalaliDatePicker";
 import { formatDate } from "../../utils/dates";
+import { SearchInput } from "../../ui/SearchInput";
 import {
   IMPROVEMENT_PLAN_STATUS_LABELS,
   type EligibleEvaluation,
   type ImprovementPlanStatus,
 } from "../../types";
 
-const PAGE_SIZE = 10;
+/** پیش‌فرض تعداد در هر صفحه؛ کاربر می‌تواند از نوار پایین عوضش کند. */
+const DEFAULT_PAGE_SIZE = 10;
 const STATUS_BADGE: Record<ImprovementPlanStatus, string> = {
   open: "bg-pulse-50 text-pulse-700",
   completed: "bg-green-50 text-green-700",
@@ -149,6 +151,7 @@ export function ImprovementPlansPage() {
   const [statusFilter, setStatusFilter] = useState<ImprovementPlanStatus | "">("");
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(0);
+  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
   const [profilePerson, setProfilePerson] = useState<{ id: number; name: string } | null>(null);
   const debouncedSearch = useDebouncedValue(search);
 
@@ -160,11 +163,11 @@ export function ImprovementPlansPage() {
   const { data, error, isPending } = useImprovementPlans({
     status: statusFilter || undefined,
     q: debouncedSearch || undefined,
-    limit: PAGE_SIZE,
-    offset: page * PAGE_SIZE,
+    limit: pageSize,
+    offset: page * pageSize,
   });
   const total = data?.total ?? 0;
-  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  const totalPages = Math.max(1, Math.ceil(total / pageSize));
 
   function refreshAll() {
     queryClient.invalidateQueries({ queryKey: ["improvement-plans"] });
@@ -219,21 +222,15 @@ export function ImprovementPlansPage() {
               filename="improvement-plans.xlsx"
               params={{ status: statusFilter || undefined, q: debouncedSearch || undefined }}
             />
-            <div className="relative">
-              <svg viewBox="0 0 20 20" className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
-                <circle cx="9" cy="9" r="6" />
-                <path d="M14 14l3 3" />
-              </svg>
-              <input
-                className="w-full rounded-xl border border-gray-200 bg-gray-100 py-1.5 pr-9 pl-3 text-sm text-gray-700 outline-none transition-colors duration-150 focus:border-pulse-500 focus:bg-white sm:w-60"
-                placeholder="جست‌وجو (نام پرسنل یا عنوان)…"
-                value={search}
-                onChange={(e) => {
-                  setSearch(e.target.value);
-                  setPage(0);
-                }}
-              />
-            </div>
+            <SearchInput
+              widthClass="sm:w-60"
+              placeholder="جست‌وجو (نام پرسنل یا عنوان)…"
+              value={search}
+              onChange={(e) => {
+                setSearch(e.target.value);
+                setPage(0);
+              }}
+            />
             <div className="relative">
             <select
               aria-label="فیلتر وضعیت"
@@ -309,7 +306,11 @@ export function ImprovementPlansPage() {
           page={page}
           totalPages={totalPages}
           totalCount={total}
-          pageSize={PAGE_SIZE}
+          pageSize={pageSize}
+          onPageSizeChange={(size) => {
+            setPageSize(size);
+            setPage(0);
+          }}
           onPageChange={setPage}
         />
       </Card>

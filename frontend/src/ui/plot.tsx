@@ -15,13 +15,18 @@
  */
 import type { ReactNode } from "react";
 
-export const RAIL = "#f1f2f4";
-export const LEAD_STRONG = "#f49f9f";
-export const LEAD_SOFT = "#facaca";
-export const DOT_STRONG = "#b61615";
-export const DOT_SOFT = "#eb4847";
+/* رنگ‌ها از متغیرهای CSS خوانده می‌شوند، نه از ثابتِ hex.
+ *
+ * این‌ها را SVG و style مستقیم مصرف می‌کنند، پس کلاس Tailwind به آن‌ها نمی‌رسد و
+ * تم شب از کنارشان رد می‌شد: نمودارِ روشن روی صفحهٔ سرمه‌ای. `var()` در همان‌جا
+ * کار می‌کند و با عوض شدن تم، خودش می‌چرخد. */
+export const RAIL = "var(--plot-rail)";
+export const LEAD_STRONG = "var(--plot-lead-strong)";
+export const LEAD_SOFT = "var(--plot-lead-soft)";
+export const DOT_STRONG = "var(--plot-dot-strong)";
+export const DOT_SOFT = "var(--plot-dot-soft)";
 /** رنگ دوم فقط برای مقایسهٔ دو مقدار روی یک ریل (فرد در برابر واحد) */
-export const DOT_COMPARE = "#6b7280";
+export const DOT_COMPARE = "var(--plot-dot-compare)";
 
 export const faInt = (value: number) => value.toLocaleString("fa-IR");
 export const fa1 = (value: number) =>
@@ -193,7 +198,7 @@ export function Dumbbell({
   const gap = a.value != null && b.value != null ? a.value - b.value : null;
 
   return (
-    <div className="px-2" role="img" aria-label={ariaLabel}>
+    <div className="px-4" role="img" aria-label={ariaLabel}>
       <ScaleTicks ticks={scale} min={min} max={max} format={format} />
       <div className="mt-1.5">
         {marks.length > 0 ? (
@@ -262,9 +267,11 @@ export function DotPlot({
   const scale = ticks ?? [0, 1, 2, 3, 4].map((i) => min + ((max - min) * i) / 4);
 
   return (
-    // برچسب دو سرِ خط‌کش روی لبه مرکز می‌شوند و نیمی‌شان بیرون می‌زند؛ بدون این
-    // حاشیه، خروجی PNG که دقیقاً به اندازهٔ همین جعبه بریده می‌شود آن‌ها را می‌بُرد.
-    <div className="px-2" role="img" aria-label={ariaLabel}>
+    // برچسب دو سرِ خط‌کش روی لبه مرکز می‌شوند و نیمی‌شان بیرون می‌زند. «۱۰۰٪»
+    // حدود ۲۶ پیکسل است، یعنی ۱۳ پیکسل سرریز از هر طرف — ۸ پیکسلِ px-2 کافی
+    // نبود و در خروجی PNG که دقیقاً به اندازهٔ همین جعبه بریده می‌شود، نصفه
+    // می‌شدند.
+    <div className="px-4" role="img" aria-label={ariaLabel}>
       <div className={`${ROW_GRID} mb-2`}>
         <span />
         <span />

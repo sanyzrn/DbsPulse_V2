@@ -487,7 +487,10 @@ def role_overview(
             ),
             RoleOverviewCard(
                 key="pending_ack",
-                label="در انتظار رؤیت شما",
+                # «رؤیت» در گفتار اداری یعنی «دیدم»، ولی کارمند آن را «قبول
+                # دارم» می‌خواند. متن‌های رو به کارمند عمداً از این واژه پرهیز
+                # می‌کنند؛ برچسب‌های لاگ ممیزی که HR می‌خواند دست‌نخورده‌اند.
+                label="هنوز ندیده‌اید",
                 value=_count_records(
                     db, mine, _FINALIZED, EvaluationRecord.acknowledged_at.is_(None)
                 ),

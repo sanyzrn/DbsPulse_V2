@@ -174,7 +174,15 @@ def test_objecting_requires_acknowledging_first(client, db_session):
     )
 
     assert r.status_code == 400
-    assert "رؤیت" in r.json()["detail"]
+    # پیام باید بگوید *چه کاری* اول لازم است، نه فقط «نمی‌شود». به واژهٔ خاصی
+    # گره نمی‌خورد: متن‌های رو به کارمند عمداً از «رؤیت» به «مشاهده» تغییر
+    # کردند و تستی که یک کلمه را قفل کند، جلوی بهتر شدن زبان را می‌گیرد.
+    detail = r.json()["detail"]
+    assert "مشاهده" in detail and "اعتراض" in detail, detail
+
+    # و اعتراضی ثبت نشده باشد — ادعای اصلی همین است، نه متن پیام.
+    mine = client.get("/api/me/evaluations", headers=auth_header(case["employee"])).json()
+    assert all(item["objection_at"] is None for item in mine["items"])
 
 
 def test_the_objection_window_closes(client, db_session):

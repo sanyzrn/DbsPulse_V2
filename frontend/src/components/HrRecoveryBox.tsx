@@ -156,6 +156,8 @@ export function HrRecoveryBox({
       {panel === "cancel" && (
         <CancelPanel
           evaluationId={evaluation.id}
+          evaluationCode={evaluation.evaluation_code}
+          subjectName={evaluation.subject_full_name}
           onDone={() => {
             setPanel("none");
             onChanged();
@@ -387,10 +389,14 @@ function HandoverPanel({
 
 function CancelPanel({
   evaluationId,
+  evaluationCode,
+  subjectName,
   onDone,
   onCancel,
 }: {
   evaluationId: number;
+  evaluationCode: string;
+  subjectName: string;
   onDone: () => void;
   onCancel: () => void;
 }) {
@@ -402,8 +408,15 @@ function CancelPanel({
   async function submit() {
     const ok = await confirm({
       title: "این پرونده لغو شود؟",
+      danger: true,
       description:
         "پرونده به وضعیت «لغوشده» می‌رود و دیگر قابل ادامه نیست. امتیازها و تاریخچه برای حسابرسی باقی می‌مانند و پس از آن می‌توان برای همین پرسنل پروندهٔ تازه‌ای باز کرد.",
+      consequence: (
+        <>
+          پروندهٔ <b>{subjectName}</b> <span dir="ltr">({evaluationCode})</span> لغو می‌شود.
+          این کار برگشت‌پذیر نیست.
+        </>
+      ),
       confirmLabel: "لغو پرونده",
     });
     if (!ok) return;

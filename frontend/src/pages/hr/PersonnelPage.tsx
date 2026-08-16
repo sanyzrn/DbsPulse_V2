@@ -19,8 +19,10 @@ import { Modal } from "../../ui/Modal";
 import { Table } from "../../ui/Table";
 import { JalaliDatePicker } from "../../ui/JalaliDatePicker";
 import type { AppUser, Personnel } from "../../types";
+import { SearchInput } from "../../ui/SearchInput";
 
-const PAGE_SIZE = 10;
+/** پیش‌فرض تعداد در هر صفحه؛ کاربر می‌تواند از نوار پایین عوضش کند. */
+const DEFAULT_PAGE_SIZE = 10;
 
 const emptyForm = {
   personnel_code: "",
@@ -257,6 +259,7 @@ export function PersonnelPage() {
   const [orgUnitFilter, setOrgUnitFilter] = useState("");
   const [managerFilter, setManagerFilter] = useState<"" | "true" | "false">("");
   const [page, setPage] = useState(0);
+  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
   const debouncedSearch = useDebouncedValue(search);
 
   const listParams = {
@@ -268,8 +271,8 @@ export function PersonnelPage() {
 
   const { data, error: loadError, isPending } = usePersonnelList({
     ...listParams,
-    limit: PAGE_SIZE,
-    offset: page * PAGE_SIZE,
+    limit: pageSize,
+    offset: page * pageSize,
   });
   const { data: usersPage } = useUsersList({ limit: 1000 });
   const users = usersPage?.items ?? [];
@@ -285,7 +288,7 @@ export function PersonnelPage() {
   }
 
   const total = data?.total ?? 0;
-  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  const totalPages = Math.max(1, Math.ceil(total / pageSize));
 
   async function createPersonnel() {
     setError(null);
@@ -476,21 +479,15 @@ export function PersonnelPage() {
                 </svg>
                 ورودی Excel
               </button>
-              <div className="relative">
-                <svg viewBox="0 0 20 20" className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
-                  <circle cx="9" cy="9" r="6" />
-                  <path d="M14 14l3 3" />
-                </svg>
-                <input
-                  className="w-full rounded-xl border border-gray-200 bg-gray-100 py-1.5 pr-9 pl-3 text-sm text-gray-700 outline-none transition-colors duration-150 focus:border-pulse-500 focus:bg-white sm:w-72"
-                  placeholder="جست‌وجو (نام، کد پرسنلی، عنوان شغلی، واحد)…"
-                  value={search}
-                  onChange={(e) => {
-                    setSearch(e.target.value);
-                    setPage(0);
-                  }}
-                />
-              </div>
+              <SearchInput
+                widthClass="sm:w-72"
+                placeholder="جست‌وجو (نام، کد پرسنلی، عنوان شغلی، واحد)…"
+                value={search}
+                onChange={(e) => {
+                  setSearch(e.target.value);
+                  setPage(0);
+                }}
+              />
             </div>
           </div>
 
@@ -563,10 +560,17 @@ export function PersonnelPage() {
                 >
                   {p.full_name}
                 </button>,
-                <span key="job" className="text-gray-600">
-                  {p.job_title}
+                // نشان «مدیر» با فاصلهٔ flex از عنوان جدا می‌شود، نه با حاشیهٔ
+                // ۶ پیکسلی. «مدیر» عنوان شغلی نیست — یک نشانهٔ ساختاری است که
+                // مسیر ارزیابی را عوض می‌کند — و چسبیده به عنوان، «کارشناس فروش
+                // مدیر» خوانده می‌شد، انگار بخشی از خودِ عنوان باشد.
+                <span key="job" className="flex flex-wrap items-center gap-x-2 gap-y-1 text-gray-600">
+                  <span>{p.job_title}</span>
                   {p.is_manager && (
-                    <span className="mr-1.5 rounded-full bg-amber-50 px-2 py-0.5 text-[11px] font-medium text-amber-700">
+                    <span
+                      className="shrink-0 rounded-full bg-amber-50 px-2 py-0.5 text-[11px] font-medium text-amber-700 ring-1 ring-amber-100"
+                      title="ارزیابی این فرد مستقیماً توسط معاونت انجام می‌شود"
+                    >
                       مدیر
                     </span>
                   )}
@@ -604,7 +608,11 @@ export function PersonnelPage() {
             page={page}
             totalPages={totalPages}
             totalCount={total}
-            pageSize={PAGE_SIZE}
+            pageSize={pageSize}
+            onPageSizeChange={(size) => {
+              setPageSize(size);
+              setPage(0);
+            }}
             onPageChange={setPage}
           />
         </div>

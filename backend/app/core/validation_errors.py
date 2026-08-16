@@ -56,6 +56,20 @@ def _describe(error: dict) -> str:
     kind = error.get("type", "")
     ctx = error.get("ctx") or {}
 
+    # پیام‌های `raise ValueError(...)` داخل validator های خودمان.
+    #
+    # این شاخه باید *اول* بیاید: آن پیام‌ها از قبل فارسی و دقیق‌اند («مجموع وزن دو
+    # بخش باید دقیقاً ۱ باشد») و ترجمهٔ عمومیِ پایین صفحه آن‌ها را به «مقدار
+    # نامعتبر است» تبدیل می‌کرد — یعنی همان کاری که این ماژول ساخته شد تا نکند.
+    # پیدانتیک متن اصلی را با پیشوند "Value error, " در msg می‌گذارد.
+    if kind in ("value_error", "assertion_error"):
+        message = str(ctx.get("error") or error.get("msg") or "")
+        for prefix in ("Value error, ", "Assertion failed, "):
+            if message.startswith(prefix):
+                message = message[len(prefix) :]
+        if message:
+            return message
+
     if kind == "string_too_long":
         limit = ctx.get("max_length")
         return f"«{field}» طولانی‌تر از حد مجاز است (حداکثر {limit} نویسه)"

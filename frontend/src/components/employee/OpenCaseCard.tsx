@@ -5,14 +5,17 @@
  * دیدنِ وضعیت (بدون هیچ نمره‌ای، چون نمرهٔ پیش‌نویس هنوز تصمیم نیست) و امکان ثبت
  * دیدگاه خودش پیش از آن‌که ارزیاب نمره را قطعی کند.
  */
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { motion } from "motion/react";
 import { apiClient, extractErrorMessage } from "../../api/client";
 import { useIndicators } from "../../api/queries";
+import { useConfirm } from "../../components/ConfirmDialog";
 import { useToast } from "../../components/Toast";
+import { WorkflowStepper } from "../WorkflowStepper";
 import { Button } from "../../ui/Button";
 import { Card } from "../../ui/Card";
+import { useLocalDraft } from "../../ui/useLocalDraft";
 import { formatDateTime } from "../../utils/dates";
 import type { MyOpenEvaluation, SelfAssessment } from "../../types";
 
@@ -42,6 +45,10 @@ export function OpenCaseCard({ item, index }: { item: MyOpenEvaluation; index: n
           </span>
         }
       >
+        {/* کارمند تا امروز فقط نام مرحله را می‌دید؛ اینکه «چند مرحله مانده»
+            هیچ‌جا نبود. جعبهٔ سیاه، حتی وقتی محتوایش درست است، جعبهٔ سیاه است. */}
+        <WorkflowStepper status={item.status} className="mb-4" />
+
         <p className="text-sm text-gray-600">
           ارزیابی شما از {formatDateTime(item.created_at)} آغاز شده و از{" "}
           {formatDateTime(item.stage_entered_at)} در مرحلهٔ فعلی است.
@@ -72,6 +79,7 @@ export function OpenCaseCard({ item, index }: { item: MyOpenEvaluation; index: n
         {showForm && !submitted?.submitted_at && (
           <SelfAssessmentForm
             evaluationId={item.id}
+            indicatorIds={item.indicator_ids}
             onDone={(result) => {
               setSubmitted(result);
               setShowForm(false);
@@ -86,24 +94,57 @@ export function OpenCaseCard({ item, index }: { item: MyOpenEvaluation; index: n
 
 function SelfAssessmentForm({
   evaluationId,
+  indicatorIds,
   onDone,
   onCancel,
 }: {
   evaluationId: number;
+  indicatorIds: number[];
   onDone: (result: SelfAssessment) => void;
   onCancel: () => void;
 }) {
-  const { data: indicators = [] } = useIndicators();
+  const { data: allIndicators = [] } = useIndicators({ includeInactive: true });
   const { showSuccess, showError } = useToast();
+  const confirm = useConfirm();
   const queryClient = useQueryClient();
-  const [scores, setScores] = useState<Record<number, number>>({});
-  const [notes, setNotes] = useState<Record<number, string>>({});
-  const [overallNote, setOverallNote] = useState("");
+
+  // شاخص‌های *این پرونده* (P1-05). فیلتر کردن با «فعال بودن» یعنی کارمند ممکن
+  // است به مجموعه‌ای پاسخ بدهد که ارزیاب به آن نمره نمی‌دهد — و کل ارزشِ
+  // خودارزیابی در کنار هم گذاشتنِ دو دیدگاه دربارهٔ *یک* پرسش است.
+  const indicators = useMemo(() => {
+    const wanted = new Set(indicatorIds);
+    return allIndicators.filter((i) => wanted.has(i.id));
+  }, [allIndicators, indicatorIds]);
+
+  // پیش‌نویس در مرورگر می‌ماند تا رفرش یا «بازگشت» اشتباهی کار را نبرد.
+  //
+  // فرم ارزیاب از قبل ذخیرهٔ خودکار داشت؛ فرمِ کارمند نداشت — یعنی کم‌قدرت‌ترین
+  // آدمِ این فرایند، نابخشنده‌ترین فرم را داشت: بیست شاخص با یادداشت، که با یک
+  // کلید Back از بین می‌رفت.
+  const draftKey = `dbspulse:self-assessment:${evaluationId}`;
+  const [draft, setDraft] = useLocalDraft(draftKey);
+  const scores = draft.scores;
+  const notes = draft.notes;
+  const overallNote = draft.overallNote;
+  const setScores = (next: Record<number, number>) => setDraft({ ...draft, scores: next });
+  const setNotes = (next: Record<number, string>) => setDraft({ ...draft, notes: next });
+  const setOverallNote = (next: string) => setDraft({ ...draft, overallNote: next });
+
   const [busy, setBusy] = useState(false);
 
   const allScored = indicators.length > 0 && indicators.every((i) => scores[i.id]);
 
   async function submit() {
+    // ثبت یک‌طرفه است و برای ارزیاب دیده می‌شود. «ثبت نهایی» را می‌شود سرسری
+    // خواند؛ یک پرسش صریح، پشیمانی روی کاری که برنمی‌گردد را کم می‌کند.
+    const ok = await confirm({
+      title: "خودارزیابی ثبت شود؟",
+      danger: true,
+      description:
+        "دیدگاه شما برای ارزیاب ارسال می‌شود و پس از ثبت قابل ویرایش نیست. اگر بعداً نظرتان عوض شد، می‌توانید آن را در گفت‌وگو با ارزیاب مطرح کنید.",
+      confirmLabel: "ثبت نهایی",
+    });
+    if (!ok) return;
     setBusy(true);
     try {
       const { data } = await apiClient.post<SelfAssessment>(
@@ -118,6 +159,8 @@ function SelfAssessmentForm({
         },
       );
       await queryClient.invalidateQueries({ queryKey: ["me", "evaluations", "open"] });
+      // پیش‌نویس دیگر لازم نیست؛ ماندنش یعنی دفعهٔ بعد فرمی پر می‌شود که ثبت شده.
+      window.localStorage.removeItem(draftKey);
       showSuccess("خودارزیابی شما ثبت شد");
       onDone(data);
     } catch (err) {

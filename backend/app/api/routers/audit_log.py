@@ -5,7 +5,7 @@ from fastapi.responses import Response
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from app.api.deps import require_roles
+from app.api.deps import hr_or_diagnostics, require_roles
 from app.db.session import get_db
 from app.models.audit_log import AuditLog
 from app.models.enums import UserRole
@@ -18,6 +18,42 @@ from app.services.audit import verify_chain
 from app.services.excel import build_audit_log_workbook
 
 router = APIRouter(prefix="/api/audit-log", tags=["audit-log"])
+
+#: رویدادهایی که هیچ ردی از محتوای ارزیابی ندارند — امنیت، حساب‌ها و خودِ سامانه.
+#:
+#: پشتیبانی فنی برای عیب‌یابی به این‌ها نیاز دارد («چرا فلانی نمی‌تواند وارد شود؟»،
+#: «چه کسی این بخش را خاموش کرد؟») ولی نباید نمرهٔ کسی را ببیند. لاگ ممیزی هر دو
+#: را با هم دارد: بعضی ردیف‌هایش عیناً امتیاز و نتیجهٔ نهایی را در خود نگه می‌دارند.
+#:
+#: این فهرست عمداً allowlist است. اگر روزی رویداد تازه‌ای اضافه شود و کسی یادش
+#: برود این‌جا بیاوردش، از دید پشتیبانی *پنهان* می‌ماند — نه اینکه ناخواسته
+#: افشا شود. همان درسی که در دامنهٔ دید پرونده‌ها گرفتیم.
+SYSTEM_EVENT_TYPES: frozenset[str] = frozenset(
+    {
+        # امنیت حساب
+        "login_succeeded",
+        "login_failed",
+        "account_locked",
+        "password_changed_self",
+        "password_reset_by_hr",
+        "session_revoked",
+        "sessions_revoked_all",
+        # کاربران و مجوزها
+        "user_created",
+        "user_updated",
+        "capabilities_changed",
+        # پیکربندی سامانه
+        "module_toggled",
+        "scheduled_jobs_run",
+        "scoring_scheme_drafted",
+        "scoring_scheme_activated",
+        "scoring_scheme_draft_deleted",
+        "indicator_created",
+        "indicator_updated",
+        "indicator_deleted",
+        "indicators_reordered",
+    }
+)
 
 # برچسب فارسی رویدادها برای خروجی Excel — هم‌راستا با AUDIT_EVENT_LABELS فرانت‌اند.
 _EVENT_LABELS = {
@@ -144,7 +180,7 @@ def list_audit_log(
     limit: int = Query(default=50, ge=1, le=200),
     offset: int = Query(default=0, ge=0),
     db: Session = Depends(get_db),
-    current_user: CurrentUser = Depends(require_roles(UserRole.hr)),
+    current_user: CurrentUser = Depends(hr_or_diagnostics),
 ) -> AuditLogPage:
     filters = _build_filters(
         event_type,
@@ -157,6 +193,17 @@ def list_audit_log(
         contract_end_from,
         contract_end_to,
     )
+    # منابع انسانی کل لاگ را می‌بیند؛ هر کس دیگری که فقط مجوز عیب‌یابی دارد
+    # (پشتیبانی فنی) تنها رویدادهای سامانه‌ای را — بدون هیچ ردی از محتوای پرونده.
+    if current_user.role is not UserRole.hr:
+        filters = [
+            *filters,
+            AuditLog.event_type.in_(SYSTEM_EVENT_TYPES),
+            # کمربند دوم: حتی اگر روزی رویدادی از فهرست بالا به پرونده‌ای گره
+            # بخورد، باز هم بیرون نمی‌رود.
+            AuditLog.evaluation_record_id.is_(None),
+        ]
+
     total = db.scalar(select(func.count()).select_from(AuditLog).where(*filters)) or 0
     # نام کاربر و کد ارزیابی با JOIN در همان کوئری صفحه حل می‌شوند؛ نسخه قبلی کل
     # جدول users و evaluation_records را برای ۵۰ ردیف در حافظه بارگذاری می‌کرد.

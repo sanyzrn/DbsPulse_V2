@@ -12,9 +12,11 @@ import { FilterSelect, PageHeader, TableSkeleton } from "../../ui/Card";
 import { Modal } from "../../ui/Modal";
 import { Table } from "../../ui/Table";
 import { ROLE_LABELS, type AppUser, type Personnel, type UserRole } from "../../types";
+import { SearchInput } from "../../ui/SearchInput";
 
 const ROLES: UserRole[] = ["unit_supervisor", "hr", "deputy", "ceo", "employee"];
-const PAGE_SIZE = 10;
+/** پیش‌فرض تعداد در هر صفحه؛ کاربر می‌تواند از نوار پایین عوضش کند. */
+const DEFAULT_PAGE_SIZE = 10;
 
 const inputClass =
   "w-full rounded-xl border border-gray-200 bg-gray-100 px-3 py-2 text-sm text-gray-900 outline-none transition-colors duration-150 focus:border-pulse-500 focus:bg-white";
@@ -31,6 +33,7 @@ export function UsersPage() {
   const [roleFilter, setRoleFilter] = useState<UserRole | "">("");
   const [activeFilter, setActiveFilter] = useState<"" | "true" | "false">("");
   const [page, setPage] = useState(0);
+  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
   const [showAddUser, setShowAddUser] = useState(false);
   const [editingUser, setEditingUser] = useState<AppUser | null>(null);
   const debouncedSearch = useDebouncedValue(search);
@@ -46,11 +49,11 @@ export function UsersPage() {
 
   const { data, error: loadError, isPending } = useUsersList({
     ...listParams,
-    limit: PAGE_SIZE,
-    offset: page * PAGE_SIZE,
+    limit: pageSize,
+    offset: page * pageSize,
   });
   const total = data?.total ?? 0;
-  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  const totalPages = Math.max(1, Math.ceil(total / pageSize));
   const hasActiveFilter = Boolean(search || roleFilter || activeFilter);
 
   function resetFilters() {
@@ -226,21 +229,15 @@ export function UsersPage() {
               <option value="true">فعال</option>
               <option value="false">غیرفعال</option>
             </FilterSelect>
-            <div className="relative">
-              <svg viewBox="0 0 20 20" className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
-                <circle cx="9" cy="9" r="6" />
-                <path d="M14 14l3 3" />
-              </svg>
-              <input
-                className="w-full rounded-xl border border-gray-200 bg-gray-100 py-1.5 pr-9 pl-3 text-sm text-gray-700 outline-none transition-colors duration-150 focus:border-pulse-500 focus:bg-white sm:w-56"
-                placeholder="جست‌وجو (نام کاربری)…"
-                value={search}
-                onChange={(e) => {
-                  setSearch(e.target.value);
-                  setPage(0);
-                }}
-              />
-            </div>
+            <SearchInput
+              widthClass="sm:w-56"
+              placeholder="جست‌وجو (نام کاربری)…"
+              value={search}
+              onChange={(e) => {
+                setSearch(e.target.value);
+                setPage(0);
+              }}
+            />
             {hasActiveFilter && (
               <button
                 onClick={resetFilters}
@@ -299,7 +296,11 @@ export function UsersPage() {
           page={page}
           totalPages={totalPages}
           totalCount={total}
-          pageSize={PAGE_SIZE}
+          pageSize={pageSize}
+          onPageSizeChange={(size) => {
+            setPageSize(size);
+            setPage(0);
+          }}
           onPageChange={setPage}
         />
       </div>

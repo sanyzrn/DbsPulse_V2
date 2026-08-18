@@ -18,7 +18,7 @@ import { FilterSelect, PageHeader, TableSkeleton } from "../../ui/Card";
 import { Modal } from "../../ui/Modal";
 import { Table } from "../../ui/Table";
 import { JalaliDatePicker } from "../../ui/JalaliDatePicker";
-import type { AppUser, Personnel } from "../../types";
+import { SEPARATION_REASON_LABELS, type AppUser, type Personnel, type SeparationReason } from "../../types";
 import { SearchInput } from "../../ui/SearchInput";
 
 /** پیش‌فرض تعداد در هر صفحه؛ کاربر می‌تواند از نوار پایین عوضش کند. */
@@ -659,6 +659,7 @@ function EditPersonnelModal({
     contract_start_date: personnel.contract_start_date,
     contract_end_date: personnel.contract_end_date,
     status: personnel.status,
+    separation_reason: personnel.separation_reason ?? ("resignation" as SeparationReason),
   });
   const [access, setAccess] = useState<AccessDraft>(emptyAccess);
   const [accessLoaded, setAccessLoaded] = useState(false);
@@ -692,7 +693,13 @@ function EditPersonnelModal({
     }
     setSaving(true);
     try {
-      await apiClient.patch(`/personnel/${personnel.id}`, form);
+      // علت خروج فقط وقتی فرستاده می‌شود که واقعاً دارد خارج می‌شود. فرستادنش
+      // همراه یک ویرایش معمولی، روی پروندهٔ یک نفرِ شاغل علتِ بی‌ربط می‌نشاند.
+      const { separation_reason, ...rest } = form;
+      await apiClient.patch(`/personnel/${personnel.id}`, {
+        ...rest,
+        ...(form.status === "inactive" ? { separation_reason } : {}),
+      });
       await apiClient.put(
         `/personnel/${personnel.id}/access`,
         accessPayload(access, form.is_manager)
@@ -791,6 +798,27 @@ function EditPersonnelModal({
             <option value="inactive">غیرفعال</option>
           </select>
         </label>
+        {/* فقط وقتی دیده می‌شود که واقعاً خروجی در کار است. سرور هم همین را
+            الزام می‌کند: غیرفعال‌کردن بدون علت رد می‌شود، چون «رفت» بدون
+            «چرا رفت» در هیچ گزارشی قابل استفاده نیست. */}
+        {form.status === "inactive" && (
+          <label className="flex flex-col gap-1 text-xs font-medium text-gray-600">
+            علت خروج
+            <select
+              className={inputClass}
+              value={form.separation_reason}
+              onChange={(e) =>
+                setForm({ ...form, separation_reason: e.target.value as SeparationReason })
+              }
+            >
+              {Object.entries(SEPARATION_REASON_LABELS).map(([value, label]) => (
+                <option key={value} value={value}>
+                  {label}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
         <label className="flex items-center gap-2 self-end pb-2 text-sm">
           <input
             type="checkbox"

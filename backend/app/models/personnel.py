@@ -4,7 +4,7 @@ from sqlalchemy import Boolean, Date, DateTime, Enum, ForeignKey, Index, String,
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import Base
-from app.models.enums import PersonnelStatus
+from app.models.enums import PersonnelStatus, SeparationReason
 
 
 class Personnel(Base):
@@ -25,6 +25,22 @@ class Personnel(Base):
         default=PersonnelStatus.active,
         nullable=False,
     )
+    # --- خروج از سازمان -----------------------------------------------------
+    # هر دو خالی‌پذیرند و فقط برای پرسنلِ غیرفعال معنا دارند. جدا از
+    # `contract_end_date` نگه داشته شده‌اند و این عمدی است: تاریخ پایان قرارداد
+    # یک *برنامه* است که ممکن است هرگز اتفاق نیفتد (تمدید می‌شود)، و تاریخ خروج
+    # یک *واقعه* است. یکی‌کردنشان یعنی نشود گفت چند نفر پیش از پایان قراردادشان
+    # رفتند — که دقیقاً همان چیزی است که باید دیده شود.
+    separation_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+    separation_reason: Mapped[SeparationReason | None] = mapped_column(
+        Enum(
+            SeparationReason,
+            name="separation_reason",
+            values_callable=lambda e: [m.value for m in e],
+        ),
+        nullable=True,
+    )
+
     created_by_user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(

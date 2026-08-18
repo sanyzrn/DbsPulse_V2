@@ -30,6 +30,23 @@ export interface CurrentUser {
 
 export type PersonnelStatus = "active" | "inactive";
 
+/** چرا این فرد دیگر در سازمان نیست. «غیرفعال» به‌تنهایی این را نمی‌گفت، و
+ *  استعفا با پایان قرارداد در هیچ گزارشی یک چیز نیست. */
+export type SeparationReason =
+  | "resignation"
+  | "dismissal"
+  | "contract_end"
+  | "retirement"
+  | "other";
+
+export const SEPARATION_REASON_LABELS: Record<SeparationReason, string> = {
+  resignation: "استعفا",
+  dismissal: "اخراج",
+  contract_end: "پایان قرارداد",
+  retirement: "بازنشستگی",
+  other: "سایر",
+};
+
 export interface Personnel {
   id: number;
   personnel_code: string;
@@ -40,6 +57,8 @@ export interface Personnel {
   contract_start_date: string;
   contract_end_date: string;
   status: PersonnelStatus;
+  separation_date: string | null;
+  separation_reason: SeparationReason | null;
   created_at: string;
   updated_at: string;
 }

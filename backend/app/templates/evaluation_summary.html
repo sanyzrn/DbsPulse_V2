@@ -20,9 +20,23 @@
   .meta { display: flex; justify-content: space-between; flex-wrap: wrap; margin-bottom: 8px; }
   .meta div { width: 32%; margin-bottom: 4px; }
   .meta b { display: block; color: #666; font-size: 10px; }
-  table { width: 100%; border-collapse: collapse; margin-bottom: 10px; }
+  /* table-layout: fixed عمدی است، و مسئله‌ای که حل می‌کند فقط زیبایی نیست.
+     با چیدمان خودکار (پیش‌فرض)، پهنای ستون‌ها از روی محتوا حساب می‌شود — و وقتی
+     جدول بین دو صفحه می‌شکند، هر تکه محتوای خودش را دارد، پس هر تکه پهنای
+     متفاوتی می‌گیرد. در بدترین حالت، تکه‌ای که فقط یک ردیف در انتهای صفحه دارد
+     ستون «شرح» را تا عرض یک نویسه جمع می‌کند و متن عمودی می‌شکند؛ همان چیزی که
+     در گزارش دیده شد. با پهنای ثابت، هر تکه دقیقاً همان ستون‌ها را دارد. */
+  table { width: 100%; border-collapse: collapse; margin-bottom: 10px; table-layout: fixed; }
   th, td { border: 1px solid #ddd; padding: 4px 6px; text-align: right; font-size: 11px; }
   th { background: #f4f4f5; }
+  /* سرستون روی هر صفحهٔ ادامه تکرار شود؛ جدولی که سرستونش را جا گذاشته، ستون
+     «امتیاز» و «شواهد» را از هم قابل‌تشخیص نمی‌گذارد. */
+  thead { display: table-header-group; }
+  /* یک ردیف نباید بین دو صفحه نصف شود. */
+  tr { break-inside: avoid; }
+  /* با پهنای ثابت، یک واژهٔ بلندِ بی‌فاصله (مسیر فایل، کد) از ستون بیرون می‌زد
+     به‌جای اینکه بشکند. */
+  td { overflow-wrap: anywhere; }
   .scores { display: flex; gap: 10px; margin: 10px 0; }
   .scores div { flex: 1; text-align: center; border: 1px solid #ddd; border-radius: 6px; padding: 8px; }
   .scores b { display: block; font-size: 16px; }
@@ -58,6 +72,15 @@
 
   <h2>شاخص‌های عمومی</h2>
   <table>
+    <colgroup>
+      <!-- نسبت‌ها از روی محتوای واقعی انتخاب شده‌اند: «شرح» همیشه یک جملهٔ کامل
+           است و «شواهد» در بیشتر ردیف‌ها خالی (فقط امتیاز ۱ و ۵ شواهد اجباری
+           دارند). دادنِ سهم مساوی به این دو، شرح را بی‌دلیل سه‌خطی می‌کرد. -->
+      <col style="width: 20%" />
+      <col style="width: 58%" />
+      <col style="width: 7%" />
+      <col style="width: 15%" />
+    </colgroup>
     <thead><tr><th>دسته</th><th>شرح</th><th>امتیاز</th><th>شواهد</th></tr></thead>
     <tbody>
       {% for s in snapshot.scores if s.section == 'general' %}
@@ -68,6 +91,15 @@
 
   <h2>شاخص‌های تخصصی</h2>
   <table>
+    <colgroup>
+      <!-- نسبت‌ها از روی محتوای واقعی انتخاب شده‌اند: «شرح» همیشه یک جملهٔ کامل
+           است و «شواهد» در بیشتر ردیف‌ها خالی (فقط امتیاز ۱ و ۵ شواهد اجباری
+           دارند). دادنِ سهم مساوی به این دو، شرح را بی‌دلیل سه‌خطی می‌کرد. -->
+      <col style="width: 20%" />
+      <col style="width: 58%" />
+      <col style="width: 7%" />
+      <col style="width: 15%" />
+    </colgroup>
     <thead><tr><th>دسته</th><th>شرح</th><th>امتیاز</th><th>شواهد</th></tr></thead>
     <tbody>
       {% for s in snapshot.scores if s.section == 'specialized' %}
@@ -84,6 +116,10 @@
   {% if snapshot.comments %}
   <h2>کامنت‌های مراحل بررسی</h2>
   <table>
+    <colgroup>
+      <col style="width: 20%" />
+      <col style="width: 80%" />
+    </colgroup>
     <thead><tr><th>مرحله</th><th>متن</th></tr></thead>
     <tbody>
       {% for c in snapshot.comments %}

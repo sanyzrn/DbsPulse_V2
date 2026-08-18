@@ -25,6 +25,7 @@ vi.mock("../../auth/AuthContext", async (importOriginal) => {
       user: {
         id: 999,
         username: "hr-admin",
+        display_name: "hr-admin",
         role: "hr",
         personnel_id: null,
         must_change_password: false,
@@ -61,7 +62,18 @@ describe("UsersPage edit modal", () => {
         return {
           data: {
             total: 1,
-            items: [{ id: 1, username: "sup1", role: "unit_supervisor", is_active: true, personnel_id: null, created_at: "" }],
+            items: [
+              {
+                id: 1,
+                username: "sup1",
+                full_name: "مسئول واحد فروش، آقای رضایی",
+                display_name: "مسئول واحد فروش، آقای رضایی",
+                role: "unit_supervisor",
+                is_active: true,
+                personnel_id: null,
+                created_at: "",
+              },
+            ],
           },
         };
       }
@@ -75,6 +87,9 @@ describe("UsersPage edit modal", () => {
     renderPage();
 
     await screen.findByText("sup1");
+    // نامِ آدم کنار نام کاربری دیده می‌شود؛ فهرستی که فقط «sup1» دارد همان چیزی
+    // است که این ستون برای رفعش اضافه شد.
+    expect(screen.getByText("مسئول واحد فروش، آقای رضایی")).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: "ویرایش" }));
 
     const dialog = await screen.findByRole("dialog");
@@ -87,6 +102,7 @@ describe("UsersPage edit modal", () => {
     await waitFor(() =>
       expect(patchMock).toHaveBeenCalledWith("/users/1", {
         role: "hr",
+        full_name: "مسئول واحد فروش، آقای رضایی",
         personnel_id: null,
         password: "NewPassword123",
       })

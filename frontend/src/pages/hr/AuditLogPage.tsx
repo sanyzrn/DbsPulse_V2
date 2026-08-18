@@ -316,7 +316,16 @@ export function AuditLogPage() {
                 <span key="event" className="inline-flex items-center rounded-lg bg-pulse-50 px-2 py-0.5 text-xs font-medium text-pulse-700">
                   {AUDIT_EVENT_LABELS[entry.event_type] ?? entry.event_type}
                 </span>,
-                entry.actor_username ?? `#${entry.actor_user_id}`,
+                // نام و نام کاربری با هم: در یک لاگ حسابرسی «چه کسی» و «با کدام
+                // حساب» دو سؤال جدا هستند، و پاسخ یکی جای دیگری را نمی‌گیرد.
+                <span key="actor" className="whitespace-nowrap">
+                  <span className="text-gray-700">
+                    {entry.actor_display_name ?? entry.actor_username ?? `#${entry.actor_user_id}`}
+                  </span>
+                  {entry.actor_username && entry.actor_display_name !== entry.actor_username && (
+                    <span className="mr-1.5 text-xs text-gray-400">({entry.actor_username})</span>
+                  )}
+                </span>,
                 <span key="code" className="text-gray-500">
                   {entry.evaluation_code ?? "—"}
                 </span>,

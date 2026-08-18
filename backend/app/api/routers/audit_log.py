@@ -154,7 +154,9 @@ def _build_filters(
 
 def _query_rows(db: Session, filters: list, *, limit: int | None, offset: int):
     query = (
-        select(AuditLog, User.username, EvaluationRecord.evaluation_code)
+        # نام کاربری و نام، هر دو: در یک لاگ حسابرسی «کدام حساب» و «کدام آدم»
+        # دو سؤال جدا هستند و پاسخ یکی نباید جای دیگری را بگیرد.
+        select(AuditLog, User.username, User.full_name, EvaluationRecord.evaluation_code)
         .join(User, User.id == AuditLog.actor_user_id, isouter=True)
         .join(EvaluationRecord, EvaluationRecord.id == AuditLog.evaluation_record_id, isouter=True)
         .where(*filters)
@@ -215,12 +217,13 @@ def list_audit_log(
             evaluation_code=evaluation_code,
             actor_user_id=row.actor_user_id,
             actor_username=username,
+            actor_display_name=full_name or username,
             event_type=row.event_type,
             old_value=row.old_value,
             new_value=row.new_value,
             created_at=row.created_at,
         )
-        for row, username, evaluation_code in rows
+        for row, username, full_name, evaluation_code in rows
     ]
     return AuditLogPage(total=total, items=items)
 
@@ -271,7 +274,10 @@ def export_audit_log_excel(
         contract_end_to,
     )
     rows = _query_rows(db, filters, limit=5000, offset=0)
-    entries = [(row, username, evaluation_code) for row, username, evaluation_code in rows]
+    entries = [
+        (row, full_name or username, evaluation_code)
+        for row, username, full_name, evaluation_code in rows
+    ]
     return Response(
         content=build_audit_log_workbook(entries, _EVENT_LABELS),
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",

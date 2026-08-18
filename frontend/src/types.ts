@@ -20,6 +20,9 @@ export const ROLE_LABELS: Record<UserRole, string> = {
 export interface CurrentUser {
   id: number;
   username: string;
+  // همیشه پر است: اگر نامی روی حساب ثبت نشده باشد، بک‌اند خودِ نام کاربری را
+  // برمی‌گرداند.
+  display_name: string;
   role: UserRole;
   personnel_id: number | null;
   must_change_password: boolean;
@@ -58,6 +61,10 @@ export interface AppUser {
   is_active: boolean;
   personnel_id: number | null;
   created_at: string;
+  full_name: string | null;
+  // همیشه پر است؛ بک‌اند ترتیب «نام پرسنل ← نام حساب ← نام کاربری» را اعمال
+  // می‌کند تا هر صفحه لازم نباشد خودش این تصمیم را دوباره بگیرد.
+  display_name: string;
 }
 
 export type IndicatorSection = "general" | "specialized";
@@ -341,6 +348,7 @@ export interface AuditLogEntry {
   evaluation_code: string | null;
   actor_user_id: number;
   actor_username: string | null;
+  actor_display_name: string | null;
   event_type: string;
   old_value: Record<string, unknown> | null;
   new_value: Record<string, unknown> | null;

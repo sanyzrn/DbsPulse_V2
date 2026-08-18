@@ -14,6 +14,9 @@ class UserCreate(BaseModel):
     password: str = Field(min_length=_PASSWORD_MIN_LENGTH)
     role: UserRole
     personnel_id: int | None = None
+    # نام آدمی که پشت این حساب است. اجباری نیست چون برای حساب‌های وصل به پرسنل
+    # نام از پروندهٔ پرسنلی می‌آید و نوشتن دوباره‌اش فقط دو منبع حقیقت می‌سازد.
+    full_name: str | None = Field(default=None, max_length=200)
 
     @model_validator(mode="after")
     def _employee_requires_personnel(self) -> "UserCreate":
@@ -28,6 +31,7 @@ class UserUpdate(BaseModel):
     is_active: bool | None = None
     password: str | None = Field(default=None, min_length=_PASSWORD_MIN_LENGTH)
     personnel_id: int | None = None
+    full_name: str | None = Field(default=None, max_length=200)
 
 
 class UserRead(BaseModel):
@@ -39,6 +43,10 @@ class UserRead(BaseModel):
     is_active: bool
     personnel_id: int | None
     created_at: datetime
+    full_name: str | None = None
+    # همیشه پر است. UI هرگز نباید مجبور شود بین «نام» و «نام کاربری» انتخاب کند
+    # و برای حسابِ بی‌نام رشتهٔ خالی نشان بدهد.
+    display_name: str = ""
 
 
 class UserPage(BaseModel):

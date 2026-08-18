@@ -26,7 +26,12 @@ export function UsersPage() {
   const { user: currentUser } = useAuth();
   const confirm = useConfirm();
   const queryClient = useQueryClient();
-  const [form, setForm] = useState({ username: "", password: "", role: "unit_supervisor" as UserRole });
+  const [form, setForm] = useState({
+    username: "",
+    fullName: "",
+    password: "",
+    role: "unit_supervisor" as UserRole,
+  });
   const [personnelId, setPersonnelId] = useState<number | "">("");
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
@@ -72,11 +77,15 @@ export function UsersPage() {
       return;
     }
     try {
+      const { fullName, ...rest } = form;
       await apiClient.post("/users", {
-        ...form,
+        ...rest,
+        // برای حساب «کارمند» نام از پروندهٔ پرسنلی می‌آید؛ فرستادن دوبارهٔ آن فقط
+        // یک نسخهٔ دوم می‌سازد که با اصلاح پرونده هماهنگ نمی‌ماند.
+        full_name: form.role === "employee" ? undefined : fullName.trim() || undefined,
         personnel_id: form.role === "employee" ? personnelId : undefined,
       });
-      setForm({ username: "", password: "", role: "unit_supervisor" });
+      setForm({ username: "", fullName: "", password: "", role: "unit_supervisor" });
       setPersonnelId("");
       await queryClient.invalidateQueries({ queryKey: ["users"] });
       setShowAddUser(false);
@@ -142,6 +151,18 @@ export function UsersPage() {
               onChange={(e) => setForm({ ...form, username: e.target.value })}
             />
           </label>
+          {form.role !== "employee" && (
+            <label className="flex flex-col gap-1 text-xs font-medium text-gray-600">
+              نام و سِمَت
+              <input
+                autoComplete="off"
+                placeholder="مثلاً: معاونت اداری، آقای رضایی"
+                className={`${inputClass} sm:w-56`}
+                value={form.fullName}
+                onChange={(e) => setForm({ ...form, fullName: e.target.value })}
+              />
+            </label>
+          )}
           <label className="flex flex-col gap-1 text-xs font-medium text-gray-600">
             رمز عبور (حداقل ۱۰ نویسه)
             <input
@@ -231,7 +252,7 @@ export function UsersPage() {
             </FilterSelect>
             <SearchInput
               widthClass="sm:w-56"
-              placeholder="جست‌وجو (نام کاربری)…"
+              placeholder="جست‌وجو (نام یا نام کاربری)…"
               value={search}
               onChange={(e) => {
                 setSearch(e.target.value);
@@ -255,12 +276,24 @@ export function UsersPage() {
         {data && (
           <Table
             bordered={false}
-            headers={["نام کاربری", "نقش", "وضعیت", ""]}
+            headers={["نام کاربری", "نام", "نقش", "وضعیت", ""]}
             rowKeys={data.items.map((u) => u.id)}
             rows={data.items.map((u) => [
               <span key="username" className="font-medium text-gray-700">
                 {u.username}
               </span>,
+              // بک‌اند وقتی نامی نداشته باشد خودِ نام کاربری را برمی‌گرداند، پس
+              // نابرابری یعنی «نام واقعی دارد». تکرار نام کاربری در دو ستون
+              // چیزی اضافه نمی‌کند؛ خط تیره صریح‌تر می‌گوید هنوز اسمی ثبت نشده.
+              u.display_name !== u.username ? (
+                <span key="name" className="text-gray-700">
+                  {u.display_name}
+                </span>
+              ) : (
+                <span key="name" className="text-gray-400">
+                  —
+                </span>
+              ),
               <span key="role" className="text-gray-600">
                 {ROLE_LABELS[u.role]}
               </span>,
@@ -328,6 +361,7 @@ function EditUserModal({
   const { showSuccess, showError } = useToast();
   const queryClient = useQueryClient();
   const [role, setRole] = useState<UserRole>(user.role);
+  const [fullName, setFullName] = useState(user.full_name ?? "");
   const [personnelId, setPersonnelId] = useState<number | "">(user.personnel_id ?? "");
   const [newPassword, setNewPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -351,6 +385,7 @@ function EditUserModal({
     try {
       await apiClient.patch(`/users/${user.id}`, {
         role,
+        full_name: fullName.trim() || null,
         personnel_id: role === "employee" ? personnelId : null,
         ...(newPassword ? { password: newPassword } : {}),
       });
@@ -382,6 +417,22 @@ function EditUserModal({
       }
     >
       <div className="space-y-4 py-2">
+        <label className="flex flex-col gap-1.5 text-sm font-medium text-gray-700">
+          نام و سِمَت
+          <input
+            autoComplete="off"
+            placeholder="مثلاً: معاونت اداری، آقای رضایی"
+            className={inputClass}
+            value={fullName}
+            onChange={(e) => setFullName(e.target.value)}
+          />
+          {role === "employee" && (
+            <span className="text-xs font-normal text-gray-500">
+              برای حساب کارمند، نامِ نمایش‌داده‌شده از پروندهٔ پرسنلی خوانده می‌شود.
+            </span>
+          )}
+        </label>
+
         <label className="flex flex-col gap-1.5 text-sm font-medium text-gray-700">
           نقش
           <select className={inputClass} value={role} onChange={(e) => setRole(e.target.value as UserRole)}>

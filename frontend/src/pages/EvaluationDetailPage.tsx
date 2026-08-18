@@ -11,6 +11,7 @@ import {
 } from "../api/queries";
 import { useAuth } from "../auth/AuthContext";
 import { useConfirm } from "../components/ConfirmDialog";
+import { PdfDownloadButton } from "../components/PdfDownloadButton";
 import { HrOwnerBar, HrRecoveryBox } from "../components/HrRecoveryBox";
 import { ObjectionPanel } from "../components/ObjectionPanel";
 import { SelfAssessmentPanel } from "../components/SelfAssessmentPanel";
@@ -572,43 +573,12 @@ export function EvaluationDetailPage() {
           />
         )}
         {user.role === "hr" && evaluation.status === "finalized" && (
-          <button
-            onClick={async () => {
-              // پنجره باید هم‌زمان با کلیک کاربر (sync) باز شود، وگرنه مرورگر (به‌خصوص
-              // Safari و برخی نسخه‌های Chrome) آن را پاپ‌آپ مسدودشده تلقی می‌کند، چون
-              // بعد از یک await دیگر «مستقیماً ناشی از تعامل کاربر» به‌حساب نمی‌آید.
-              const printWindow = window.open("", "_blank");
-              try {
-                const { data } = await apiClient.get(`/evaluations/${evaluation.id}/summary.pdf`, {
-                  responseType: "blob",
-                });
-                const url = URL.createObjectURL(new Blob([data], { type: "application/pdf" }));
-                if (printWindow) {
-                  printWindow.location.href = url;
-                } else {
-                  // اگر مرورگر حتی پنجرهٔ خالی را هم مسدود کرده، فایل را دانلود می‌کنیم
-                  // تا کاربر دست‌کم به خروجی PDF دسترسی داشته باشد.
-                  const a = document.createElement("a");
-                  a.href = url;
-                  a.download = `${evaluation.evaluation_code}.pdf`;
-                  document.body.appendChild(a);
-                  a.click();
-                  a.remove();
-                  showError("باز کردن پنجرهٔ جدید توسط مرورگر مسدود شد؛ فایل به‌جای آن دانلود شد.");
-                }
-                setTimeout(() => URL.revokeObjectURL(url), 30_000);
-              } catch (err) {
-                printWindow?.close();
-                showError(extractErrorMessage(err));
-              }
-            }}
-            className="inline-flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm transition-all duration-200 hover:bg-gray-50 hover:shadow-md"
-          >
-            <svg viewBox="0 0 20 20" className="h-4 w-4 text-red-500" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M10 3v10m0 0l-3.5-3.5M10 13l3.5-3.5M4 15v1a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1v-1" />
-            </svg>
-            چاپ / خروجی PDF
-          </button>
+          <PdfDownloadButton
+            evaluationId={evaluation.id}
+            filename={`${evaluation.evaluation_code}.pdf`}
+            label="چاپ / خروجی PDF"
+            className="inline-flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm transition-all duration-200 hover:bg-gray-50 hover:shadow-md disabled:cursor-not-allowed disabled:opacity-50"
+          />
         )}
       </div>
     </div>

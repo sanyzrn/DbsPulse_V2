@@ -5,6 +5,7 @@ import { apiClient, extractErrorMessage } from "../../api/client";
 import { useMyEvaluations, useMyImprovementPlans, useMyOpenEvaluations } from "../../api/queries";
 import { OpenCaseCard } from "../../components/employee/OpenCaseCard";
 import { useConfirm } from "../../components/ConfirmDialog";
+import { PdfDownloadButton } from "../../components/PdfDownloadButton";
 import { RoleOverviewCards } from "../../components/RoleOverviewCards";
 import { useToast } from "../../components/Toast";
 import { Button } from "../../ui/Button";
@@ -104,17 +105,10 @@ function MyEvaluationCard({ item, index }: { item: MyEvaluation; index: number }
         {/* سندی که دربارهٔ این فرد است باید در اختیار خودش باشد — تا پیش از این
             تنها HR می‌توانست کارنامهٔ هش‌شده و قابل‌تأیید را دانلود کند. */}
         <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-gray-100 pt-3">
-          <a
-            href={`/api/evaluations/${item.id}/summary.pdf`}
-            target="_blank"
-            rel="noreferrer"
-            className="inline-flex items-center gap-1.5 rounded-xl border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-100"
-          >
-            <svg viewBox="0 0 20 20" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M10 3v9m0 0l-3-3m3 3l3-3M4 15v2h12v-2" />
-            </svg>
-            دریافت کارنامهٔ رسمی (PDF)
-          </a>
+          <PdfDownloadButton
+            evaluationId={item.id}
+            filename={`${item.evaluation_code}.pdf`}
+          />
         </div>
 
         <ObjectionSection item={item} />

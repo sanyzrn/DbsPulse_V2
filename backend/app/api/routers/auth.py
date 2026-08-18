@@ -18,6 +18,7 @@ from app.core.security import (
 )
 from app.db.session import get_db
 from app.models.auth_session import AuthSession
+from app.models.personnel import Personnel
 from app.models.user import User
 from app.schemas.auth import (
     AccessTokenResponse,
@@ -273,7 +274,20 @@ def change_password(
 
 
 @router.get("/me", response_model=CurrentUser)
-def me(current_user: CurrentUser = Depends(get_current_user)) -> CurrentUser:
+def me(
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(get_current_user),
+) -> CurrentUser:
+    """نام پرسنل فقط همین‌جا خوانده می‌شود، نه در `get_current_user`.
+
+    آن یکی روی *هر* درخواست احراز هویت‌شده اجرا می‌شود؛ یک کوئری اضافه در آن
+    مسیر، هزینه‌ای است که کل API می‌پردازد تا یک نام در نوار بالای صفحه درست
+    شود. این نقطه تنها جایی است که آن نام واقعاً مصرف می‌شود.
+    """
+    if current_user.personnel_id is not None:
+        linked = db.get(Personnel, current_user.personnel_id)
+        if linked is not None and linked.full_name:
+            return current_user.model_copy(update={"display_name": linked.full_name})
     return current_user
 
 

@@ -9,6 +9,9 @@ class AuditLogRead(BaseModel):
     evaluation_code: str | None
     actor_user_id: int
     actor_username: str | None
+    # نامِ آدم، اگر ثبت شده باشد؛ وگرنه همان نام کاربری. UI نباید خودش این
+    # جایگزینی را انجام بدهد و در هر صفحه یک‌جور بنویسدش.
+    actor_display_name: str | None = None
     event_type: str
     old_value: dict | None
     new_value: dict | None

@@ -72,7 +72,6 @@
       "PowerShell(Remove-Item *)"
     ],
     "deny": [
-      "Bash(git push*)",
       "Bash(gh pr create*)",
       "Bash(gh repo*)",
       "Bash(rm -rf /*)",

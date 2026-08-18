@@ -3,7 +3,27 @@ name: CI
 on:
   push:
     branches: [main]
+    # تغییرِ فقط-مستندات، کل CI را روشن می‌کرد. سوئیت بک‌اند حدود ۵ دقیقه طول
+    # می‌کشد و یک ویرایش در README هیچ‌کدامش را لازم ندارد.
+    paths-ignore:
+      - "**.md"
+      - "docs/**"
+      - "LICENSE"
   pull_request:
+    paths-ignore:
+      - "**.md"
+      - "docs/**"
+      - "LICENSE"
+
+# بزرگ‌ترین صرفه‌جویی، و دلیلش هم ساده است: هر push روی یک شاخه، اجرای قبلیِ
+# همان شاخه را *لغو نمی‌کرد*. یعنی سه بار push پشت سر هم یعنی سه اجرای کامل که
+# دو تایش نتیجه‌اش را کسی نمی‌بیند و همچنان دقیقه می‌سوزاند.
+#
+# `main` عمداً استثناست: آن‌جا هر کامیت باید نتیجهٔ خودش را داشته باشد، وگرنه
+# تاریخچهٔ سبز/قرمز شاخهٔ اصلی سوراخ می‌شود.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
   backend:
@@ -34,9 +54,13 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
+          # بدون کش، هر اجرا کل وابستگی‌ها را دوباره دانلود و بیلد می‌کرد —
+          # psycopg و weasyprint و argon2-cffi سبک نیستند.
+          cache: pip
+          cache-dependency-path: backend/requirements-dev.txt
       - run: pip install -r requirements-dev.txt
       - run: ruff check .
-      - run: pytest -v
+      - run: pytest -q
 
   frontend:
     runs-on: ubuntu-latest

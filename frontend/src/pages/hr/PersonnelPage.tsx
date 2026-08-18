@@ -197,14 +197,15 @@ function AccessFields({
       <label className="flex flex-col gap-1 text-xs font-medium text-gray-600">
         معاونت
         <select
-          required
           className={inputClass}
           value={access.deputy_user_id ?? ""}
           onChange={(e) =>
             setAccess({ ...access, deputy_user_id: e.target.value ? Number(e.target.value) : null })
           }
         >
-          <option value="">— انتخاب کنید —</option>
+          {/* خالی‌گذاشتنش یک انتخاب است، نه یک فراموشی: کسی که معاونتی بالای
+              سرش نیست، پرونده‌اش از منابع انسانی مستقیم به مدیرعامل می‌رود. */}
+          <option value="">بدون معاونت — مستقیم زیر نظر مدیرعامل</option>
           {deputies.map((u) => (
             <option key={u.id} value={u.id}>
               {u.username}
@@ -319,8 +320,16 @@ export function PersonnelPage() {
 
   async function createPersonnel() {
     setError(null);
-    if (access.deputy_user_id == null || access.ceo_user_id == null) {
-      const message = "برای ثبت پرسنل، معاونت و مدیرعامل زنجیره ارزیابی را انتخاب کنید";
+    if (access.ceo_user_id == null) {
+      const message = "برای ثبت پرسنل، مدیرعامل زنجیره ارزیابی را انتخاب کنید";
+      setError(message);
+      showError(message);
+      return;
+    }
+    // دست‌کم یکی از دو مرحلهٔ میانی باید باشد، وگرنه هیچ‌کس نمره نمی‌دهد. سرور
+    // هم همین را رد می‌کند؛ این‌جا فقط زودتر و با پیام روشن‌تر گفته می‌شود.
+    if (access.unit_supervisor_user_id == null && access.deputy_user_id == null) {
+      const message = "دست‌کم یکی از «مسئول واحد» یا «معاونت» باید انتخاب شود";
       setError(message);
       showError(message);
       return;
@@ -729,8 +738,14 @@ function EditPersonnelModal({
 
   async function save() {
     setError(null);
-    if (access.deputy_user_id == null || access.ceo_user_id == null) {
-      const message = "معاونت و مدیرعامل زنجیره ارزیابی الزامی هستند";
+    if (access.ceo_user_id == null) {
+      const message = "مدیرعامل زنجیره ارزیابی الزامی است";
+      setError(message);
+      showError(message);
+      return;
+    }
+    if (access.unit_supervisor_user_id == null && access.deputy_user_id == null) {
+      const message = "دست‌کم یکی از «مسئول واحد» یا «معاونت» باید انتخاب شود";
       setError(message);
       showError(message);
       return;

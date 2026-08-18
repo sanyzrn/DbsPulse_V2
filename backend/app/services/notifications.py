@@ -105,6 +105,11 @@ def notify_for_workflow_action(db: Session, record: EvaluationRecord, action: st
         if record.unit_supervisor_user_id is None
         else record.unit_supervisor_user_id
     )
+    # زنجیره می‌تواند معاونت نداشته باشد؛ آن‌وقت نفرِ بعد از منابع انسانی خودِ
+    # مدیرعامل است. بدون این، اعلان به `None` فرستاده می‌شد و کل گذارِ تأیید
+    # منابع انسانی با NotNullViolation شکست می‌خورد — یعنی نبودِ معاونت، پرونده
+    # را در همان مرحله قفل می‌کرد.
+    after_hr_id = record.deputy_user_id or record.ceo_user_id
 
     recipients: list[int] = []
     message = ""
@@ -112,13 +117,13 @@ def notify_for_workflow_action(db: Session, record: EvaluationRecord, action: st
         recipients = _active_user_ids_with_role(db, UserRole.hr)
         message = f"پرونده {code} ({name}) در صف بررسی منابع انسانی قرار گرفت"
     elif action == "hr_approve":
-        recipients = [record.deputy_user_id]
+        recipients = [after_hr_id]
         message = f"پرونده {code} ({name}) در انتظار بررسی و تأیید شماست"
     elif action == "deputy_approve":
         recipients = [record.ceo_user_id]
         message = f"پرونده {code} ({name}) در انتظار تأیید نهایی شماست"
     elif action == "ceo_finalize":
-        recipients = [evaluator_id]
+        recipients = [evaluator_id] if evaluator_id is not None else []
         message = f"پرونده {code} ({name}) تأیید نهایی شد"
     elif action == "hr_return":
         recipients = [record.unit_supervisor_user_id] if record.unit_supervisor_user_id else []
@@ -127,7 +132,8 @@ def notify_for_workflow_action(db: Session, record: EvaluationRecord, action: st
         recipients = _active_user_ids_with_role(db, UserRole.hr)
         message = f"پرونده {code} ({name}) توسط معاونت برگشت داده شد؛ دلیل در کامنت‌های پرونده"
     elif action == "ceo_return":
-        recipients = [record.deputy_user_id]
+        # برگشت از مدیرعامل هم به همان کسی می‌رود که پرونده را به او داده بود.
+        recipients = [after_hr_id]
         message = f"پرونده {code} ({name}) توسط مدیرعامل برگشت داده شد؛ دلیل در کامنت‌های پرونده"
     elif action == "cancel":
         # همهٔ کسانی که روی این پرونده نقشی داشتند باید بدانند دیگر منتظرشان نیست.

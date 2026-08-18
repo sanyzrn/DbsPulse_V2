@@ -120,7 +120,8 @@ class EvaluationRead(BaseModel):
     subject_full_name: str
     period_id: int | None
     unit_supervisor_user_id: int | None
-    deputy_user_id: int
+    # None یعنی زنجیره معاونت ندارد و پرونده از HR مستقیم به مدیرعامل می‌رود.
+    deputy_user_id: int | None
     ceo_user_id: int
     # مسئولِ HR این پرونده؛ null یعنی هنوز در صف مشترک منابع انسانی است
     hr_user_id: int | None = None

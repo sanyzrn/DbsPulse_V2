@@ -27,6 +27,7 @@ from app.schemas.personnel import (
 )
 from app.services.audit import log_event
 from app.services.excel import build_personnel_workbook
+from app.services.org_unit import site_of
 from app.services.personnel_import import ImportPreview, build_template, parse_workbook
 from app.services.security_tokens import generate_temp_password
 from app.services.sessions import revoke_all_for_user
@@ -52,9 +53,11 @@ _PERSONNEL_SORT_COLUMNS = {
 def _apply_personnel_filters(
     query,
     *,
+    db: Session,
     q: str | None,
     status_filter: PersonnelStatus | None,
     org_unit: str | None,
+    site: str | None,
     is_manager: bool | None,
 ):
     """فیلترهای ترکیب‌پذیر فهرست/خروجی پرسنل — یک‌جا تا list و export.xlsx رفتار
@@ -67,6 +70,22 @@ def _apply_personnel_filters(
             | Personnel.job_title.ilike(pattern)
             | Personnel.org_unit.ilike(pattern)
         )
+    if site:
+        # تطبیق در پایتون و با همان تابعی که همه‌جا استفاده می‌شود، نه با یک
+        # الگوی LIKE.
+        #
+        # الگوی LIKE یعنی قرارداد جداکننده دو بار نوشته شود — یک بار در
+        # `split_site` و یک بار این‌جا — و همان‌جا بود که اولین بار شکست: مقدارِ
+        # واقعی «کارخانه / فروش» فاصله دارد و الگوی «کارخانه/%» هیچ‌چیز نگرفت.
+        # تعداد واحدهای متمایز ده‌ها است، پس خواندنشان ارزان‌تر از نگه‌داشتن دو
+        # نسخه از یک قانون است.
+        wanted = site.strip()
+        matching = [
+            unit
+            for unit in db.scalars(select(Personnel.org_unit).distinct())
+            if site_of(unit) == wanted
+        ]
+        query = query.where(Personnel.org_unit.in_(matching))
     if status_filter is not None:
         query = query.where(Personnel.status == status_filter)
     if org_unit:
@@ -116,6 +135,7 @@ def list_personnel(
     q: str | None = None,
     status_filter: PersonnelStatus | None = Query(default=None, alias="status"),
     org_unit: str | None = None,
+    site: str | None = None,
     is_manager: bool | None = None,
     sort_by: str = Query(default="full_name"),
     sort_dir: str = Query(default="asc", pattern="^(asc|desc)$"),
@@ -135,7 +155,13 @@ def list_personnel(
             column == current_user.id
         )
     query = _apply_personnel_filters(
-        query, q=q, status_filter=status_filter, org_unit=org_unit, is_manager=is_manager
+        query,
+        db=db,
+        q=q,
+        status_filter=status_filter,
+        org_unit=org_unit,
+        site=site,
+        is_manager=is_manager,
     )
 
     total = db.scalar(select(func.count()).select_from(query.subquery())) or 0
@@ -165,6 +191,7 @@ def export_personnel_excel(
     q: str | None = None,
     status_filter: PersonnelStatus | None = Query(default=None, alias="status"),
     org_unit: str | None = None,
+    site: str | None = None,
     is_manager: bool | None = None,
     sort_by: str = Query(default="full_name"),
     sort_dir: str = Query(default="asc", pattern="^(asc|desc)$"),
@@ -174,7 +201,13 @@ def export_personnel_excel(
     """خروجی Excel از فهرست پرسنل (فقط HR) با همان فیلترها/مرتب‌سازی فهرست، تا HR
     دقیقاً همان چیزی را که روی صفحه فیلتر کرده دریافت کند."""
     query = _apply_personnel_filters(
-        select(Personnel), q=q, status_filter=status_filter, org_unit=org_unit, is_manager=is_manager
+        select(Personnel),
+        db=db,
+        q=q,
+        status_filter=status_filter,
+        org_unit=org_unit,
+        site=site,
+        is_manager=is_manager,
     )
     rows = list(db.scalars(query.order_by(_personnel_order_by(sort_by, sort_dir))))
     log_event(db, actor_user_id=current_user.id, event_type="personnel_excel_exported")

@@ -243,6 +243,23 @@ function accessPayload(access: AccessDraft, isManager: boolean) {
   };
 }
 
+/** «محل» را از «واحد» جدا می‌کند — قرینهٔ `split_site` در
+ *  `backend/app/services/org_unit.py`.
+ *
+ *  نیمه‌کاره‌ها («/ فروش» یا «کارخانه /») عمداً محل حساب نمی‌شوند: یک محلِ
+ *  خالی در فهرست فیلتر، گزینه‌ای است که هیچ‌چیز را فیلتر نمی‌کند.
+ */
+function siteOf(orgUnit: string): string | null {
+  for (const separator of ["/", "—", " - "]) {
+    const at = orgUnit.indexOf(separator);
+    if (at === -1) continue;
+    const site = orgUnit.slice(0, at).trim();
+    const unit = orgUnit.slice(at + separator.length).trim();
+    if (site && unit) return site;
+  }
+  return null;
+}
+
 export function PersonnelPage() {
   const { showSuccess, showError } = useToast();
   const queryClient = useQueryClient();
@@ -257,6 +274,7 @@ export function PersonnelPage() {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<"" | "active" | "inactive">("");
   const [orgUnitFilter, setOrgUnitFilter] = useState("");
+  const [siteFilter, setSiteFilter] = useState("");
   const [managerFilter, setManagerFilter] = useState<"" | "true" | "false">("");
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
@@ -266,6 +284,7 @@ export function PersonnelPage() {
     q: debouncedSearch,
     status: statusFilter || undefined,
     org_unit: orgUnitFilter || undefined,
+    site: siteFilter || undefined,
     is_manager: managerFilter === "" ? undefined : managerFilter === "true",
   } as const;
 
@@ -277,12 +296,20 @@ export function PersonnelPage() {
   const { data: usersPage } = useUsersList({ limit: 1000 });
   const users = usersPage?.items ?? [];
   const { data: orgUnits = [] } = useOrgUnits(true);
-  const hasActiveFilter = Boolean(search || statusFilter || orgUnitFilter || managerFilter);
+  const hasActiveFilter = Boolean(
+    search || statusFilter || orgUnitFilter || siteFilter || managerFilter
+  );
+  // محل‌ها از همان فهرست واحدها استخراج می‌شوند — قرارداد «محل / واحد»، که
+  // سمت سرور در services/org_unit.py تعریف شده. اگر هیچ واحدی جداکننده نداشته
+  // باشد فهرست خالی می‌ماند و فیلتر اصلاً نشان داده نمی‌شود، چون سازمان
+  // تک‌محلی نباید فیلتری ببیند که همیشه یک گزینه دارد.
+  const sites = [...new Set(orgUnits.map(siteOf).filter((s): s is string => s !== null))].sort();
 
   function resetFilters() {
     setSearch("");
     setStatusFilter("");
     setOrgUnitFilter("");
+    setSiteFilter("");
     setManagerFilter("");
     setPage(0);
   }
@@ -493,6 +520,23 @@ export function PersonnelPage() {
 
           {/* فیلترهای ترکیب‌پذیر فهرست پرسنل */}
           <div className="mb-4 flex flex-wrap items-center gap-2">
+            {sites.length > 1 && (
+              <FilterSelect
+                aria-label="فیلتر محل"
+                value={siteFilter}
+                onChange={(v) => {
+                  setSiteFilter(v);
+                  setPage(0);
+                }}
+              >
+                <option value="">همهٔ محل‌ها</option>
+                {sites.map((site) => (
+                  <option key={site} value={site}>
+                    {site}
+                  </option>
+                ))}
+              </FilterSelect>
+            )}
             <FilterSelect
               aria-label="فیلتر واحد سازمانی"
               value={orgUnitFilter}

@@ -38,9 +38,11 @@ from app.schemas.analytics import (
     MyScoringProfile,
     RecommendationSlice,
     ScoreDistributionBucket,
+    SitePerformance,
     UnitPerformance,
 )
 from app.schemas.auth import CurrentUser
+from app.services.org_unit import site_of
 from app.services.privacy import is_below_cohort, suppressed_avg
 from app.services.workflow import IS_OPEN_RECORD
 
@@ -280,6 +282,30 @@ def executive_overview(
         for unit, avg, count in unit_rows
     ]
 
+    # تجمیعِ محل در پایتون و نه در SQL: قرارداد جداکننده یک تصمیم *محصولی* است
+    # (توضیحش در services/org_unit.py) و بردنش داخل کوئری یعنی همان قانون در دو
+    # زبان نوشته شود. تعداد واحدها ده‌ها است، نه میلیون‌ها.
+    site_totals: dict[str, list[float]] = {}
+    for unit, avg, count in unit_rows:
+        site = site_of(unit)
+        if site is None or avg is None:
+            continue
+        bucket = site_totals.setdefault(site, [0.0, 0.0])
+        bucket[0] += float(avg) * count
+        bucket[1] += count
+    by_site = [
+        SitePerformance(
+            site=site,
+            # میانگینِ وزنی بر حسب تعداد، نه میانگینِ میانگین‌ها — وگرنه واحدی با
+            # دو نفر همان‌قدر وزن داشت که واحدی با پنجاه نفر.
+            avg_final_pct=suppressed_avg(_round(total / count, 1), int(count)),
+            count=int(count),
+        )
+        for site, (total, count) in sorted(
+            site_totals.items(), key=lambda item: item[1][0] / item[1][1], reverse=True
+        )
+    ]
+
     recommendation_rows = db.execute(
         select(EvaluationRecord.recommendation, func.count())
         .where(_FINALIZED, EvaluationRecord.recommendation.is_not(None))
@@ -360,6 +386,7 @@ def executive_overview(
         total_finalized=total,
         avg_final_pct=avg_final,
         by_org_unit=by_org_unit,
+        by_site=by_site,
         recommendation_mix=recommendation_mix,
         cycle_time=cycle_time,
         contract_exposure=contract_exposure,

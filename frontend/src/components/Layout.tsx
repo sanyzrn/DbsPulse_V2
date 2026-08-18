@@ -27,7 +27,6 @@ const NAV_BY_ROLE: Record<string, { to: string; label: string; module?: string }
     { to: "/hr/queue", label: "صف بررسی" },
     { to: "/hr/periods", label: "دوره‌های ارزیابی", module: "periods" },
     { to: "/improvement-plans", label: "برنامه‌های بهبود", module: "improvement_plans" },
-    { to: "/hr/audit-log", label: "گزارش رویدادها" },
   ],
   // مسئول واحد و معاونت ممکن است «مسئول پیگیریِ» یک برنامهٔ بهبود باشند (P1-10).
   // سرور فهرست را به برنامه‌های خودشان محدود می‌کند؛ بدون این لینک، تنها راه
@@ -51,9 +50,10 @@ const NAV_BY_ROLE: Record<string, { to: string; label: string; module?: string }
     { to: "/executive", label: "تحلیل سازمان", module: "role_analytics" },
   ],
   employee: [{ to: "/me", label: "کارنامه من" }],
-  // پشتیبانی فنی هیچ صف کاری‌ای ندارد. تنها لینکش («مدیریت سامانه») از روی
-  // مجوز اضافه می‌شود، نه از این جدول — چون همان لینک برای HR دارای مجوز هم هست.
-  support: [{ to: "/hr/audit-log", label: "گزارش رویدادها" }],
+  // پشتیبانی فنی هیچ صف کاری‌ای ندارد. هر دو لینکش («گزارش رویدادها» و
+  // «مدیریت سامانه») از روی مجوز اضافه می‌شوند، نه از این جدول — چون این دو
+  // به نقش گره نخورده‌اند و هرکسی که مجوزش را بگیرد باید ببیندشان.
+  support: [],
 };
 
 export function Layout() {
@@ -130,9 +130,19 @@ export function Layout() {
                   </NavLink>
                 </li>
               ))}
-              {/* مدیریت سامانه بر پایهٔ مجوز است نه نقش — حساب پشتیبانی فنی
-                  نقش hr ندارد ولی باید این‌جا را ببیند. */}
-              {(can("manage_users") || can("manage_modules")) && (
+              {/* هر دو بر پایهٔ مجوزند نه نقش. تا امروز «گزارش رویدادها» در
+                  فهرست ثابتِ HR بود و «مدیریت سامانه» با `manage_users` باز
+                  می‌شد — یعنی همان کسی که در زنجیره تصمیم می‌گیرد، هر دو را
+                  هم داشت. حالا منابع انسانی حسابِ کاربر می‌سازد (manage_users)
+                  ولی نه اختیار می‌دهد و نه لاگ کامل را می‌خواند. */}
+              {(can("view_audit_log") || can("view_diagnostics")) && (
+                <li>
+                  <NavLink to="/hr/audit-log" className={navLinkClass}>
+                    گزارش رویدادها
+                  </NavLink>
+                </li>
+              )}
+              {(can("manage_capabilities") || can("manage_modules")) && (
                 <li>
                   <NavLink to="/administration" className={navLinkClass}>
                     مدیریت سامانه

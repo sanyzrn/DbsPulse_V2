@@ -2,7 +2,7 @@ from datetime import date, datetime
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-from app.models.enums import PersonnelStatus
+from app.models.enums import PersonnelStatus, SeparationReason
 from app.schemas.user import _PASSWORD_MIN_LENGTH, _USERNAME_PATTERN
 
 
@@ -59,6 +59,11 @@ class PersonnelUpdate(BaseModel):
     contract_start_date: date | None = None
     contract_end_date: date | None = None
     status: PersonnelStatus | None = None
+    # فقط هنگام غیرفعال‌کردن معنا دارند. اگر علت داده نشود و وضعیت به «غیرفعال»
+    # برود، سرور رد می‌کند — نه چون فیلد اجباری است، بلکه چون رفتنِ بدونِ علت
+    # همان چیزی است که این دو ستون برای حذفش آمدند.
+    separation_reason: SeparationReason | None = None
+    separation_date: date | None = None
 
 
 class PersonnelRead(BaseModel):
@@ -73,6 +78,8 @@ class PersonnelRead(BaseModel):
     contract_start_date: date
     contract_end_date: date
     status: PersonnelStatus
+    separation_date: date | None = None
+    separation_reason: SeparationReason | None = None
     created_at: datetime
     updated_at: datetime
 

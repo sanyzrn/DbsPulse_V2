@@ -69,6 +69,18 @@ class UnitPerformance(BaseModel):
     count: int
 
 
+class SitePerformance(BaseModel):
+    """کارنامهٔ یک محل (دفتر مرکزی، کارخانه، …).
+
+    از روی همان `org_unit` ساخته می‌شود؛ توضیحِ قرارداد در
+    `app/services/org_unit.py`.
+    """
+
+    site: str
+    avg_final_pct: float | None
+    count: int
+
+
 class RecommendationSlice(BaseModel):
     """ترکیب نتیجهٔ پیشنهادی — همان چیزی که به تصمیم تمدید قرارداد ترجمه می‌شود."""
 
@@ -101,6 +113,9 @@ class ExecutiveOverview(BaseModel):
     total_finalized: int
     avg_final_pct: float | None
     by_org_unit: list[UnitPerformance]
+    #: خالی می‌ماند اگر هیچ واحدی جداکنندهٔ محل نداشته باشد — یعنی سازمان یک
+    #: محل بیشتر ندارد و این تفکیک برایش معنا ندارد.
+    by_site: list[SitePerformance]
     recommendation_mix: list[RecommendationSlice]
     cycle_time: CycleTime
     contract_exposure: list[ContractExposure]

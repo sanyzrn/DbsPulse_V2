@@ -1,3 +1,5 @@
+from datetime import date
+
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
 from fastapi.responses import Response as FastAPIResponse
 from sqlalchemy import func, select
@@ -6,8 +8,8 @@ from sqlalchemy.orm import Session
 from app.api.deps import get_current_user, require_roles
 from app.core.security import hash_password
 from app.db.session import get_db
-from app.models.enums import PersonnelStatus, UserRole
-from app.models.evaluation import EvaluationRecord
+from app.models.enums import CommentStage, PersonnelStatus, UserRole
+from app.models.evaluation import EvaluationComment, EvaluationRecord
 from app.models.evaluation_access import EvaluationAccess
 from app.models.personnel import Personnel
 from app.models.user import User
@@ -25,9 +27,11 @@ from app.schemas.personnel import (
 )
 from app.services.audit import log_event
 from app.services.excel import build_personnel_workbook
+from app.services.org_unit import site_of
 from app.services.personnel_import import ImportPreview, build_template, parse_workbook
 from app.services.security_tokens import generate_temp_password
-from app.services.workflow import IS_OPEN_RECORD
+from app.services.sessions import revoke_all_for_user
+from app.services.workflow import IS_OPEN_RECORD, apply_transition
 
 router = APIRouter(prefix="/api/personnel", tags=["personnel"])
 
@@ -49,9 +53,11 @@ _PERSONNEL_SORT_COLUMNS = {
 def _apply_personnel_filters(
     query,
     *,
+    db: Session,
     q: str | None,
     status_filter: PersonnelStatus | None,
     org_unit: str | None,
+    site: str | None,
     is_manager: bool | None,
 ):
     """فیلترهای ترکیب‌پذیر فهرست/خروجی پرسنل — یک‌جا تا list و export.xlsx رفتار
@@ -64,6 +70,22 @@ def _apply_personnel_filters(
             | Personnel.job_title.ilike(pattern)
             | Personnel.org_unit.ilike(pattern)
         )
+    if site:
+        # تطبیق در پایتون و با همان تابعی که همه‌جا استفاده می‌شود، نه با یک
+        # الگوی LIKE.
+        #
+        # الگوی LIKE یعنی قرارداد جداکننده دو بار نوشته شود — یک بار در
+        # `split_site` و یک بار این‌جا — و همان‌جا بود که اولین بار شکست: مقدارِ
+        # واقعی «کارخانه / فروش» فاصله دارد و الگوی «کارخانه/%» هیچ‌چیز نگرفت.
+        # تعداد واحدهای متمایز ده‌ها است، پس خواندنشان ارزان‌تر از نگه‌داشتن دو
+        # نسخه از یک قانون است.
+        wanted = site.strip()
+        matching = [
+            unit
+            for unit in db.scalars(select(Personnel.org_unit).distinct())
+            if site_of(unit) == wanted
+        ]
+        query = query.where(Personnel.org_unit.in_(matching))
     if status_filter is not None:
         query = query.where(Personnel.status == status_filter)
     if org_unit:
@@ -113,6 +135,7 @@ def list_personnel(
     q: str | None = None,
     status_filter: PersonnelStatus | None = Query(default=None, alias="status"),
     org_unit: str | None = None,
+    site: str | None = None,
     is_manager: bool | None = None,
     sort_by: str = Query(default="full_name"),
     sort_dir: str = Query(default="asc", pattern="^(asc|desc)$"),
@@ -132,7 +155,13 @@ def list_personnel(
             column == current_user.id
         )
     query = _apply_personnel_filters(
-        query, q=q, status_filter=status_filter, org_unit=org_unit, is_manager=is_manager
+        query,
+        db=db,
+        q=q,
+        status_filter=status_filter,
+        org_unit=org_unit,
+        site=site,
+        is_manager=is_manager,
     )
 
     total = db.scalar(select(func.count()).select_from(query.subquery())) or 0
@@ -162,6 +191,7 @@ def export_personnel_excel(
     q: str | None = None,
     status_filter: PersonnelStatus | None = Query(default=None, alias="status"),
     org_unit: str | None = None,
+    site: str | None = None,
     is_manager: bool | None = None,
     sort_by: str = Query(default="full_name"),
     sort_dir: str = Query(default="asc", pattern="^(asc|desc)$"),
@@ -171,7 +201,13 @@ def export_personnel_excel(
     """خروجی Excel از فهرست پرسنل (فقط HR) با همان فیلترها/مرتب‌سازی فهرست، تا HR
     دقیقاً همان چیزی را که روی صفحه فیلتر کرده دریافت کند."""
     query = _apply_personnel_filters(
-        select(Personnel), q=q, status_filter=status_filter, org_unit=org_unit, is_manager=is_manager
+        select(Personnel),
+        db=db,
+        q=q,
+        status_filter=status_filter,
+        org_unit=org_unit,
+        site=site,
+        is_manager=is_manager,
     )
     rows = list(db.scalars(query.order_by(_personnel_order_by(sort_by, sort_dir))))
     log_event(db, actor_user_id=current_user.id, event_type="personnel_excel_exported")
@@ -449,6 +485,64 @@ def get_personnel(
     return personnel
 
 
+def _close_out_departure(db: Session, personnel: Personnel, actor: CurrentUser) -> None:
+    """کارهایی که با رفتنِ یک نفر باید انجام شوند، و تا امروز نمی‌شدند.
+
+    **پروندهٔ باز.** تا دیروز همان‌جا می‌ماند: در صف بررسی کسی معلق، و
+    یادآوری‌های SLA رویش فعال — برای کسی که دیگر در سازمان نیست. لغو می‌شود، نه
+    پاک: `cancelled` یک وضعیت پایانی است و همهٔ امتیازها و کامنت‌ها سر جایشان
+    می‌مانند. علتش هم به‌صورت کامنت در خودِ پرونده ثبت می‌شود تا شش ماه بعد
+    معلوم باشد چرا نیمه‌کاره ماند.
+
+    **حساب کاربری.** کسی که رفته نباید فردا بتواند وارد شود. `token_version`
+    بالا می‌رود و نشست‌ها باطل می‌شوند، وگرنه توکنِ زنده‌اش تا انقضا کار می‌کرد
+    — یعنی «غیرفعال کردم» تا ساعت‌ها بعد واقعاً معنایی نداشت.
+
+    این‌جا عمداً *مسدود* نمی‌کند (برخلاف تغییر `is_manager`، که پرونده‌اش
+    می‌تواند ادامه پیدا کند و فقط مسیرش عوض می‌شود). پروندهٔ کسی که رفته
+    ادامه‌پذیر نیست؛ مجبورکردن HR به لغو دستی پیش از غیرفعال‌کردن، فقط دو کلیک
+    اضافه برای رسیدن به همان نتیجه است.
+    """
+    open_evaluation = db.scalar(
+        select(EvaluationRecord).where(
+            EvaluationRecord.subject_personnel_id == personnel.id,
+            IS_OPEN_RECORD,
+        )
+    )
+    if open_evaluation is not None:
+        reason = personnel.separation_reason.value if personnel.separation_reason else "—"
+        db.add(
+            EvaluationComment(
+                evaluation_record_id=open_evaluation.id,
+                commenter_user_id=actor.id,
+                stage=CommentStage.hr_review,
+                comment_text=f"لغو خودکار — پرسنل از سازمان خارج شد (علت: {reason})",
+            )
+        )
+        log_event(
+            db,
+            actor_user_id=actor.id,
+            event_type="evaluation_cancelled_on_separation",
+            evaluation_record_id=open_evaluation.id,
+            old_value={"status": open_evaluation.status.value},
+            new_value={"separation_reason": reason},
+        )
+        apply_transition(db, open_evaluation, "cancel", actor)
+
+    account = db.scalar(select(User).where(User.personnel_id == personnel.id))
+    if account is not None and account.is_active:
+        account.is_active = False
+        account.token_version += 1
+        revoke_all_for_user(db, account.id)
+        log_event(
+            db,
+            actor_user_id=actor.id,
+            event_type="user_deactivated_on_separation",
+            old_value={"username": account.username, "is_active": True},
+            new_value={"username": account.username, "is_active": False},
+        )
+
+
 @router.patch("/{personnel_id}", response_model=PersonnelRead)
 def update_personnel(
     personnel_id: int,
@@ -490,6 +584,26 @@ def update_personnel(
                 ),
             )
 
+    # --- خروج از سازمان ---------------------------------------------------
+    # سه کار که تا امروز هیچ‌کدام انجام نمی‌شد و هر سه بی‌سروصدا هزینه داشتند.
+    leaving = (
+        "status" in updates
+        and updates["status"] is PersonnelStatus.inactive
+        and personnel.status is not PersonnelStatus.inactive
+    )
+    if leaving and updates.get("separation_reason") is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="برای غیرفعال‌کردن پرسنل باید علت خروج مشخص شود",
+        )
+    if leaving and updates.get("separation_date") is None:
+        updates["separation_date"] = date.today()
+    # برگشتن به «فعال» یعنی آن خروج اتفاق نیفتاده یا برگشت خورده؛ ماندنِ علتِ
+    # قدیمی روی پروندهٔ یک نفرِ شاغل، بدترین نوع دادهٔ کهنه است.
+    if "status" in updates and updates["status"] is PersonnelStatus.active:
+        updates["separation_date"] = None
+        updates["separation_reason"] = None
+
     def _jsonable(value: object) -> object:
         return value.value if hasattr(value, "value") else str(value)
 
@@ -511,6 +625,9 @@ def update_personnel(
         old_value=old_value,
         new_value={"id": personnel.id, **payload.model_dump(exclude_unset=True, mode="json")},
     )
+
+    if leaving:
+        _close_out_departure(db, personnel, current_user)
 
     # اگر فرد به «مدیر» تبدیل شود، دسترسی مسئول واحد قبلی (در صورت وجود) دیگر معتبر
     # نیست؛ طبق همان قانونی که در ثبت/ویرایش دسترسی اعمال می‌شود، باید خودکار پاک شود.

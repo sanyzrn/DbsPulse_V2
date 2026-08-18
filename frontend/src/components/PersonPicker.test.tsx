@@ -15,6 +15,8 @@ function person(id: number, full_name: string, over: Partial<Personnel> = {}): P
     contract_start_date: "2025-01-01",
     contract_end_date: "2026-01-01",
     status: "active",
+    separation_date: null,
+    separation_reason: null,
     created_at: "",
     updated_at: "",
     ...over,

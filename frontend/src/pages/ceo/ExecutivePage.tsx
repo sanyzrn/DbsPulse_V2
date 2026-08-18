@@ -30,6 +30,9 @@ interface ExecutiveOverview {
   total_finalized: number;
   avg_final_pct: number | null;
   by_org_unit: UnitPerformance[];
+  /** خالی می‌ماند اگر هیچ واحدی جداکنندهٔ محل نداشته باشد — یعنی سازمان یک
+   *  محل بیشتر ندارد و این تفکیک برایش معنا ندارد. */
+  by_site: { site: string; avg_final_pct: number | null; count: number }[];
   recommendation_mix: RecommendationSlice[];
   cycle_time: {
     finalized_count: number;
@@ -66,6 +69,7 @@ export function ExecutivePage() {
 
   const visibleUnits = data.by_org_unit.filter((u) => u.avg_final_pct !== null);
   const hiddenUnits = data.by_org_unit.length - visibleUnits.length;
+  const visibleSites = data.by_site.filter((s) => s.avg_final_pct !== null);
 
   return (
     <div className="space-y-5">
@@ -198,6 +202,30 @@ export function ExecutivePage() {
           </dl>
         </Card>
       </div>
+
+      {/* ── مقایسهٔ محل‌ها ──
+          فقط وقتی دیده می‌شود که واقعاً بیش از یک محل در کار باشد. سازمان
+          تک‌محلی نباید کارتی ببیند که همیشه یک ردیف دارد و چیزی نمی‌گوید. */}
+      {visibleSites.length > 1 && (
+        <Card title="عملکرد به تفکیک محل">
+          <DotPlot
+            rows={visibleSites.map((site) => ({
+              key: site.site,
+              label: site.site,
+              value: site.avg_final_pct!,
+              note: `${faInt(site.count)} ارزیابی`,
+            }))}
+            reference={data.avg_final_pct}
+            ariaLabel="میانگین امتیاز نهایی به تفکیک محل"
+            footer={
+              <span>
+                میانگینِ وزنی بر حسب تعداد ارزیابی است، نه میانگینِ میانگینِ واحدها —
+                وگرنه واحدی با دو نفر همان وزنی را داشت که واحدی با پنجاه نفر.
+              </span>
+            }
+          />
+        </Card>
+      )}
 
       {/* ── مقایسهٔ واحدها ── */}
       <Card title="عملکرد به تفکیک واحد سازمانی">

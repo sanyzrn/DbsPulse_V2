@@ -11,8 +11,17 @@ class EvaluationAccess(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     personnel_id: Mapped[int] = mapped_column(ForeignKey("personnel.id"), nullable=False)
+    # هر دو خالی‌پذیرند، و هرکدام یک مرحلهٔ *نبودنی* را نشان می‌دهند:
+    #
+    # مسئول واحدِ خالی = مسیر «مدیر»؛ معاونت خودش نمره‌دهندهٔ اول است.
+    # معاونتِ خالی = فرد مستقیم زیر نظر مدیرعامل است.
+    #
+    # دومی از روی ساختار واقعی یک سازمان اضافه شد: در فایل پرسنلی که وارد شد، ۹
+    # نفر هیچ معاونتی بالای سرشان نداشتند. تا پیش از این ستون NOT NULL بود، یعنی
+    # تنها راه ثبتشان این بود که یک معاونتِ ساختگی بالای سرشان گذاشته شود — و
+    # همان اسمِ ساختگی بعداً پای تأیید پروندهٔ آن‌ها می‌نشست.
     unit_supervisor_user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
-    deputy_user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False)
+    deputy_user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
     ceo_user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False)
     updated_by_user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
     updated_at: Mapped[datetime] = mapped_column(

@@ -59,6 +59,10 @@ class Transition:
     # پیام مخصوصِ «این پرونده مالِ کاربر دیگری است» — وقتی error_detail خودش این
     # معنا را نمی‌رساند (مثل مرحلهٔ HR که پیامش دربارهٔ وضعیت است، نه مالکیت).
     owner_error_detail: str | None = None
+    # شرط اضافه بر وضعیت. برای گذارهایی که *نبودنِ* یک مرحله مجازشان می‌کند:
+    # مدیرعامل می‌تواند از `hr_approved` نهایی کند، ولی فقط وقتی معاونتی در
+    # زنجیره نیست. بدون این شرط، همان گذار راهی می‌شد برای دورزدنِ تأیید معاونت.
+    guard: "Callable[[EvaluationRecord], bool] | None" = None
 
 
 TRANSITIONS: dict[str, Transition] = {
@@ -89,7 +93,13 @@ TRANSITIONS: dict[str, Transition] = {
         error_detail="این ارزیابی در مرحله تأیید معاونت توسط شما نیست",
     ),
     "ceo_finalize": Transition(
-        from_statuses=frozenset({EvaluationStatus.deputy_approved}),
+        from_statuses=frozenset(
+            {EvaluationStatus.deputy_approved, EvaluationStatus.hr_approved}
+        ),
+        guard=lambda record: (
+            record.status is not EvaluationStatus.hr_approved
+            or record.deputy_user_id is None
+        ),
         to_status=EvaluationStatus.finalized,
         allowed_role=UserRole.ceo,
         assignee_field="ceo_user_id",
@@ -145,6 +155,8 @@ def ensure_transition_allowed(
     spec = TRANSITIONS[action]
     denied = HTTPException(status_code=spec.error_status, detail=spec.error_detail)
     if record.status not in spec.from_statuses or current_user.role != spec.allowed_role:
+        raise denied
+    if spec.guard is not None and not spec.guard(record):
         raise denied
     if spec.assignee_field is not None:
         assignee = getattr(record, spec.assignee_field)
@@ -212,6 +224,15 @@ def apply_transition(
 def is_manager_path(record: EvaluationRecord) -> bool:
     """مسیر «مدیر»: مسئول واحد ندارد؛ معاونت خودش نمره‌دهنده اول است."""
     return record.unit_supervisor_user_id is None
+
+
+def skips_deputy(record: EvaluationRecord) -> bool:
+    """این پرونده مرحلهٔ معاونت ندارد؛ پس از منابع انسانی مستقیم به مدیرعامل می‌رود.
+
+    قرینهٔ `is_manager_path` برای آن سرِ زنجیره. هر دو یک چیز می‌گویند: مرحله‌ای
+    که کسی در آن نایستاده، نباید پرونده را نگه دارد.
+    """
+    return record.deputy_user_id is None
 
 
 # `active_indicators_by_id` عمداً حذف شد (P1-05). هر جا که پرسیده می‌شود «این

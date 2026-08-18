@@ -43,8 +43,12 @@ class EvaluationRecord(Base):
     # پیشنهاد می‌داد آن‌که در دیتابیس نیست را بسازد.
     verify_token: Mapped[str | None] = mapped_column(String(64), nullable=True)
     subject_personnel_id: Mapped[int] = mapped_column(ForeignKey("personnel.id"), nullable=False)
+    # زنجیره در لحظهٔ ساخت از `EvaluationAccess` کپی می‌شود، تا تغییر بعدیِ
+    # دسترسی، پروندهٔ در جریان را از زیر پای تأییدکننده‌اش عوض نکند. هر دو مرحلهٔ
+    # میانی می‌توانند غایب باشند و NULL دقیقاً همان را می‌گوید: مسئول واحدِ خالی
+    # یعنی مسیر «مدیر»، معاونتِ خالی یعنی فرد مستقیم زیر نظر مدیرعامل است.
     unit_supervisor_user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
-    deputy_user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False)
+    deputy_user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
     ceo_user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False)
     # مسئولِ HR این پرونده. سه مرحلهٔ دیگر همیشه صاحب مشخصی داشتند، ولی مرحلهٔ HR
     # نداشت: هر کاربر HR روی هر پرونده‌ای می‌توانست اقدام کند، پس در سازمانی با چند

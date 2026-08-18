@@ -5,13 +5,24 @@ title DbsPulse - Setup and Run
 REM ============================================================
 REM  DbsPulse - local development bootstrap (Windows)
 REM
-REM  DESIGN RULE FOR THIS SCRIPT: never open the browser on a
-REM  broken stack. The previous version checked whether the
-REM  backend came up, stored the answer in a variable, and then
-REM  never looked at it - so a dead backend produced a perfectly
-REM  healthy-looking login page and no clue why sign-in failed.
-REM  Every check below either passes or stops with the reason
-REM  and the exact command that fixes it.
+REM  TWO DESIGN RULES FOR THIS SCRIPT:
+REM
+REM  1. Never open the browser on a broken stack. A dead backend
+REM     still serves a perfectly healthy-looking login page that
+REM     simply cannot log anyone in, and that is the single most
+REM     confusing way for this to fail.
+REM
+REM  2. Never end on an instruction the user cannot follow. The
+REM     old version stopped with "run psql -U postgres ..." - but
+REM     the PostgreSQL installer does not put psql on PATH, so
+REM     that command failed too and the setup dead-ended. Where
+REM     this script can fix something itself, it does; where it
+REM     genuinely cannot, it says exactly what to do.
+REM
+REM  Checks verify that a thing WORKS, not that it EXISTS. "python
+REM  is on PATH" is not the same as "python runs and is new
+REM  enough" - on a fresh Windows 11, `python` is usually a Store
+REM  stub that satisfies the first and fails the second.
 REM ============================================================
 
 set "ROOT=%~dp0"
@@ -20,6 +31,13 @@ set "BACKEND=%ROOT%\backend"
 set "FRONTEND=%ROOT%\frontend"
 set "VENV=%BACKEND%\.venv"
 
+REM Minimum versions, kept next to each other so they are easy to
+REM find when a dependency raises the bar.
+REM   Python 3.11 - app code imports `datetime.UTC`, added in 3.11.
+REM   Node 20.19  - required by Vite 8 (see frontend/package.json).
+set "MIN_PY_MAJOR=3"
+set "MIN_PY_MINOR=11"
+
 REM UTF-8 mode, set once and inherited by both server windows.
 REM
 REM Without this, `import app.main` dies before binding a port:
@@ -27,7 +45,7 @@ REM slowapi builds its Limiter by reading backend\.env through
 REM starlette's Config, which uses the OS default encoding. On a
 REM Persian Windows install that is cp1252, and a single Persian
 REM comment in .env raises UnicodeDecodeError. The generated .env
-REM is kept ASCII as well (step 3) so a manually started uvicorn
+REM is kept ASCII as well (step 4) so a manually started uvicorn
 REM works too - but this line means it works either way.
 set "PYTHONUTF8=1"
 set "PYTHONIOENCODING=utf-8"
@@ -46,33 +64,99 @@ echo.
 REM ------------------------------------------------------------
 REM  1. Prerequisites
 REM ------------------------------------------------------------
-echo [1/7] Checking prerequisites...
+echo [1/8] Checking prerequisites...
 
 if not exist "%BACKEND%" call :fail "Backend folder not found at %BACKEND%" "You are running this script from the wrong place. Keep setup_and_run.bat in the repository root."
 if not exist "%FRONTEND%" call :fail "Frontend folder not found at %FRONTEND%" "You are running this script from the wrong place. Keep setup_and_run.bat in the repository root."
 
-where python >nul 2>nul
-if errorlevel 1 call :fail "Python was not found in PATH." "Install Python 3.11 or newer from https://python.org and tick 'Add python.exe to PATH' during setup."
+REM --- Python: must actually run, and be new enough ---------------
+REM `where python` is deliberately NOT used. On a fresh Windows 11
+REM it finds %LOCALAPPDATA%\Microsoft\WindowsApps\python.exe - an
+REM App Execution Alias that opens the Microsoft Store and prints
+REM nothing. It satisfies `where`, creates no venv, and the first
+REM real symptom is a confusing failure several steps later.
+REM Running it and reading the version back is the only check that
+REM distinguishes a real interpreter from the stub.
+REM Detection lives in a subroutine because the probe command contains
+REM parentheses - `print(...)`. Inside a parenthesised if/for block, cmd
+REM matches the first `)` it sees against the block instead of the
+REM command, and the line silently does the wrong thing. At subroutine
+REM top level there is no enclosing block to confuse it.
+call :detect_python
 
-where node >nul 2>nul
-if errorlevel 1 call :fail "Node.js was not found in PATH." "Install Node.js 20 or newer from https://nodejs.org, then open a NEW terminal so PATH is refreshed."
+if not defined PYCMD (
+    echo.
+    echo    Python did not run. If `python` opens the Microsoft Store,
+    echo    that is the placeholder, not a real install:
+    echo        Settings ^> Apps ^> Advanced app settings ^>
+    echo        App execution aliases ^> turn OFF both "python" entries
+    echo.
+    call :fail "No working Python interpreter found." "Install Python %MIN_PY_MAJOR%.%MIN_PY_MINOR% or newer from https://python.org and tick 'Add python.exe to PATH', then open a NEW terminal."
+)
 
-echo    OK  python and node are available
+set /a MIN_PY_ENC=%MIN_PY_MAJOR%*1000+%MIN_PY_MINOR%
+if !PYVER! LSS !MIN_PY_ENC! (
+    set /a FOUND_MAJOR=!PYVER!/1000
+    set /a FOUND_MINOR=!PYVER!%%1000
+    echo.
+    echo    Found Python !FOUND_MAJOR!.!FOUND_MINOR!, but this project needs %MIN_PY_MAJOR%.%MIN_PY_MINOR% or newer.
+    echo    The backend imports `datetime.UTC`, which only exists from 3.11 on,
+    echo    so an older interpreter fails at import time - after everything
+    echo    else in this script has already reported success.
+    echo.
+    call :fail "Python is too old." "Install Python %MIN_PY_MAJOR%.%MIN_PY_MINOR%+ from https://python.org, then open a NEW terminal and run this script again."
+)
+
+REM --- Node: must be new enough for Vite 8 -----------------------
+REM Same reasoning as Python. Node 18 was LTS until recently and is
+REM still widely installed; `npm install` succeeds on it and only
+REM `npm run dev` fails, which points the blame at the wrong step.
+call :detect_node
+
+if not defined NODEVER call :fail "Node.js was not found (or did not run)." "Install Node.js 20.19+ or 22.12+ from https://nodejs.org, then open a NEW terminal so PATH is refreshed."
+
+REM Vite 8 wants ^20.19 || >=22.12. Anything at or above 20.19 that
+REM is not a 21.x or an early 22.x satisfies it.
+set "NODE_OK=0"
+if !NODEVER! GEQ 22012 set "NODE_OK=1"
+if !NODEVER! GEQ 20019 if !NODEVER! LSS 21000 set "NODE_OK=1"
+if "!NODE_OK!"=="0" (
+    echo.
+    echo    Found Node !NODE_TEXT!, which Vite 8 refuses to start on.
+    echo    `npm install` will still succeed on it - only `npm run dev`
+    echo    fails, which makes it look like a frontend bug.
+    echo.
+    call :fail "Node.js is too old." "Install Node.js 20.19+ or 22.12+ from https://nodejs.org, then open a NEW terminal and run this script again."
+)
+
+echo    OK  python ^(!PYCMD!^) and node are present and new enough
 echo.
 
 REM ------------------------------------------------------------
-REM  2. Python virtual environment + dependencies
+REM  2. Python virtual environment
 REM ------------------------------------------------------------
-echo [2/7] Backend virtual environment...
+echo [2/8] Backend virtual environment...
 if not exist "%VENV%\Scripts\python.exe" (
     echo    Creating venv at "%VENV%"...
-    python -m venv "%VENV%"
+    %PYCMD% -m venv "%VENV%"
     if errorlevel 1 call :fail "Could not create the Python virtual environment." "Check that you have write permission in %BACKEND%, then run this script again."
-) else (
-    echo    OK  venv already exists
 )
 
+REM `python -m venv` can report success and still leave an unusable
+REM venv (interrupted run, antivirus, a half-deleted folder). Test
+REM the interpreter rather than trusting the exit code.
+if not exist "%VENV%\Scripts\python.exe" call :fail "The virtual environment is missing its interpreter." "Delete the folder %VENV% and run this script again."
+
 set "PY=%VENV%\Scripts\python.exe"
+"%PY%" -c "import sys" >nul 2>nul
+if errorlevel 1 call :fail "The virtual environment's Python does not run." "Delete the folder %VENV% and run this script again - it is usually a half-created venv."
+echo    OK  venv ready
+echo.
+
+REM ------------------------------------------------------------
+REM  3. Backend dependencies
+REM ------------------------------------------------------------
+echo [3/8] Backend dependencies...
 
 REM Reinstall only when requirements.txt actually changed. The marker
 REM is a copy of the file, so `fc /b` is an exact content comparison.
@@ -83,6 +167,11 @@ if exist "%REQ_MARKER%" (
     fc /b "%REQ_MARKER%" "%REQ_FILE%" >nul 2>nul
     if not errorlevel 1 set "NEED_INSTALL=0"
 )
+
+REM The marker says "we installed these requirements", not "the venv
+REM is intact". If uvicorn is gone the marker is lying, so re-install
+REM rather than start a server that cannot launch.
+if "!NEED_INSTALL!"=="0" if not exist "%VENV%\Scripts\uvicorn.exe" set "NEED_INSTALL=1"
 
 if "!NEED_INSTALL!"=="1" (
     echo    Installing Python packages ^(this can take a few minutes^)...
@@ -98,9 +187,9 @@ if "!NEED_INSTALL!"=="1" (
 echo.
 
 REM ------------------------------------------------------------
-REM  3. Backend .env
+REM  4. Backend .env
 REM ------------------------------------------------------------
-echo [3/7] Backend environment file...
+echo [4/8] Backend environment file...
 set "ENV_FILE=%BACKEND%\.env"
 if not exist "%ENV_FILE%" (
     echo    Creating "%ENV_FILE%" with local defaults...
@@ -123,6 +212,13 @@ if not exist "%ENV_FILE%" (
     >>"%ENV_FILE%" echo CORS_ORIGINS=http://localhost:5173,http://localhost:8080
     >>"%ENV_FILE%" echo PUBLIC_BASE_URL=http://localhost:5173
     >>"%ENV_FILE%" echo SEED_DEMO_DATA=true
+    >>"%ENV_FILE%" echo.
+    >>"%ENV_FILE%" echo # Aggregate averages are hidden below this many evaluations, so that
+    >>"%ENV_FILE%" echo # a "unit average" over two people cannot be read back as those two
+    >>"%ENV_FILE%" echo # people's scores. The production default is 5; the demo data set is
+    >>"%ENV_FILE%" echo # smaller than that, so every dashboard chart would come up empty
+    >>"%ENV_FILE%" echo # and look broken. 1 disables suppression - LOCAL DEMO ONLY.
+    >>"%ENV_FILE%" echo MIN_COHORT_SIZE=1
     echo    OK  created - edit it if your PostgreSQL user/password/database differ
 ) else (
     REM An existing .env may still carry Persian comments from an older
@@ -142,12 +238,12 @@ if not exist "%ENV_FILE%" (
 echo.
 
 REM ------------------------------------------------------------
-REM  4. PostgreSQL reachability
+REM  5. PostgreSQL: reachable, and the database actually exists
 REM ------------------------------------------------------------
 REM Checked before Alembic so the message names the real cause. A failed
 REM migration can mean a dozen things; "nothing is listening on 5432"
 REM means one.
-echo [4/7] PostgreSQL...
+echo [5/8] PostgreSQL...
 "%PY%" -c "import socket,sys; s=socket.socket(); s.settimeout(2); sys.exit(s.connect_ex(('127.0.0.1',5432)))" >nul 2>nul
 if errorlevel 1 (
     echo.
@@ -160,35 +256,78 @@ if errorlevel 1 (
     call :fail "PostgreSQL is not reachable." "See the commands above, then run this script again."
 )
 echo    OK  something is listening on 127.0.0.1:5432
-echo.
 
-REM ------------------------------------------------------------
-REM  5. Database migrations
-REM ------------------------------------------------------------
-echo [5/7] Applying database migrations...
+REM The role and database are created here instead of being demanded
+REM from the user, because the instructions we used to print could not
+REM be followed: psql is not on PATH after a default Windows install.
+REM psycopg is already in the venv by this point, so we can just do it.
 pushd "%BACKEND%"
-"%PY%" -m alembic upgrade head
-if errorlevel 1 (
-    popd
+"%PY%" -m scripts.ensure_database
+set "DBRC=!errorlevel!"
+
+if "!DBRC!"=="3" (
     echo.
-    echo    PostgreSQL is running, so this is almost certainly the database
-    echo    or role not existing yet. Create them once with:
+    echo    The database does not exist yet, and creating it needs the
+    echo    PostgreSQL admin password - the one set during installation
+    echo    for the "postgres" user.
     echo.
+    REM Read into PGPASSWORD rather than a command line argument: libpq
+    REM picks it up from the environment, and it never shows up in the
+    REM process list where other users could read it. Subroutine again -
+    REM the PowerShell one-liner is full of brackets and parentheses.
+    call :read_pgpassword
+    echo.
+    "%PY%" -m scripts.ensure_database
+    set "DBRC=!errorlevel!"
+    set "PGPASSWORD="
+)
+
+popd
+
+if not "!DBRC!"=="0" (
+    echo.
+    echo    Could not create the database automatically.
+    echo.
+    echo    If you have pgAdmin ^(installed alongside PostgreSQL^), create:
+    echo        role      dbspulse   password  dbspulse_dev_password
+    echo        database  dbspulse   owner     dbspulse
+    echo.
+    echo    Or from the PostgreSQL bin folder, which is usually
+    echo        C:\Program Files\PostgreSQL\16\bin
+    echo    run:
     echo        psql -U postgres -c "CREATE ROLE dbspulse LOGIN PASSWORD 'dbspulse_dev_password';"
     echo        psql -U postgres -c "CREATE DATABASE dbspulse OWNER dbspulse;"
     echo.
     echo    If your credentials differ, edit DATABASE_URL in "%ENV_FILE%".
     echo.
-    call :fail "Alembic migration failed." "See the commands above, then run this script again."
+    call :fail "The application database is not available." "See the options above, then run this script again."
+)
+echo    OK  database is available
+echo.
+
+REM ------------------------------------------------------------
+REM  6. Database migrations
+REM ------------------------------------------------------------
+echo [6/8] Applying database migrations...
+pushd "%BACKEND%"
+"%PY%" -m alembic upgrade head
+if errorlevel 1 (
+    popd
+    echo.
+    echo    The database exists and is reachable, so this is a migration
+    echo    error rather than a connection problem - read the traceback
+    echo    above for the failing revision.
+    echo.
+    call :fail "Alembic migration failed." "See the output above, then run this script again."
 )
 popd
 echo    OK  schema is up to date
 echo.
 
 REM ------------------------------------------------------------
-REM  6. Frontend dependencies
+REM  7. Frontend dependencies
 REM ------------------------------------------------------------
-echo [6/7] Frontend dependencies...
+echo [7/8] Frontend dependencies...
 if exist "%FRONTEND%\node_modules" (
     echo    OK  node_modules already present
 ) else (
@@ -205,9 +344,9 @@ if exist "%FRONTEND%\node_modules" (
 echo.
 
 REM ------------------------------------------------------------
-REM  7. Start the servers
+REM  8. Start the servers
 REM ------------------------------------------------------------
-echo [7/7] Starting servers...
+echo [8/8] Starting servers...
 
 REM A stale process on 8000 makes uvicorn exit instantly in its own
 REM window, which is easy to miss. Name it now rather than let the
@@ -293,8 +432,16 @@ echo  Frontend : http://localhost:5173
 echo  Backend  : http://localhost:8000
 if defined LAN_IP echo  On LAN   : http://!LAN_IP!:5173
 echo.
-echo  Demo sign-in: hr1 / sup1 / dep1 / ceo1 / emp1
+REM Only the accounts the seed migration actually creates are listed.
+REM An account that does not exist looks identical to a broken backend
+REM from the login screen, so a wrong name here costs real debugging time.
+echo  Demo sign-in: hr1 / sup1 / sup2 / dep1 / ceo1
 echo  Password    : DbsPulse@12345
+echo.
+echo  The base seed is only 3 people, so most charts stay empty. For a
+echo  realistic org (every workflow stage, a returned case, an expiring
+echo  contract), run once in the backend folder:
+echo      .venv\Scripts\python -m scripts.seed_demo_scenarios
 echo.
 echo  Two console windows are running the servers.
 echo  Close them (or press Ctrl+C inside) to stop DbsPulse.
@@ -305,10 +452,51 @@ endlocal
 exit /b 0
 
 REM ------------------------------------------------------------
+REM  :detect_python -> sets PYCMD and PYVER, or leaves both unset
+REM
+REM  Tries `python` first, then the `py` launcher, which is often
+REM  present and working even when `python` is the Store stub.
+REM  PYVER is major*1000+minor, so 3.11 -> 3011 and plain integer
+REM  comparison gives correct ordering (3.9 -> 3009 < 3011).
+REM ------------------------------------------------------------
+:detect_python
+set "PYVER="
+for /f "usebackq delims=" %%V in (`python -c "import sys;print(sys.version_info[0]*1000+sys.version_info[1])" 2^>nul`) do set "PYVER=%%V"
+if defined PYVER (
+    set "PYCMD=python"
+    exit /b 0
+)
+for /f "usebackq delims=" %%V in (`py -3 -c "import sys;print(sys.version_info[0]*1000+sys.version_info[1])" 2^>nul`) do set "PYVER=%%V"
+if defined PYVER (
+    set "PYCMD=py -3"
+    exit /b 0
+)
+exit /b 1
+
+REM ------------------------------------------------------------
+REM  :detect_node -> sets NODEVER (major*1000+minor) and NODE_TEXT
+REM ------------------------------------------------------------
+:detect_node
+set "NODEVER="
+set "NODE_TEXT="
+for /f "usebackq delims=" %%V in (`node -e "const p=process.versions.node.split('.');console.log(Number(p[0])*1000+Number(p[1]))" 2^>nul`) do set "NODEVER=%%V"
+for /f "usebackq delims=" %%V in (`node -p "process.versions.node" 2^>nul`) do set "NODE_TEXT=%%V"
+exit /b 0
+
+REM ------------------------------------------------------------
+REM  :read_pgpassword -> sets PGPASSWORD from a masked prompt
+REM ------------------------------------------------------------
+:read_pgpassword
+for /f "usebackq delims=" %%P in (`powershell -NoProfile -Command "$s=Read-Host -AsSecureString 'postgres password'; [Runtime.InteropServices.Marshal]::PtrToStringBSTR([Runtime.InteropServices.Marshal]::SecureStringToBSTR($s))"`) do set "PGPASSWORD=%%P"
+exit /b 0
+
+REM ------------------------------------------------------------
 REM  :fail "<what went wrong>" "<what to do about it>"
 REM
 REM  Every stop goes through here, so no failure can end with a
-REM  bare "press any key" and no explanation.
+REM  bare "press any key" and no explanation. `exit` without /b is
+REM  deliberate: this is CALLed, and `exit /b` would return to the
+REM  caller and let the script carry on past a fatal error.
 REM ------------------------------------------------------------
 :fail
 echo.

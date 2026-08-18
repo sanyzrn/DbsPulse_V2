@@ -60,7 +60,11 @@ def auth_header(user: User) -> dict:
 
 def make_personnel(db: Session, job_title: str = "کارشناس", **overrides) -> Personnel:
     defaults = dict(
-        personnel_code=_unique("P-"),
+        # پیشوند «PT-» عمداً از «P-» جداست. شمارندهٔ _unique بین همهٔ helperها
+        # مشترک است، پس با بزرگ‌شدن مجموعهٔ تست بالاخره به P-1001 می‌رسید — که
+        # کد یکی از پرسنل دموی seed است — و تست‌ها بسته به ترتیب اجرا با
+        # UniqueViolation می‌شکستند. با پیشوند جدا، این برخورد ممکن نیست.
+        personnel_code=_unique("PT-"),
         full_name="کارمند تست",
         job_title=job_title,
         org_unit="واحد تست",

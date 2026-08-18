@@ -141,7 +141,20 @@ _PERSONNEL_HEADERS = [
     "وضعیت",
     "شروع قرارداد",
     "پایان قرارداد",
+    # علت خروج بدون جایی برای *دیده‌شدن*، فقط یک ستون پرشده در دیتابیس است.
+    # کل دلیل ثبتش این بود که استعفا و اخراج و پایان قرارداد در گزارش HR یکی
+    # نیستند — و گزارش، همین فایل است.
+    "تاریخ خروج",
+    "علت خروج",
 ]
+
+_SEPARATION_LABELS = {
+    "resignation": "استعفا",
+    "dismissal": "اخراج",
+    "contract_end": "پایان قرارداد",
+    "retirement": "بازنشستگی",
+    "other": "سایر",
+}
 
 
 def build_personnel_workbook(rows: list[Personnel]) -> bytes:
@@ -157,6 +170,10 @@ def build_personnel_workbook(rows: list[Personnel]) -> bytes:
                 "فعال" if p.status.value == "active" else "غیرفعال",
                 _jalali_date(p.contract_start_date),
                 _jalali_date(p.contract_end_date),
+                _jalali_date(p.separation_date),
+                _SEPARATION_LABELS.get(
+                    p.separation_reason.value if p.separation_reason else "", ""
+                ),
             ]
         )
     return _to_bytes(wb)

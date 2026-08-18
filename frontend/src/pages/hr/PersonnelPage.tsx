@@ -637,9 +637,15 @@ export function PersonnelPage() {
                     فعال
                   </span>
                 ) : (
+                  // علتِ خروج کنار خودِ نشان می‌آید، نه پشت یک کلیک. کل دلیل
+                  // ثبتش این بود که استعفا و اخراج و پایان قرارداد یکی نیستند —
+                  // و اگر برای دیدنشان باید فرم ویرایش را باز کرد، در عمل
+                  // هیچ‌وقت دیده نمی‌شوند.
                   <span key="status" className="inline-flex items-center gap-1.5 rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-medium text-gray-500">
                     <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-gray-400" />
-                    غیرفعال
+                    {p.separation_reason
+                      ? SEPARATION_REASON_LABELS[p.separation_reason]
+                      : "غیرفعال"}
                   </span>
                 ),
                 <div key="actions" className="flex items-center gap-3">

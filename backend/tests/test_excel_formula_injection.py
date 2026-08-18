@@ -23,6 +23,11 @@ class _FakePersonnel:
         self.status = type("S", (), {"value": "active"})()
         self.contract_start_date = date(2025, 1, 1)
         self.contract_end_date = date(2026, 1, 1)
+        # پرسنلِ شاغل: هیچ خروجی ندارد. این دو فیلد این‌جا هستند چون خروجی اکسل
+        # می‌خواندشان — بدلی که فیلدهای واقعی را نداشته باشد، به‌جای سنجیدنِ
+        # ضدعفونی، روی AttributeError می‌افتد.
+        self.separation_date = None
+        self.separation_reason = None
         self.created_at = datetime(2025, 1, 1)
 
 

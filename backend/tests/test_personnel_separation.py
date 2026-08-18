@@ -9,6 +9,7 @@
 * علت خروج ثبت نمی‌شد. استعفا و اخراج و پایان قرارداد در گزارش HR یک چیز نیستند.
 """
 from datetime import date
+from io import BytesIO
 
 from app.models.enums import EvaluationStatus, PersonnelStatus, SeparationReason
 from app.models.evaluation import EvaluationRecord
@@ -129,3 +130,29 @@ def test_a_departure_does_not_disturb_anyone_else(client, db_session):
     db_session.refresh(stayer_account)
     assert stayer_account.is_active is True
     assert db_session.get(Personnel, stayer.id).status is PersonnelStatus.active
+
+
+def test_the_reason_reaches_the_hr_export(client, db_session):
+    """داده‌ای که فقط وارد می‌شود و هیچ‌جا بیرون نمی‌آید، ثبت نشده است.
+
+    کل توجیه این ستون‌ها گزارش‌گیری بود — «نرخ استعفا در یک واحد یک سیگنال
+    است». اگر در خروجی اکسل نباشند، آن سیگنال هیچ‌وقت خوانده نمی‌شود.
+    """
+    from openpyxl import load_workbook
+
+    hr = _hr(db_session)
+    personnel = make_personnel(db_session, full_name="کارمند رفته")
+    db_session.commit()
+    _leave(client, hr, personnel, SeparationReason.resignation)
+
+    response = client.get("/api/personnel/export.xlsx", headers=auth_header(hr))
+    assert response.status_code == 200, response.text
+
+    sheet = load_workbook(BytesIO(response.content)).active
+    header = [c.value for c in sheet[1]]
+    assert "علت خروج" in header
+    assert "تاریخ خروج" in header
+
+    reason_at = header.index("علت خروج")
+    rows = [r for r in sheet.iter_rows(min_row=2, values_only=True) if r[1] == "کارمند رفته"]
+    assert rows and rows[0][reason_at] == "استعفا"

@@ -386,6 +386,7 @@ async def commit_personnel_import(
 
     accounts: list[CreatedAccount] = []
     created_personnel = 0
+    chains_created = 0
 
     for row in preview.valid:
         personnel = Personnel(
@@ -413,6 +414,33 @@ async def commit_personnel_import(
                 "imported": True,
             },
         )
+
+        # زنجیرهٔ ارزیابی، از همان ردیف. بدون این، ایمپورت ۴۲ نفره یعنی ۴۲ نفر
+        # که هیچ‌کس نمی‌تواند ارزیابی‌شان کند، و تنظیمش ۴۲ بار باز کردن فرم
+        # ویرایش است.
+        if row.has_chain:
+            db.add(
+                EvaluationAccess(
+                    personnel_id=personnel.id,
+                    unit_supervisor_user_id=row.unit_supervisor_user_id,
+                    deputy_user_id=row.deputy_user_id,
+                    ceo_user_id=row.ceo_user_id,
+                    updated_by_user_id=current_user.id,
+                )
+            )
+            chains_created += 1
+            log_event(
+                db,
+                actor_user_id=current_user.id,
+                event_type="evaluation_access_set",
+                new_value={
+                    "personnel_id": personnel.id,
+                    "unit_supervisor_user_id": row.unit_supervisor_user_id,
+                    "deputy_user_id": row.deputy_user_id,
+                    "ceo_user_id": row.ceo_user_id,
+                    "imported": True,
+                },
+            )
 
         if row.username:
             password = generate_temp_password()
@@ -462,6 +490,7 @@ async def commit_personnel_import(
 
     return PersonnelImportResult(
         created_personnel=created_personnel,
+        created_chains=chains_created,
         created_accounts=len(accounts),
         skipped_rows=len(preview.invalid),
         accounts=accounts,

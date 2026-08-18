@@ -32,7 +32,9 @@ router = APIRouter(prefix="/api/administration", tags=["administration"])
 
 #: توضیح فارسیِ هر مجوز — یک‌جا، تا UI و پیام‌های خطا یک زبان داشته باشند.
 CAPABILITY_LABELS: dict[Capability, str] = {
-    Capability.manage_users: "مدیریت کاربران و مجوزها",
+    Capability.manage_users: "ساخت و ویرایش حساب کاربری",
+    Capability.manage_capabilities: "دادن و گرفتن مجوزها",
+    Capability.view_audit_log: "خواندن کامل گزارش رویدادها",
     Capability.manage_scoring: "شاخص‌ها و طرح نمره‌دهی",
     Capability.manage_integrations: "تنظیمات ایمیل و پیامک",
     Capability.manage_modules: "روشن و خاموش کردن بخش‌ها",
@@ -63,13 +65,13 @@ _CHAIN_ROLES = (UserRole.hr, UserRole.unit_supervisor, UserRole.deputy, UserRole
 
 #: مجوزهایی که «تغییرِ قواعدِ بازی» محسوب می‌شوند. داشتنِ این‌ها به‌همراه نقشی در
 #: زنجیره یعنی همان کسی که تصمیم می‌گیرد، قاعده را هم می‌نویسد.
-_RULE_CHANGING = (Capability.manage_scoring, Capability.manage_users)
+_RULE_CHANGING = (Capability.manage_scoring, Capability.manage_capabilities)
 
 
 @router.get("/separation", response_model=SeparationStatus)
 def separation_status(
     db: Session = Depends(get_db),
-    current_user: CurrentUser = Depends(require_capability(Capability.manage_users)),
+    current_user: CurrentUser = Depends(require_capability(Capability.manage_capabilities)),
 ) -> SeparationStatus:
     """آیا تفکیک وظایف واقعاً برقرار است، یا فقط ممکن شده؟
 
@@ -112,7 +114,7 @@ def separation_status(
 @router.get("/capabilities", response_model=list[CapabilityHolder])
 def list_capability_holders(
     db: Session = Depends(get_db),
-    current_user: CurrentUser = Depends(require_capability(Capability.manage_users)),
+    current_user: CurrentUser = Depends(require_capability(Capability.manage_capabilities)),
 ) -> list[CapabilityHolder]:
     """چه کسی چه اختیاری دارد.
 
@@ -146,7 +148,7 @@ def set_capabilities(
     user_id: int,
     payload: CapabilityGrant,
     db: Session = Depends(get_db),
-    current_user: CurrentUser = Depends(require_capability(Capability.manage_users)),
+    current_user: CurrentUser = Depends(require_capability(Capability.manage_capabilities)),
 ) -> CapabilityHolder:
     """مجموعهٔ کامل مجوزهای یک کاربر را جایگزین می‌کند."""
     user = db.get(User, user_id)
@@ -161,16 +163,16 @@ def set_capabilities(
     desired = {Capability(value) for value in payload.capabilities}
     current = capabilities_of(db, user_id)
 
-    # آخرین دارندهٔ manage_users نمی‌تواند آن را از خودش بگیرد.
+    # آخرین دارندهٔ manage_capabilities نمی‌تواند آن را از خودش بگیرد.
     #
     # بدون این گارد، یک کلیک اشتباه سامانه را در حالتی قفل می‌کند که هیچ‌کس
     # نمی‌تواند به کسی مجوز بدهد — و تنها راه خروج، SQL دستی روی پروداکشن است.
-    if Capability.manage_users in current and Capability.manage_users not in desired:
+    if Capability.manage_capabilities in current and Capability.manage_capabilities not in desired:
         others = db.scalar(
             select(User.id)
             .join(UserCapability, UserCapability.user_id == User.id)
             .where(
-                UserCapability.capability == Capability.manage_users,
+                UserCapability.capability == Capability.manage_capabilities,
                 User.id != user_id,
                 User.is_active.is_(True),
             )

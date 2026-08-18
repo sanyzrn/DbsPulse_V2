@@ -5,16 +5,17 @@ from fastapi.responses import Response
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from app.api.deps import hr_or_diagnostics, require_roles
+from app.api.deps import audit_log_reader, require_capability
 from app.db.session import get_db
 from app.models.audit_log import AuditLog
-from app.models.enums import UserRole
+from app.models.enums import Capability
 from app.models.evaluation import EvaluationRecord
 from app.models.personnel import Personnel
 from app.models.user import User
 from app.schemas.audit_log import AuditIntegrityRead, AuditLogPage, AuditLogRead
 from app.schemas.auth import CurrentUser
 from app.services.audit import verify_chain
+from app.services.authorization import capabilities_of
 from app.services.excel import build_audit_log_workbook
 
 router = APIRouter(prefix="/api/audit-log", tags=["audit-log"])
@@ -182,7 +183,7 @@ def list_audit_log(
     limit: int = Query(default=50, ge=1, le=200),
     offset: int = Query(default=0, ge=0),
     db: Session = Depends(get_db),
-    current_user: CurrentUser = Depends(hr_or_diagnostics),
+    current_user: CurrentUser = Depends(audit_log_reader),
 ) -> AuditLogPage:
     filters = _build_filters(
         event_type,
@@ -195,9 +196,12 @@ def list_audit_log(
         contract_end_from,
         contract_end_to,
     )
-    # منابع انسانی کل لاگ را می‌بیند؛ هر کس دیگری که فقط مجوز عیب‌یابی دارد
-    # (پشتیبانی فنی) تنها رویدادهای سامانه‌ای را — بدون هیچ ردی از محتوای پرونده.
-    if current_user.role is not UserRole.hr:
+    # دارندهٔ `view_audit_log` کل لاگ را می‌بیند؛ کسی که فقط مجوز عیب‌یابی دارد
+    # تنها رویدادهای سامانه‌ای را — بدون هیچ ردی از محتوای پرونده.
+    #
+    # شرط قبلی `role is not hr` بود، که دو ایراد داشت: دسترسیِ کامل را نمی‌شد
+    # از HR گرفت مگر با عوض‌کردن نقشش، و نمی‌شد به کس دیگری داد.
+    if Capability.view_audit_log not in capabilities_of(db, current_user.id):
         filters = [
             *filters,
             AuditLog.event_type.in_(SYSTEM_EVENT_TYPES),
@@ -231,7 +235,7 @@ def list_audit_log(
 @router.get("/integrity", response_model=AuditIntegrityRead)
 def audit_integrity(
     db: Session = Depends(get_db),
-    current_user: CurrentUser = Depends(require_roles(UserRole.hr)),
+    current_user: CurrentUser = Depends(require_capability(Capability.view_audit_log)),
 ) -> AuditIntegrityRead:
     """راستی‌آزمایی زنجیرهٔ هش لاگ حسابرسی.
 
@@ -258,7 +262,7 @@ def export_audit_log_excel(
     contract_end_from: date | None = None,
     contract_end_to: date | None = None,
     db: Session = Depends(get_db),
-    current_user: CurrentUser = Depends(require_roles(UserRole.hr)),
+    current_user: CurrentUser = Depends(require_capability(Capability.view_audit_log)),
 ) -> Response:
     """خروجی Excel از گزارش رویدادها (فقط HR) با همان فیلترهای فهرست. برای پرهیز از
     فایل‌های عظیم، حداکثر ۵۰۰۰ ردیف اخیرِ منطبق با فیلتر صادر می‌شود."""

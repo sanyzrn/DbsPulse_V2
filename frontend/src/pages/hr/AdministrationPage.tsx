@@ -31,10 +31,14 @@ interface ModuleState {
 
 /** برچسب فارسی هر مجوز، و — مهم‌تر — این‌که نداشتنش یعنی چه. */
 const CAPABILITY_INFO: Record<Capability, { label: string; scope: string }> = {
-  manage_users: { label: "کاربران و مجوزها", scope: "ساخت و غیرفعال‌کردن حساب، و دادن همین مجوزها" },
+  manage_users: { label: "حساب‌های کاربری", scope: "ساخت، ویرایش و غیرفعال‌کردن حساب" },
+  // عمداً از «حساب‌های کاربری» جداست: تا امروز یکی بودند، یعنی هرکس می‌توانست
+  // حساب بسازد می‌توانست به خودش هم هر اختیاری بدهد.
+  manage_capabilities: { label: "دادن مجوز", scope: "تعیین اینکه هر حساب چه اختیاری دارد — همین جدول" },
   manage_scoring: { label: "شاخص‌ها و طرح نمره‌دهی", scope: "تغییر سؤال‌های فرم و قواعد امتیازدهی" },
   manage_integrations: { label: "ایمیل و پیامک", scope: "تنظیم سرویس‌های ارسال بیرونی" },
   manage_modules: { label: "بخش‌های سامانه", scope: "روشن و خاموش کردن بخش‌ها" },
+  view_audit_log: { label: "گزارش کامل رویدادها", scope: "کل لاگ ممیزی، شامل امتیاز و نتیجهٔ پرونده‌ها" },
   view_diagnostics: { label: "سلامت سامانه", scope: "صف تحویل، اجرای زمان‌بند، وضعیت — فقط خواندنی" },
 };
 
@@ -55,8 +59,8 @@ export function AdministrationPage() {
         title="مدیریت سامانه"
         subtitle="چه کسی می‌تواند خودِ سامانه را عوض کند، و کدام بخش‌ها فعال‌اند"
       />
-      {can("manage_users") && <SeparationCard />}
-      {can("manage_users") && <CapabilitiesCard />}
+      {can("manage_capabilities") && <SeparationCard />}
+      {can("manage_capabilities") && <CapabilitiesCard />}
       {can("manage_modules") && <ModulesCard />}
       {!can("manage_users") && !can("manage_modules") && (
         <Card>

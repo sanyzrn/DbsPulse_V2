@@ -128,24 +128,28 @@ def require_module(key: str):
     return dependency
 
 
-def hr_or_diagnostics(
+def audit_log_reader(
     current_user: CurrentUser = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> CurrentUser:
-    """دو راهِ مشروعِ رسیدن به لاگ ممیزی.
+    """دو راهِ مشروعِ رسیدن به لاگ ممیزی — هر دو با مجوز، نه با نقش.
 
-    منابع انسانی به‌عنوان کارِ خودش («چه کسی این پرونده را برگرداند و چرا»)، و
-    پشتیبانی فنی برای عیب‌یابی («چرا فلانی نمی‌تواند وارد شود»). این گارد فقط
-    می‌گوید *حق ورود داری*؛ این‌که *چه چیزی می‌بینی* را خودِ endpoint تعیین
-    می‌کند — پشتیبانی تنها رویدادهای سامانه‌ای را.
+    `view_audit_log` کل لاگ را می‌دهد، شامل ردیف‌هایی که امتیاز و نتیجهٔ پرونده
+    را در خود دارند. `view_diagnostics` فقط رویدادهای سامانه‌ای را — عیب‌یابیِ
+    «چرا این حساب وارد نمی‌شود» به نمرهٔ کسی نیاز ندارد. این گارد فقط می‌گوید
+    *حق ورود داری*؛ اینکه *چه چیزی می‌بینی* را خودِ endpoint تعیین می‌کند.
+
+    تا پیش از این شرط اول `role is hr` بود، نه یک مجوز. یعنی دسترسی به کامل‌ترین
+    ردِ تصمیم‌ها به کسی گره خورده بود که خودش در زنجیرهٔ تصمیم می‌ایستد، و
+    گرفتنش از او هیچ راهی نداشت جز عوض‌کردن نقشش. حالا مثل هر اختیار اداری
+    دیگری داده و گرفته می‌شود.
 
     صریح نوشته شده و نه با یک `require_any` عمومی: نسخهٔ عمومی باید امضای هر
     گارد را با گرفتنِ TypeError حدس می‌زد، که تا روزی کار می‌کند که یکی از
     گاردها به دلیل دیگری TypeError بدهد و بی‌صدا از گارد رد شود.
     """
-    if current_user.role is UserRole.hr:
-        return current_user
-    if Capability.view_diagnostics in capabilities_of(db, current_user.id):
+    held = capabilities_of(db, current_user.id)
+    if Capability.view_audit_log in held or Capability.view_diagnostics in held:
         return current_user
     raise HTTPException(
         status_code=status.HTTP_403_FORBIDDEN,

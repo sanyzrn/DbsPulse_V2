@@ -16,9 +16,11 @@ import { useAuth } from "./AuthContext";
 
 export type Capability =
   | "manage_users"
+  | "manage_capabilities"
   | "manage_scoring"
   | "manage_integrations"
   | "manage_modules"
+  | "view_audit_log"
   | "view_diagnostics";
 
 interface Permissions {

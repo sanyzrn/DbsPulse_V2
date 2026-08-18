@@ -334,9 +334,13 @@ def test_separation_reports_not_separated_while_hr_still_holds_everything(client
 
     assert body["separated"] is False
     assert [u["username"] for u in body["overlapping_users"]] == [admin.username]
-    # فقط مجوزهای «قاعده‌ساز» گزارش می‌شوند، نه هر مجوزی
+    # فقط مجوزهای «قاعده‌ساز» گزارش می‌شوند، نه هر مجوزی.
+    #
+    # `manage_users` عمداً این‌جا نیست: ساختنِ حساب کارِ روزمرهٔ منابع انسانی
+    # است و تفکیک وظایف را نمی‌شکند. چیزی که می‌شکند، *اختیار دادن* است — و آن
+    # حالا مجوز جداگانه‌ای است.
     assert set(body["overlapping_users"][0]["capabilities"]) == {
-        Capability.manage_users.value,
+        Capability.manage_capabilities.value,
         Capability.manage_scoring.value,
     }
 

@@ -137,5 +137,8 @@ class CreatedAccount(BaseModel):
 class PersonnelImportResult(BaseModel):
     created_personnel: int
     created_accounts: int
+    #: چند نفر زنجیرهٔ ارزیابی هم گرفتند. اگر کمتر از تعداد پرسنل باشد، بقیه
+    #: هنوز قابل ارزیابی نیستند و کاربر باید بداند — نه اینکه بعداً کشف کند.
+    created_chains: int = 0
     skipped_rows: int
     accounts: list[CreatedAccount] = []

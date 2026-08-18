@@ -38,6 +38,7 @@ interface CreatedAccount {
 interface ImportResult {
   created_personnel: number;
   created_accounts: number;
+  created_chains: number;
   skipped_rows: number;
   accounts: CreatedAccount[];
 }
@@ -117,7 +118,12 @@ export function PersonnelImportDialog({
     try {
       const data = await send<ImportResult>("/personnel/import", file);
       setResult(data);
-      showSuccess(`${faNum(data.created_personnel)} پرسنل ثبت شد`);
+      showSuccess(
+        `${faNum(data.created_personnel)} پرسنل ثبت شد` +
+          (data.created_chains < data.created_personnel
+            ? ` — ${faNum(data.created_personnel - data.created_chains)} نفر هنوز زنجیرهٔ ارزیابی ندارند`
+            : "")
+      );
       onImported();
     } catch (err) {
       showError(extractErrorMessage(err));
@@ -284,6 +290,13 @@ function ResultView({ result }: { result: ImportResult }) {
     <div className="space-y-4">
       <div className="grid grid-cols-3 gap-3 text-center">
         <Stat label="پرسنل ثبت‌شده" value={result.created_personnel} tone="green" />
+        {/* اگر از تعداد پرسنل کمتر باشد، بقیه هنوز قابل ارزیابی نیستند — و این
+            باید همان‌جا دیده شود، نه اینکه بعداً کشف شود. */}
+        <Stat
+          label="زنجیرهٔ ارزیابی"
+          value={result.created_chains}
+          tone={result.created_chains < result.created_personnel ? "red" : "green"}
+        />
         <Stat label="حساب ساخته‌شده" value={result.created_accounts} tone="gray" />
         <Stat label="ردیف ردشده" value={result.skipped_rows} tone="red" />
       </div>

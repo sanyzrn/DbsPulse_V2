@@ -154,7 +154,9 @@ def ensure_transition_allowed(
 ) -> Transition:
     spec = TRANSITIONS[action]
     denied = HTTPException(status_code=spec.error_status, detail=spec.error_detail)
-    if record.status not in spec.from_statuses or current_user.role != spec.allowed_role:
+    if record.status not in spec.from_statuses or not may_act_at(
+        current_user.role, spec.allowed_role
+    ):
         raise denied
     if spec.guard is not None and not spec.guard(record):
         raise denied
@@ -219,6 +221,38 @@ def apply_transition(
     from app.services.notifications import notify_for_workflow_action
 
     notify_for_workflow_action(db, record, action)
+
+
+#: جایگاه هر نقش در سلسله‌مراتب زنجیرهٔ ارزیابی. منابع انسانی عمداً این‌جا نیست:
+#: نقشِ HR یک *پله* در سلسله‌مراتب نیست، یک وظیفهٔ جداست، و هیچ‌کس نباید با
+#: بالاتربودن بتواند جای آن بنشیند.
+_CHAIN_RANK: dict[UserRole, int] = {
+    UserRole.unit_supervisor: 1,
+    UserRole.deputy: 2,
+    UserRole.ceo: 3,
+}
+
+
+def may_act_at(user_role: UserRole, stage_role: UserRole) -> bool:
+    """آیا این نقش می‌تواند کارِ این مرحله را انجام دهد؟
+
+    مافوق می‌تواند کارِ مرحلهٔ پایین‌تر را بکند. این از ساختار واقعی یک سازمان
+    آمد: مدیرعاملی که برای چهار نفر خودش مسئول مستقیم هم هست، و معاونتی که برای
+    چند نفر نمره‌دهندهٔ اول است. تا پیش از این هر حساب یک نقش داشت و گارد همان
+    را می‌سنجید، پس چنین آدمی *اصلاً قابل تنظیم نبود* — نه اینکه سخت بود.
+    نمی‌شد.
+
+    این گارد را شل نمی‌کند: تنها راه اقدام روی یک پرونده همچنان این است که
+    شناسهٔ همان شخص در آن مرحله از زنجیره نشسته باشد (`assignee_field`). این
+    تابع فقط می‌گوید چه کسی *می‌تواند* در آن مرحله نشانده شود.
+    """
+    if stage_role is UserRole.hr:
+        return user_role is UserRole.hr
+    user_rank = _CHAIN_RANK.get(user_role)
+    stage_rank = _CHAIN_RANK.get(stage_role)
+    if user_rank is None or stage_rank is None:
+        return False
+    return user_rank >= stage_rank
 
 
 def is_manager_path(record: EvaluationRecord) -> bool:

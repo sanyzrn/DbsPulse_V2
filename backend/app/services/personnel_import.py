@@ -28,9 +28,10 @@ from openpyxl import load_workbook
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.models.enums import PersonnelStatus
+from app.models.enums import PersonnelStatus, UserRole
 from app.models.personnel import Personnel
 from app.models.user import User
+from app.services.workflow import may_act_at
 
 # همان ستون‌های build_personnel_workbook، به‌علاوهٔ یک ستون اختیاری برای نام کاربری
 COLUMNS = [
@@ -43,8 +44,27 @@ COLUMNS = [
     "شروع قرارداد",
     "پایان قرارداد",
     "نام کاربری",
+    # سه ستون زنجیرهٔ ارزیابی. هر سه اختیاری‌اند و با *نام* پر می‌شوند، نه با
+    # شناسه: کسی که فایل پرسنلی را در اکسل پر می‌کند، id کاربر را نمی‌داند.
+    #
+    # بدون این‌ها، ایمپورت فقط پرسنل می‌ساخت و زنجیره خالی می‌ماند — یعنی
+    # بلافاصله بعد از یک ایمپورت ۴۲ نفره، ۴۲ نفر داشتید که هیچ‌کس نمی‌توانست
+    # ارزیابی‌شان کند، و تنظیمش ۴۲ بار باز کردن فرم ویرایش بود.
+    "مسئول مستقیم",
+    "معاونت مربوطه",
+    "مدیرعامل",
 ]
 REQUIRED_COLUMNS = COLUMNS[:4] + COLUMNS[6:8]
+
+#: ستون‌های زنجیره، و مرحله‌ای که هرکدام پر می‌کنند.
+CHAIN_COLUMNS: tuple[tuple[str, str, UserRole], ...] = (
+    ("مسئول مستقیم", "unit_supervisor_user_id", UserRole.unit_supervisor),
+    ("معاونت مربوطه", "deputy_user_id", UserRole.deputy),
+    ("مدیرعامل", "ceo_user_id", UserRole.ceo),
+)
+
+#: مقادیری که یعنی «این مرحله را ندارد» — نه اینکه یادشان رفته پر کنند.
+_ABSENT_WORDS = {"", "-", "—", "ندارد", "نامشخص"}
 
 # ارقام فارسی و عربی → اسکی. بدون این، «۱۴۰۵/۰۱/۰۱» که خودِ ما تولید کرده‌ایم
 # هنگام بازگشت غیرقابل تجزیه می‌شد.
@@ -140,7 +160,24 @@ class ImportRow:
     contract_start_date: date | None = None
     contract_end_date: date | None = None
     username: str | None = None
+    # شناسهٔ کاربرِ هر مرحله، پس از تطبیق نام. None یعنی یا ستون خالی بوده یا
+    # نامش پیدا نشد — که دومی خودش یک خطای ردیف است، پس این دو با هم قاطی
+    # نمی‌شوند.
+    unit_supervisor_user_id: int | None = None
+    deputy_user_id: int | None = None
+    ceo_user_id: int | None = None
     errors: list[str] = field(default_factory=list)
+
+    @property
+    def has_chain(self) -> bool:
+        """آیا آن‌قدر زنجیره دارد که بشود ساختش؟
+
+        مدیرعامل الزامی است (کسی باید پرونده را ببندد) و دست‌کم یکی از دو مرحلهٔ
+        میانی، وگرنه هیچ‌کس نمره نمی‌دهد.
+        """
+        return self.ceo_user_id is not None and (
+            self.unit_supervisor_user_id is not None or self.deputy_user_id is not None
+        )
 
     @property
     def ok(self) -> bool:
@@ -174,6 +211,95 @@ def _read_sheet(content: bytes) -> tuple[list[str], list[tuple[int, tuple]]]:
     return header, body
 
 
+def _evaluator_index(db: Session) -> tuple[dict[str, list[User]], dict[str, User]]:
+    """کاربرانِ فعال، یک‌بار، برای تطبیق نام‌های ستون‌های زنجیره.
+
+    هم با نام و هم با نام کاربری تطبیق داده می‌شود: فایلِ منابع انسانی معمولاً
+    نام فارسی دارد، ولی کسی که فایل دوم را می‌سازد ممکن است نام کاربری بنویسد،
+    و ردکردنِ آن فقط یک مانع بی‌دلیل است.
+
+    نام‌های هم‌نام در یک فهرست جمع می‌شوند نه اینکه یکی دیگری را بپوشاند —
+    انتخابِ خاموشِ یکی از دو «محمد محمدی»، همان کسی است که بعداً پای تأیید
+    پروندهٔ اشتباهی می‌نشیند.
+    """
+    users = list(db.scalars(select(User).where(User.is_active.is_(True))))
+    by_name: dict[str, list[User]] = {}
+    for user in users:
+        if user.full_name:
+            by_name.setdefault(user.full_name.strip(), []).append(user)
+    return by_name, {u.username: u for u in users}
+
+
+def _resolve_chain(
+    item: ImportRow,
+    raw: tuple,
+    cell,
+    by_name: dict[str, list[User]],
+    by_username: dict[str, User],
+    sole_ceo: User | None,
+) -> None:
+    """نام‌های ستون‌های زنجیره را به کاربر تبدیل می‌کند.
+
+    نامی که پیدا نشود یک خطای ردیف است، نه یک هشدار. اگر بی‌صدا رد می‌شد،
+    ایمپورت «موفق» گزارش می‌داد و آن پرسنل بدون زنجیره می‌ماند — یعنی همان
+    وضعیتی که این ستون‌ها برای رفعش اضافه شدند، فقط این بار پنهان.
+    """
+    for column, attribute, stage_role in CHAIN_COLUMNS:
+        written = _text(cell(raw, column))
+        if written in _ABSENT_WORDS:
+            continue
+
+        # هیچ‌کس ارزیابِ خودش نیست (P0-10). پیش از تطبیق نام سنجیده می‌شود،
+        # وگرنه وقتی آن فرد هنوز حساب کاربری ندارد، پیامِ «پیدا نشد» جای
+        # تشخیصِ درست را می‌گرفت — و کاربر می‌رفت حسابی بسازد که مشکل را حل
+        # نمی‌کرد.
+        #
+        # مسیرهای دیگر این را با `ensure_evaluators_are_not_the_subject`
+        # می‌سنجند، ولی آن از روی `users.personnel_id` کار می‌کند و در لحظهٔ
+        # پیش‌نمایش این پرسنل هنوز ساخته نشده. تریگرهای دیتابیس (مایگریشن
+        # c3e8b1a76d94) پشتیبان نهایی‌اند، ولی وسط ایمپورت یک خطای پایگاه‌داده
+        # می‌دهند نه پیامی که بشود قبلش خواند.
+        if written == item.full_name:
+            item.errors.append(f"«{column}»: یک نفر نمی‌تواند ارزیابِ خودش باشد")
+            continue
+
+        matches = by_name.get(written)
+        if not matches:
+            from_username = by_username.get(written)
+            matches = [from_username] if from_username else []
+
+        if not matches:
+            item.errors.append(
+                f"«{column}»: کاربری با نام «{written}» پیدا نشد؛ اول حسابش را بسازید"
+            )
+            continue
+        if len(matches) > 1:
+            # انتخابِ خاموشِ یکی از دو هم‌نام، همان کسی است که بعداً پای تأیید
+            # پروندهٔ اشتباهی می‌نشیند.
+            item.errors.append(
+                f"«{column}»: بیش از یک کاربر با نام «{written}» هست؛ به‌جای نام، نام کاربری را بنویسید"
+            )
+            continue
+
+        user = matches[0]
+        if not may_act_at(user.role, stage_role):
+            item.errors.append(
+                f"«{column}»: «{written}» نمی‌تواند در این مرحله قرار بگیرد"
+            )
+            continue
+        setattr(item, attribute, user.id)
+
+    # ستون مدیرعامل معمولاً در فایل‌های واقعی خالی است، چون سازمان یکی بیشتر
+    # ندارد و تکرارش در هر ردیف کار بیهوده‌ای است.
+    if item.ceo_user_id is None and sole_ceo is not None:
+        item.ceo_user_id = sole_ceo.id
+
+
+    # پرسنلِ «مدیر» مسئول واحد ندارد — همان قانونی که فرم دسترسی هم اعمال می‌کند.
+    if item.is_manager:
+        item.unit_supervisor_user_id = None
+
+
 def parse_workbook(content: bytes, db: Session) -> ImportPreview:
     """فایل را می‌خواند، هر ردیف را اعتبارسنجی می‌کند و گزارش می‌دهد. چیزی نمی‌نویسد."""
     try:
@@ -201,6 +327,12 @@ def parse_workbook(content: bytes, db: Session) -> ImportPreview:
     # یک‌بار خوانده می‌شوند تا برای هر ردیف یک کوئری جدا نزنیم
     existing_codes = {c for (c,) in db.execute(select(Personnel.personnel_code))}
     existing_usernames = {u for (u,) in db.execute(select(User.username))}
+    by_name, by_username = _evaluator_index(db)
+    # اگر سازمان دقیقاً یک مدیرعامل فعال دارد، ستون خالیِ «مدیرعامل» همان را
+    # می‌گیرد. نوشتنِ یک نام تکراری در ۴۲ ردیف، کاری است که فایل می‌تواند
+    # نکند — و وقتی گزینه یکی است، حدسی در کار نیست.
+    ceos = [u for users in by_name.values() for u in users if u.role is UserRole.ceo]
+    sole_ceo = ceos[0] if len(ceos) == 1 else None
 
     seen_codes: dict[str, int] = {}
     seen_usernames: dict[str, int] = {}
@@ -276,6 +408,8 @@ def parse_workbook(content: bytes, db: Session) -> ImportPreview:
             else:
                 seen_usernames[username] = number
                 item.username = username
+
+        _resolve_chain(item, raw, cell, by_name, by_username, sole_ceo)
 
         parsed.append(item)
 

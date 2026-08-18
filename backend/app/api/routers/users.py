@@ -23,10 +23,42 @@ def _apply_user_filters(query, *, role: UserRole | None, q: str | None, is_activ
     if role is not None:
         query = query.where(User.role == role)
     if q:
-        query = query.where(User.username.ilike(f"%{q.strip()}%"))
+        # نام هم جست‌وجو می‌شود، نه فقط نام کاربری: کسی که دنبال «رضایی» می‌گردد
+        # نمی‌داند نام کاربری‌اش dep1 است — و همین باعث می‌شد فهرست خالی برگردد.
+        needle = f"%{q.strip()}%"
+        query = query.where(User.username.ilike(needle) | User.full_name.ilike(needle))
     if is_active is not None:
         query = query.where(User.is_active == is_active)
     return query
+
+
+def _linked_names(db: Session, users: list[User]) -> dict[int, str]:
+    """نام پرسنلِ حساب‌های وصل‌شده، با یک کوئری برای کل صفحه (نه N+1)."""
+    personnel_ids = {u.personnel_id for u in users if u.personnel_id is not None}
+    if not personnel_ids:
+        return {}
+    return dict(
+        db.execute(
+            select(Personnel.id, Personnel.full_name).where(Personnel.id.in_(personnel_ids))
+        ).all()
+    )
+
+
+def _to_read(users: list[User], linked_names: dict[int, str]) -> list[UserRead]:
+    """پروندهٔ پرسنلی مرجع نام است، اگر باشد.
+
+    وگرنه HR می‌تواند نام یک نفر را در پروندهٔ پرسنلی اصلاح کند و صفحهٔ کاربران
+    همچنان نام قدیمی را نشان بدهد — دو منبع حقیقت، که دیر یا زود از هم دور
+    می‌افتند.
+    """
+    items = []
+    for user in users:
+        item = UserRead.model_validate(user)
+        linked = linked_names.get(user.personnel_id) if user.personnel_id else None
+        if linked:
+            item.display_name = linked
+        items.append(item)
+    return items
 
 
 @router.get("", response_model=UserPage)
@@ -42,7 +74,7 @@ def list_users(
     query = _apply_user_filters(select(User), role=role, q=q, is_active=is_active)
     total = db.scalar(select(func.count()).select_from(query.subquery())) or 0
     items = list(db.scalars(query.order_by(User.username).limit(limit).offset(offset)))
-    return UserPage(total=total, items=[UserRead.model_validate(u) for u in items])
+    return UserPage(total=total, items=_to_read(items, _linked_names(db, items)))
 
 
 @router.get("/export.xlsx")
@@ -56,17 +88,7 @@ def export_users_excel(
     """خروجی Excel از فهرست کاربران (فقط HR) با همان فیلترهای فهرست."""
     query = _apply_user_filters(select(User), role=role, q=q, is_active=is_active)
     users = list(db.scalars(query.order_by(User.username)))
-    # نام پرسنل مرتبط با یک کوئری دسته‌ای (نه N+1)
-    personnel_ids = {u.personnel_id for u in users if u.personnel_id is not None}
-    personnel_names = (
-        dict(
-            db.execute(
-                select(Personnel.id, Personnel.full_name).where(Personnel.id.in_(personnel_ids))
-            ).all()
-        )
-        if personnel_ids
-        else {}
-    )
+    personnel_names = _linked_names(db, users)
     log_event(db, actor_user_id=current_user.id, event_type="users_excel_exported")
     db.commit()
     return Response(
@@ -81,7 +103,7 @@ def create_user(
     payload: UserCreate,
     db: Session = Depends(get_db),
     current_user: CurrentUser = Depends(require_capability(Capability.manage_users)),
-) -> User:
+) -> UserRead:
     existing = db.scalar(select(User).where(User.username == payload.username))
     if existing is not None:
         raise HTTPException(
@@ -96,6 +118,7 @@ def create_user(
         password_hash=hash_password(payload.password),
         role=payload.role,
         personnel_id=payload.personnel_id,
+        full_name=(payload.full_name or "").strip() or None,
         is_active=True,
     )
     db.add(user)
@@ -108,7 +131,7 @@ def create_user(
     )
     db.commit()
     db.refresh(user)
-    return user
+    return _to_read([user], _linked_names(db, [user]))[0]
 
 
 @router.patch("/{user_id}", response_model=UserRead)
@@ -117,12 +140,17 @@ def update_user(
     payload: UserUpdate,
     db: Session = Depends(get_db),
     current_user: CurrentUser = Depends(require_capability(Capability.manage_users)),
-) -> User:
+) -> UserRead:
     user = db.get(User, user_id)
     if user is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="کاربر یافت نشد")
 
-    old_value = {"role": user.role.value, "is_active": user.is_active, "personnel_id": user.personnel_id}
+    old_value = {
+        "role": user.role.value,
+        "is_active": user.is_active,
+        "personnel_id": user.personnel_id,
+        "full_name": user.full_name,
+    }
     updates = payload.model_dump(exclude_unset=True, exclude={"password"})
 
     # محافظ قفل‌شدن: HR نمی‌تواند حساب خودش را غیرفعال کند یا نقش HR خودش را بگیرد؛
@@ -173,4 +201,4 @@ def update_user(
     )
     db.commit()
     db.refresh(user)
-    return user
+    return _to_read([user], _linked_names(db, [user]))[0]

@@ -64,6 +64,7 @@ def get_current_user(
     return CurrentUser(
         id=user.id,
         username=user.username,
+        display_name=user.display_name,
         role=user.role,
         personnel_id=user.personnel_id,
         must_change_password=user.must_change_password,

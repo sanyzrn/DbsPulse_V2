@@ -62,10 +62,12 @@ export function ProfileMenu({ user, onLogout }: { user: CurrentUser; onLogout: (
             {/* هدر تیره — همان زبان بصری کارت‌های «hero» تیره‌ی باقی اپ */}
             <div className="flex items-center gap-3 bg-charcoal-900 px-4 py-3.5">
               <span className="flex h-11 w-11 flex-none items-center justify-center rounded-full border-2 border-white/15 bg-pulse-600 text-base font-bold text-white">
-                {user.username.charAt(0).toUpperCase()}
+                {(user.display_name || user.username).charAt(0).toUpperCase()}
               </span>
               <span className="min-w-0 leading-tight">
-                <span className="block truncate text-sm font-bold text-white">{user.username}</span>
+                <span className="block truncate text-sm font-bold text-white">
+                  {user.display_name || user.username}
+                </span>
                 <span className="mt-1 inline-block rounded-full bg-white/15 px-2 py-0.5 text-[11px] font-medium text-white/85">
                   {ROLE_LABELS[user.role]}
                 </span>

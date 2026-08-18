@@ -16,6 +16,15 @@ class User(Base):
         nullable=True,
     )
     username: Mapped[str] = mapped_column(String(150), unique=True, nullable=False)
+    # نام قابل‌نمایشِ صاحب حساب. خالی‌پذیر، و عمداً جدا از `personnel.full_name`:
+    # حساب‌های نقش‌دار (معاونت، مدیرعامل، مسئول واحد، منابع انسانی) پروندهٔ پرسنلی
+    # ندارند، پس تا امروز همه‌جا با نام کاربری دیده می‌شدند — «dep1» به‌جای
+    # «معاونت، آقای رضایی». آن نام کاربری برای *ورود* است، نه برای شناساندنِ
+    # کسی که پای یک ارزیابی امضا گذاشته.
+    #
+    # اگر حساب به پرسنل وصل باشد، منبع نام همان پرونده است و این ستون لازم نیست؛
+    # `display_name` همین ترتیب را پیاده می‌کند.
+    full_name: Mapped[str | None] = mapped_column(String(200), nullable=True)
     password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
     role: Mapped[UserRole] = mapped_column(
         Enum(UserRole, name="user_role", values_callable=lambda e: [m.value for m in e]),
@@ -42,3 +51,14 @@ class User(Base):
     __table_args__ = (
         Index("ix_users_is_active", "is_active"),
     )
+
+    @property
+    def display_name(self) -> str:
+        """نامی که باید به آدم‌ها نشان داده شود، و هیچ‌وقت خالی نیست.
+
+        نام کاربری آخرین گزینه است، نه گزینهٔ اول: تا وقتی نامی ثبت نشده باشد
+        صفحه نباید خالی بماند. جایی که حساب به پرسنل وصل است، لایهٔ API نام
+        پرونده را ترجیح می‌دهد — آن نام را همان‌جا از قبل خوانده و اضافه‌کردن
+        یک relationship این‌جا فقط یک کوئری اضافه به‌ازای هر ردیف می‌شد.
+        """
+        return self.full_name or self.username

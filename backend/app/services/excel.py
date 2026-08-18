@@ -186,6 +186,9 @@ _ROLE_LABELS = {
 
 _USER_HEADERS = [
     "نام کاربری",
+    # نام، بلافاصله کنار نام کاربری: فهرستی که فقط «dep1» دارد برای کسی که
+    # بیرون از سامانه بازش می‌کند تقریباً بی‌معناست.
+    "نام",
     "نقش",
     "وضعیت",
     "پرسنل مرتبط",
@@ -201,6 +204,8 @@ def build_users_workbook(users: list[User], personnel_names: dict[int, str]) -> 
         ws.append(
             [
                 u.username,
+                (personnel_names.get(u.personnel_id) if u.personnel_id else None)
+                or u.display_name,
                 _ROLE_LABELS.get(u.role.value, u.role.value),
                 "فعال" if u.is_active else "غیرفعال",
                 personnel_names.get(u.personnel_id, "") if u.personnel_id else "",

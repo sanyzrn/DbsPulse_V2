@@ -33,6 +33,9 @@ class ChangePasswordRequest(BaseModel):
 class CurrentUser(BaseModel):
     id: int
     username: str
+    # نامی که در نوار بالای صفحه دیده می‌شود. اگر روی حساب ثبت نشده باشد همان
+    # نام کاربری است، پس همیشه مقدار دارد و UI لازم نیست fallback بنویسد.
+    display_name: str = ""
     role: UserRole
     personnel_id: int | None = None
     must_change_password: bool = False

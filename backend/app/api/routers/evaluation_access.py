@@ -12,6 +12,7 @@ from app.schemas.auth import CurrentUser
 from app.schemas.evaluation_access import EvaluationAccessRead, EvaluationAccessUpsert
 from app.services.audit import log_event
 from app.services.self_evaluation import ensure_evaluators_are_not_the_subject
+from app.services.workflow import may_act_at
 
 router = APIRouter(prefix="/api/personnel/{personnel_id}/access", tags=["evaluation-access"])
 
@@ -32,10 +33,13 @@ def _ensure_active_user_with_role(db: Session, user_id: int, expected_role: User
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"کاربر انتخاب‌شده برای «{label}» یافت نشد یا غیرفعال است",
         )
-    if user.role != expected_role:
+    # مافوق می‌تواند در مرحلهٔ پایین‌تر بنشیند: مدیرعاملی که برای چند نفر خودش
+    # مسئول مستقیم است، یا معاونتی که نمره‌دهندهٔ اول است. با سنجشِ نقشِ دقیق،
+    # چنین آدمی اصلاً قابل انتخاب نبود.
+    if not may_act_at(user.role, expected_role):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"کاربر انتخاب‌شده برای «{label}» باید نقش «{label}» داشته باشد",
+            detail=f"کاربر انتخاب‌شده برای «{label}» نمی‌تواند در این مرحله قرار بگیرد",
         )
 
 

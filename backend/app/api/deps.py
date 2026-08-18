@@ -83,6 +83,33 @@ def require_roles(*allowed_roles: UserRole):
     return dependency
 
 
+def require_chain_stage(stage_role: UserRole):
+    """گاردِ یک *مرحله* از زنجیرهٔ ارزیابی، نه یک نقشِ دقیق.
+
+    `require_roles(unit_supervisor)` می‌گفت «فقط کسی که نقشش دقیقاً مسئول واحد
+    است». ولی در یک سازمان واقعی، مدیرعامل ممکن است برای چند نفر خودش مسئول
+    مستقیم باشد و معاونت برای چند نفر نمره‌دهندهٔ اول. با گاردِ نقشِ دقیق، چنین
+    آدمی *اصلاً قابل تنظیم نبود*.
+
+    این گارد دسترسی را باز نمی‌کند: اقدام روی یک پروندهٔ مشخص همچنان به این بند
+    است که شناسهٔ همان شخص در همان مرحله از زنجیرهٔ آن پرونده نشسته باشد — که
+    `apply_transition` می‌سنجد. این‌جا فقط گلوگاهِ «آیا اصلاً چنین جایگاهی
+    می‌توانی داشته باشی» است.
+    """
+
+    def dependency(current_user: CurrentUser = Depends(get_current_user)) -> CurrentUser:
+        from app.services.workflow import may_act_at
+
+        if not may_act_at(current_user.role, stage_role):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="شما اجازه دسترسی به این بخش را ندارید",
+            )
+        return current_user
+
+    return dependency
+
+
 def require_capability(*required: Capability):
     """گاردِ مجوز اداری، مستقل از نقش (نیمهٔ دوم P0-03).
 

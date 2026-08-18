@@ -7,7 +7,7 @@ from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_current_user, require_roles
+from app.api.deps import get_current_user, require_chain_stage, require_roles
 from app.db.session import get_db
 from app.models.audit_log import AuditLog
 from app.models.enums import (
@@ -63,6 +63,7 @@ from app.services.workflow import (
     apply_transition,
     finalize_scoring,
     is_manager_path,
+    may_act_at,
 )
 
 router = APIRouter(prefix="/api/evaluations", tags=["evaluations"])
@@ -217,7 +218,7 @@ def create_evaluation(
     payload: EvaluationCreate,
     db: Session = Depends(get_db),
     current_user: CurrentUser = Depends(
-        require_roles(UserRole.unit_supervisor, UserRole.deputy)
+        require_chain_stage(UserRole.unit_supervisor)
     ),
 ) -> EvaluationRecord:
     personnel = db.get(Personnel, payload.subject_personnel_id)
@@ -240,7 +241,10 @@ def create_evaluation(
         )
 
     if personnel.is_manager:
-        if current_user.role != UserRole.deputy or current_user.id != access.deputy_user_id:
+        if (
+            not may_act_at(current_user.role, UserRole.deputy)
+            or current_user.id != access.deputy_user_id
+        ):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="فقط معاونت مربوطه می‌تواند ارزیابی این فرد را آغاز کند",
@@ -259,7 +263,7 @@ def create_evaluation(
                 ),
             )
         if (
-            current_user.role != UserRole.unit_supervisor
+            not may_act_at(current_user.role, UserRole.unit_supervisor)
             or current_user.id != access.unit_supervisor_user_id
         ):
             raise HTTPException(
@@ -574,13 +578,13 @@ def upsert_scores(
 
     is_supervisor_draft = (
         record.status == EvaluationStatus.draft
-        and current_user.role == UserRole.unit_supervisor
+        and may_act_at(current_user.role, UserRole.unit_supervisor)
         and current_user.id == record.unit_supervisor_user_id
     )
     is_manager_initial_scoring = (
         record.status == EvaluationStatus.hr_approved
         and is_manager_path(record)
-        and current_user.role == UserRole.deputy
+        and may_act_at(current_user.role, UserRole.deputy)
         and current_user.id == record.deputy_user_id
     )
     if not (is_supervisor_draft or is_manager_initial_scoring):
@@ -615,12 +619,12 @@ def set_evaluator_comment(
     # نمره‌دهنده اول این نظر را ثبت می‌کند: مسیر عادی مسئول واحد در draft است؛
     # مسیر «مدیر» معاونت خودش نمره‌دهندهٔ اول است و در hr_approved این کار را می‌کند.
     is_supervisor_draft = (
-        current_user.role == UserRole.unit_supervisor
+        may_act_at(current_user.role, UserRole.unit_supervisor)
         and record.status == EvaluationStatus.draft
         and current_user.id == record.unit_supervisor_user_id
     )
     is_manager_initial_scoring = (
-        current_user.role == UserRole.deputy
+        may_act_at(current_user.role, UserRole.deputy)
         and record.status == EvaluationStatus.hr_approved
         and is_manager_path(record)
         and current_user.id == record.deputy_user_id
@@ -639,7 +643,7 @@ def set_evaluator_comment(
 def submit_evaluation(
     evaluation_id: int,
     db: Session = Depends(get_db),
-    current_user: CurrentUser = Depends(require_roles(UserRole.unit_supervisor)),
+    current_user: CurrentUser = Depends(require_chain_stage(UserRole.unit_supervisor)),
 ) -> EvaluationRead:
     record = _get_record_or_404_for_update(db, evaluation_id)
     apply_transition(
@@ -668,7 +672,7 @@ def hr_approve(
 def deputy_approve(
     evaluation_id: int,
     db: Session = Depends(get_db),
-    current_user: CurrentUser = Depends(require_roles(UserRole.deputy)),
+    current_user: CurrentUser = Depends(require_chain_stage(UserRole.deputy)),
 ) -> EvaluationRead:
     record = _get_record_or_404_for_update(db, evaluation_id)
 
@@ -688,7 +692,7 @@ def ceo_finalize(
     evaluation_id: int,
     background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
-    current_user: CurrentUser = Depends(require_roles(UserRole.ceo)),
+    current_user: CurrentUser = Depends(require_chain_stage(UserRole.ceo)),
 ) -> EvaluationRead:
     record = _get_record_or_404_for_update(db, evaluation_id)
 

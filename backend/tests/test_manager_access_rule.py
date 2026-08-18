@@ -77,14 +77,17 @@ def test_access_rejects_user_with_wrong_role(client, db_session):
     regular = make_personnel(db_session, job_title="کارشناس")
     db_session.commit()
 
-    # کاربری با نقش «مسئول واحد» به‌عنوان مدیرعامل → پرونده‌ها برای همیشه گیر می‌کردند
+    # کاربری با نقش «مسئول واحد» به‌عنوان مدیرعامل → پرونده‌ها برای همیشه گیر می‌کردند.
+    #
+    # جهت‌داری اینجا مهم است و با اجازهٔ سلسله‌مراتبی هم از بین نرفت: مافوق
+    # می‌تواند کارِ مرحلهٔ پایین‌تر را بکند، ولی پایین‌دست نمی‌تواند بالا برود.
     resp = client.put(
         f"/api/personnel/{regular.id}/access",
         json={"unit_supervisor_user_id": sup.id, "deputy_user_id": dep.id, "ceo_user_id": sup.id},
         headers=auth_header(hr),
     )
     assert resp.status_code == 400
-    assert "نقش" in resp.json()["detail"]
+    assert "مدیرعامل" in resp.json()["detail"]
 
 
 def test_is_manager_change_blocked_while_open_evaluation_exists(client, db_session):

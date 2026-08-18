@@ -17,6 +17,9 @@ class CapabilityHolder(BaseModel):
 
     user_id: int
     username: str
+    #: نامِ آدم، اگر ثبت شده باشد؛ وگرنه همان نام کاربری. کارت‌های این صفحه
+    #: دربارهٔ «به چه کسی اختیار بدهم» هستند، و «dep1» به آن سؤال جواب نمی‌دهد.
+    display_name: str = ""
     role: UserRole
     is_active: bool
     capabilities: list[str]
@@ -71,3 +74,42 @@ class SeparationStatus(BaseModel):
     overlapping_users: list[OverlappingUser]
     #: چند حساب اختصاصیِ مدیریت (نقش پشتیبانی با مجوز) وجود دارد
     dedicated_admin_count: int
+
+
+class IntegrationField(BaseModel):
+    key: str
+    label: str
+    kind: str
+    help: str
+    value: str | int | bool
+
+
+class SecretStatus(BaseModel):
+    """فقط «تنظیم شده یا نه». مقدارش هرگز از سرور بیرون نمی‌رود."""
+
+    key: str
+    label: str
+    configured: bool
+
+
+class IntegrationSettings(BaseModel):
+    fields: list[IntegrationField]
+    secrets: list[SecretStatus]
+    #: کدام کانال‌ها با تنظیمات فعلی واقعاً قابل استفاده‌اند
+    active_channels: list[str]
+
+
+class IntegrationUpdate(BaseModel):
+    #: کلیدهای ناشناخته نادیده گرفته می‌شوند، نه اینکه خطا بدهند: فرم ممکن است
+    #: از نسخهٔ قدیمی‌تری بیاید و افتادنِ کل ذخیره به‌خاطر یک کلید اضافه، بدتر است.
+    values: dict[str, str | int | bool]
+
+
+class IntegrationTestRequest(BaseModel):
+    channel: str
+    recipient: str
+
+
+class IntegrationTestResult(BaseModel):
+    ok: bool
+    detail: str

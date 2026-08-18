@@ -9,24 +9,35 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user, require_capability
+from app.core.integrations import EDITABLE, EDITABLE_BY_KEY, SECRET_KEYS
 from app.core.modules import MODULES, MODULES_BY_KEY
 from app.db.session import get_db
 from app.models.capability import UserCapability
-from app.models.enums import Capability, UserRole
+from app.models.enums import Capability, DeliveryChannel, UserRole
 from app.models.module import ModuleSetting
 from app.models.user import User
 from app.schemas.administration import (
     CapabilityGrant,
     CapabilityHolder,
+    IntegrationField,
+    IntegrationSettings,
+    IntegrationTestRequest,
+    IntegrationTestResult,
+    IntegrationUpdate,
     ModuleState,
     ModuleToggle,
     MyPermissions,
     OverlappingUser,
+    SecretStatus,
     SeparationStatus,
 )
 from app.schemas.auth import CurrentUser
+from app.services import channels
 from app.services.audit import log_event
 from app.services.authorization import capabilities_of, module_states
+from app.services.integrations import effective_values, secret_status
+from app.services.integrations import refresh as refresh_integrations
+from app.services.integrations import save as save_integrations
 
 router = APIRouter(prefix="/api/administration", tags=["administration"])
 
@@ -135,6 +146,7 @@ def list_capability_holders(
         CapabilityHolder(
             user_id=user.id,
             username=user.username,
+            display_name=user.display_name,
             role=user.role,
             is_active=user.is_active,
             capabilities=sorted(c.value for c in held.get(user.id, set())),
@@ -211,6 +223,7 @@ def set_capabilities(
     return CapabilityHolder(
         user_id=user.id,
         username=user.username,
+        display_name=user.display_name,
         role=user.role,
         is_active=user.is_active,
         capabilities=sorted(c.value for c in desired),
@@ -274,3 +287,100 @@ def toggle_module(
         description=module.description,
         enabled=payload.enabled,
     )
+
+
+@router.get("/integrations", response_model=IntegrationSettings)
+def read_integrations(
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(require_capability(Capability.manage_integrations)),
+) -> IntegrationSettings:
+    """تنظیمات ارسال بیرونی — آنچه اثر دارد، نه آنچه در `.env` نوشته شده.
+
+    مقدارِ برگشتی همان چیزی است که کانال‌ها می‌بینند: مقدار دیتابیس اگر باشد،
+    وگرنه مقدار `.env`. نشان‌دادنِ فقط یکی از این دو یعنی صفحه‌ای که با واقعیت
+    نمی‌خواند.
+    """
+    values = effective_values(db)
+    return IntegrationSettings(
+        fields=[
+            IntegrationField(
+                key=field.key,
+                label=field.label,
+                kind=field.kind,
+                help=field.help,
+                value=values[field.key],
+            )
+            for field in EDITABLE
+        ],
+        secrets=[
+            SecretStatus(key=key, label=label, configured=secret_status()[key])
+            for key, label in SECRET_KEYS
+        ],
+        active_channels=[channel.kind.value for channel in channels.available()],
+    )
+
+
+@router.put("/integrations", response_model=IntegrationSettings)
+def update_integrations(
+    payload: IntegrationUpdate,
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(require_capability(Capability.manage_integrations)),
+) -> IntegrationSettings:
+    save_integrations(db, payload.values)
+    # مقدارهای تازه باید *همین حالا* اثر کنند، وگرنه «ذخیره شد» تا ری‌استارت
+    # بعدی دروغ است.
+    refresh_integrations(db)
+    # مقدارها عمداً در لاگ نمی‌آیند: قالب پیامک ممکن است کلید را در خودش داشته
+    # باشد. اینکه *چه کسی* و *کِی* عوض کرد، همان چیزی است که لازم است.
+    log_event(
+        db,
+        actor_user_id=current_user.id,
+        event_type="integration_settings_changed",
+        new_value={"keys": sorted(k for k in payload.values if k in EDITABLE_BY_KEY)},
+    )
+    db.commit()
+    return read_integrations(db=db, current_user=current_user)
+
+
+@router.post("/integrations/test", response_model=IntegrationTestResult)
+def test_integration(
+    payload: IntegrationTestRequest,
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(require_capability(Capability.manage_integrations)),
+) -> IntegrationTestResult:
+    """یک پیام واقعی می‌فرستد، بدون رد شدن از صف.
+
+    بدون این، تنها راهِ فهمیدنِ درست‌بودن تنظیمات، منتظرماندن برای یک اعلانِ
+    واقعی بود — که یعنی اولین آزمونِ پیکربندی، روی پیامِ کسی انجام می‌شد.
+    """
+    refresh_integrations(db)
+    try:
+        kind = DeliveryChannel(payload.channel)
+    except ValueError:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="کانال ناشناخته"
+        ) from None
+
+    channel = channels.channel_for(kind)
+    if channel is None:
+        return IntegrationTestResult(
+            ok=False, detail="این کانال با تنظیمات فعلی قابل استفاده نیست"
+        )
+    try:
+        channel.send(
+            channels.Message(
+                recipient=payload.recipient,
+                subject="آزمون پیکربندی DbsPulse",
+                body="این یک پیام آزمایشی است. اگر آن را دریافت کردید، تنظیمات درست است.",
+            )
+        )
+    except channels.DeliveryError as exc:
+        return IntegrationTestResult(ok=False, detail=str(exc))
+    log_event(
+        db,
+        actor_user_id=current_user.id,
+        event_type="integration_test_sent",
+        new_value={"channel": payload.channel},
+    )
+    db.commit()
+    return IntegrationTestResult(ok=True, detail="پیام آزمایشی فرستاده شد")

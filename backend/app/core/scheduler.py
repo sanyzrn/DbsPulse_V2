@@ -45,10 +45,22 @@ async def _scheduler_loop() -> None:
 
 
 @contextlib.asynccontextmanager
+def _load_integration_settings() -> None:
+    from app.db.session import SessionLocal
+    from app.services.integrations import refresh
+
+    with SessionLocal() as db:
+        refresh(db)
+
+
 async def lifespan(app):
     from app.core.startup_checks import assert_no_demo_credentials
 
     await asyncio.to_thread(assert_no_demo_credentials)
+    # تنظیمات ارسال بیرونی که از پنل ذخیره شده‌اند باید پیش از اولین ارسال روی
+    # `settings` بنشینند. بدون این، تا اولین ذخیرهٔ بعدی، مقدارهای `.env` اثر
+    # داشتند — یعنی تنظیماتِ پنل بعد از هر ری‌استارت بی‌صدا از کار می‌افتاد.
+    await asyncio.to_thread(_load_integration_settings)
 
     task: asyncio.Task | None = None
     if settings.enable_scheduler:

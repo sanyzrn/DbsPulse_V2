@@ -34,6 +34,7 @@ import sys
 from pathlib import Path
 
 from sqlalchemy import text
+from sqlalchemy.exc import SQLAlchemyError
 
 from app.core.config import settings
 from app.db.session import SessionLocal, engine
@@ -48,9 +49,11 @@ def _summary() -> list[tuple[str, int]]:
     rows = []
     with SessionLocal() as db:
         for table in _COUNTED:
+            # جدول ممکن است هنوز وجود نداشته باشد (دیتابیسِ تازه، یا اجرای دوم
+            # همین اسکریپت). صفر همان چیزی است که باید گزارش شود، نه یک traceback.
             try:
                 rows.append((table, db.scalar(text(f"SELECT count(*) FROM {table}")) or 0))
-            except Exception:  # noqa: BLE001 - جدول هنوز ساخته نشده؛ صفر یعنی همان
+            except SQLAlchemyError:
                 db.rollback()
                 rows.append((table, 0))
     return rows

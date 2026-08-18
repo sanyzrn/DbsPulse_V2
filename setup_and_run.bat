@@ -168,10 +168,25 @@ if exist "%REQ_MARKER%" (
     if not errorlevel 1 set "NEED_INSTALL=0"
 )
 
-REM The marker says "we installed these requirements", not "the venv
-REM is intact". If uvicorn is gone the marker is lying, so re-install
-REM rather than start a server that cannot launch.
-if "!NEED_INSTALL!"=="0" if not exist "%VENV%\Scripts\uvicorn.exe" set "NEED_INSTALL=1"
+REM The marker says "we installed these requirements". It does NOT say
+REM the packages are still there - and that gap is the failure that has
+REM cost the most time on this project: a venv loses packages (an
+REM interrupted pip, antivirus, a partly-deleted folder), the marker
+REM still matches requirements.txt, this step prints "packages already
+REM match", uvicorn dies with ModuleNotFoundError in its own window, and
+REM the frontend shows ECONNREFUSED with nothing pointing at the cause.
+REM Checking for uvicorn.exe is not enough either - it survives while
+REM other packages are gone. So ask the venv the real question: can it
+REM import what the app imports? scripts/check_deps.py holds the list
+REM (and knows weasyprint is optional).
+pushd "%BACKEND%"
+"%PY%" -m scripts.check_deps >nul 2>nul
+set "DEPS_OK=!errorlevel!"
+popd
+if not "!DEPS_OK!"=="0" (
+    if "!NEED_INSTALL!"=="0" echo    Marker says installed, but the venv cannot import them - reinstalling.
+    set "NEED_INSTALL=1"
+)
 
 if "!NEED_INSTALL!"=="1" (
     echo    Installing Python packages ^(this can take a few minutes^)...
@@ -184,6 +199,16 @@ if "!NEED_INSTALL!"=="1" (
 ) else (
     echo    OK  packages already match requirements.txt
 )
+
+REM Same question again, now as the last word of this step. If pip said
+REM it succeeded and the imports still fail, the venv itself is damaged
+REM and no amount of re-running pip will fix it - say so here instead of
+REM letting it surface four steps later as a dead backend.
+pushd "%BACKEND%"
+"%PY%" -m scripts.check_deps
+set "DEPRC=!errorlevel!"
+popd
+if not "!DEPRC!"=="0" call :fail "The venv is missing packages even after pip install." "Delete the folder %VENV% and run this script again - a rebuilt venv fixes this."
 echo.
 
 REM ------------------------------------------------------------
@@ -348,17 +373,56 @@ REM  8. Start the servers
 REM ------------------------------------------------------------
 echo [8/8] Starting servers...
 
-REM A stale process on 8000 makes uvicorn exit instantly in its own
-REM window, which is easy to miss. Name it now rather than let the
-REM health check time out for 40 seconds first.
-"%PY%" -c "import socket,sys; s=socket.socket(); s.settimeout(1); sys.exit(0 if s.connect_ex(('127.0.0.1',8000)) else 1)" >nul 2>nul
-if errorlevel 1 (
+REM Anything wrong with port 8000 makes uvicorn exit instantly in its own
+REM window, which is easy to miss. Name it now rather than let the health
+REM check time out for 40 seconds first and then say nothing useful.
+REM
+REM This used to be a `connect` test, which answers the wrong question.
+REM `connect` asks "is someone listening there?"; we need "can WE listen
+REM there?". On Windows those differ: Hyper-V / WSL2 / Docker Desktop
+REM reserve whole ranges of ports, and inside such a range nobody is
+REM listening (so connect says "free") while bind fails with WSAEACCES
+REM 10013. check_port binds for real - on 0.0.0.0, the same address
+REM uvicorn is started with below - and tells the two cases apart.
+pushd "%BACKEND%"
+"%PY%" -m scripts.check_port --port 8000
+set "PORTRC=!errorlevel!"
+popd
+
+if "!PORTRC!"=="2" (
     echo.
     echo    Port 8000 is already in use. Find and stop the process with:
     echo        netstat -ano ^| findstr :8000
     echo        taskkill /PID ^<pid^> /F
     echo.
     call :fail "Port 8000 is occupied." "Stop whatever is using it, then run this script again."
+)
+
+if "!PORTRC!"=="3" (
+    echo.
+    echo    Port 8000 falls inside a range Windows has reserved for itself
+    echo    ^(listed above^). Nothing is listening there, so the port LOOKS
+    echo    free - but no program is allowed to bind to it, so the backend
+    echo    would start and die in the same second.
+    echo.
+    echo    From an Administrator terminal, either:
+    echo      a^) release the reserved ranges and let them be re-picked:
+    echo         net stop winnat
+    echo         net start winnat
+    echo      b^) or claim 8000 permanently so Windows stops taking it:
+    echo         netsh int ipv4 add excludedportrange protocol=tcp startport=8000 numberofports=1 store=persistent
+    echo         ^(needs a reboot; after it, programs can bind 8000 again^)
+    echo.
+    echo    Moving the backend to another port also works, but the frontend
+    echo    proxy target lives in frontend\vite.config.ts and would have to
+    echo    be changed to match.
+    echo.
+    call :fail "Port 8000 is reserved by Windows." "See the options above, then run this script again."
+)
+
+if not "!PORTRC!"=="0" (
+    echo.
+    call :fail "Port 8000 could not be tested - see the error above." "Fix the reported problem, then run this script again."
 )
 
 start "DbsPulse Backend (port 8000)" /D "%BACKEND%" cmd /k ""%VENV%\Scripts\uvicorn.exe" app.main:app --reload --host 0.0.0.0 --port 8000"

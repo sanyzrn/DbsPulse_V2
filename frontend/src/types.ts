@@ -145,7 +145,12 @@ export interface EvaluationRecord {
   status: EvaluationStatus;
   general_score_pct: number | null;
   specialized_score_pct: number | null;
+  /** امتیازِ فرم پیش از افزودن امتیاز ویژه */
+  base_weighted_pct: number | null;
   final_weighted_pct: number | null;
+  /** امتیاز ویژه: نمرهٔ اختیاری بابت کاری خارج از شرح وظایف (null یا صفر = ندارد) */
+  bonus_points: number | null;
+  bonus_reason: string | null;
   recommendation: string | null;
   evaluator_comment: string | null;
   created_at: string;
@@ -165,7 +170,10 @@ export interface MyEvaluation {
   period_id: number | null;
   general_score_pct: number | null;
   specialized_score_pct: number | null;
+  base_weighted_pct: number | null;
   final_weighted_pct: number | null;
+  bonus_points: number | null;
+  bonus_reason: string | null;
   recommendation: string | null;
   finalized_at: string | null;
   acknowledged_at: string | null;
@@ -450,6 +458,8 @@ export interface AppConfig {
   evidence_required_scores: number[];
   general_section_weight: number;
   specialized_section_weight: number;
+  /** سقف امتیاز ویژه در طرح فعال؛ صفر یعنی فرم این بخش را نشان ندهد. */
+  bonus_max_points: number;
 }
 
 export const DEFAULT_APP_CONFIG: AppConfig = {
@@ -458,6 +468,7 @@ export const DEFAULT_APP_CONFIG: AppConfig = {
   evidence_required_scores: [1, 5],
   general_section_weight: 0.6,
   specialized_section_weight: 0.4,
+  bonus_max_points: 5,
 };
 
 export interface AppNotification {

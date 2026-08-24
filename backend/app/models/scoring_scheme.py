@@ -69,6 +69,13 @@ class ScoringScheme(Base):
     evidence_min_words: Mapped[int] = mapped_column(Integer, nullable=False)
     evidence_max_words: Mapped[int] = mapped_column(Integer, nullable=False)
 
+    # --- امتیاز ویژه -------------------------------------------------------
+    #: سقف نمرهٔ اختیاری‌ای که ارزیاب بابت کارِ خارج از شرح وظایف اضافه می‌کند.
+    #: صفر یعنی این قابلیت زیر این نسخه از طرح اصلاً در دسترس نیست.
+    bonus_max_points: Mapped[float] = mapped_column(
+        Numeric(4, 2), nullable=False, server_default="5"
+    )
+
     #: جدول آستانه‌ها: [{"upper_exclusive": 60, "label": "..."}, ...]
     #: بازه‌ها نیم‌باز و پیوسته‌اند تا کل [0, 100] بدون شکاف پوشش داده شود.
     thresholds: Mapped[list] = mapped_column(JSONB, nullable=False)

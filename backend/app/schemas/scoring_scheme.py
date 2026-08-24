@@ -3,6 +3,7 @@ from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+from app.core import constants
 from app.models.enums import SchemeStatus
 
 #: سقف تعداد پله‌های جدول آستانه. بیش از این، جدول برای خواننده بی‌معنا می‌شود و
@@ -31,6 +32,9 @@ class SchemeInput(BaseModel):
     evidence_required_scores: list[int] = Field(default_factory=list)
     evidence_min_words: int = Field(ge=0, le=200)
     evidence_max_words: int = Field(ge=1, le=1000)
+    #: سقف امتیاز ویژه. صفر یعنی این قابلیت زیر این طرح در دسترس نیست. سقفِ سقف
+    #: عمداً کوچک است: امتیاز ویژه باید یک تعدیل باشد، نه راهی برای دور زدن فرم.
+    bonus_max_points: float = Field(default=constants.BONUS_MAX_POINTS, ge=0, le=20)
     thresholds: list[ThresholdBand] = Field(min_length=1, max_length=MAX_THRESHOLDS)
     #: {indicator_id: weight}. شاخصِ غایب وزن ۱ می‌گیرد.
     indicator_weights: dict[int, float] = Field(default_factory=dict)
@@ -84,6 +88,7 @@ class SchemeRead(BaseModel):
     evidence_required_scores: list[int]
     evidence_min_words: int
     evidence_max_words: int
+    bonus_max_points: float
     thresholds: list[ThresholdBand]
     indicator_weights: dict[int, float]
     created_at: datetime

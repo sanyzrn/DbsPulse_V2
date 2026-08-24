@@ -65,8 +65,20 @@
   <div class="scores">
     <div><span>امتیاز عمومی</span><b>{{ snapshot.general_score_pct }}٪</b></div>
     <div><span>امتیاز تخصصی</span><b>{{ snapshot.specialized_score_pct }}٪</b></div>
+    {# امتیاز ویژه فقط وقتی چاپ می‌شود که واقعاً داده شده باشد؛ در snapshot های
+       نسخهٔ ۱ این کلید اصلاً وجود ندارد و همین شرط هر دو حالت را پوشش می‌دهد. #}
+    {% if snapshot.bonus_points %}
+    <div><span>امتیاز فرم</span><b>{{ snapshot.base_weighted_pct }}٪</b></div>
+    <div><span>امتیاز ویژه</span><b>+{{ snapshot.bonus_points }}</b></div>
+    {% endif %}
     <div><span>امتیاز نهایی وزنی</span><b>{{ snapshot.final_weighted_pct }}٪</b></div>
   </div>
+
+  {% if snapshot.bonus_points %}
+  {# عددِ امتیاز ویژه بدون دلیلش، در سندی که مبنای تصمیم تمدید قرارداد است،
+     یک تعدیل بی‌توضیح می‌ماند. #}
+  <div class="recommendation">دلیل امتیاز ویژه: {{ snapshot.bonus_reason }}</div>
+  {% endif %}
 
   <div class="recommendation">نتیجه پیشنهادی: {{ snapshot.recommendation }}</div>
 

@@ -311,7 +311,13 @@ def finalize_scoring(db: Session, record: EvaluationRecord, current_user: Curren
     except ValueError as exc:
         raise HTTPException(status_code=http_status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
 
-    result = compute_result(scores, indicators_by_id, rules)
+    # امتیاز ویژه از خود پرونده می‌آید (ارزیاب پیش از ثبت واردش کرده). محاسبه
+    # همیشه این‌جا از نو انجام می‌شود، پس پرونده‌ای که برگشت خورده و دوباره ثبت
+    # می‌شود هم با همان امتیاز ویژهٔ ثبت‌شده حساب می‌شود، نه با نتیجهٔ کهنه.
+    result = compute_result(
+        scores, indicators_by_id, rules, bonus_points=float(record.bonus_points or 0)
+    )
+    record.base_weighted_pct = result["base_weighted_pct"]
     record.general_score_pct = result["general_score_pct"]
     record.specialized_score_pct = result["specialized_score_pct"]
     record.final_weighted_pct = result["final_weighted_pct"]

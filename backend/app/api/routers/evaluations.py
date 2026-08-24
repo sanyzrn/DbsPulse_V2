@@ -41,11 +41,12 @@ from app.schemas.evaluation import (
     ScoresUpsert,
     SelfAssessmentRead,
     SelfAssessmentScoreRead,
+    SpecialScoreUpdate,
     StageOwnerReassign,
 )
 from app.services.audit import log_event
 from app.services.documents import archive_final_pdf, archive_final_pdf_detached
-from app.services.evaluation import next_evaluation_code
+from app.services.evaluation import next_evaluation_code, validate_bonus
 from app.services.excel import build_evaluations_workbook
 from app.services.indicator_framework import (
     ensure_framework,
@@ -54,7 +55,7 @@ from app.services.indicator_framework import (
 )
 from app.services.notifications import notify, notify_stage_owner_reassigned
 from app.services.pdf import weasyprint_available
-from app.services.scoring_scheme import active_scheme
+from app.services.scoring_scheme import active_scheme, rules_for_record
 from app.services.self_evaluation import ensure_evaluators_are_not_the_subject
 from app.services.snapshot import build_final_snapshot
 from app.services.workflow import (
@@ -634,6 +635,71 @@ def set_evaluator_comment(
             status_code=status.HTTP_403_FORBIDDEN, detail="امکان ثبت نظر در این مرحله وجود ندارد"
         )
     record.evaluator_comment = payload.evaluator_comment
+    db.commit()
+    db.refresh(record)
+    return _to_read(db, record)
+
+
+@router.patch("/{evaluation_id}/special-score", response_model=EvaluationRead)
+def set_special_score(
+    evaluation_id: int,
+    payload: SpecialScoreUpdate,
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(get_current_user),
+) -> EvaluationRead:
+    """امتیاز ویژه: نمرهٔ اختیاری بابت کاری خارج از شرح وظایف.
+
+    همان کسی می‌تواند ثبتش کند که نمره می‌دهد و جمع‌بندی می‌نویسد — و در همان
+    مرحله، پیش از ثبت. بعد از ثبت، امتیاز نهایی حساب شده و پرونده در زنجیرهٔ
+    تأیید است؛ تغییر عددِ نتیجه در آن نقطه یعنی تأییدکننده روی چیزی امضا کرده
+    که دیگر وجود ندارد. تأییدکننده‌ای که با این عدد موافق نیست، پرونده را
+    برمی‌گرداند — همان مسیری که برای هر مخالفتِ دیگری هست.
+    """
+    record = _get_record_or_404_for_update(db, evaluation_id)
+    is_supervisor_draft = (
+        may_act_at(current_user.role, UserRole.unit_supervisor)
+        and record.status == EvaluationStatus.draft
+        and current_user.id == record.unit_supervisor_user_id
+    )
+    is_manager_initial_scoring = (
+        may_act_at(current_user.role, UserRole.deputy)
+        and record.status == EvaluationStatus.hr_approved
+        and is_manager_path(record)
+        and current_user.id == record.deputy_user_id
+    )
+    if not (is_supervisor_draft or is_manager_initial_scoring):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="امکان ثبت امتیاز ویژه در این مرحله برای شما وجود ندارد",
+        )
+
+    reason = (payload.bonus_reason or "").strip() or None
+    try:
+        validate_bonus(payload.bonus_points, reason, rules_for_record(db, record))
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)
+        ) from exc
+
+    previous = {
+        "bonus_points": float(record.bonus_points) if record.bonus_points is not None else None,
+        "bonus_reason": record.bonus_reason,
+    }
+    record.bonus_points = payload.bonus_points
+    # صفر یعنی امتیاز ویژه‌ای در کار نیست؛ دلیلِ باقی‌مانده از مقدار قبلی فقط
+    # گمراه‌کننده است (قید دیتابیس هم اجازه‌اش را نمی‌دهد).
+    record.bonus_reason = reason if payload.bonus_points > 0 else None
+
+    # این یک تعدیلِ دستی روی نتیجهٔ یک تصمیم رسمی است — دقیقاً همان چیزی که
+    # لاگ ممیزی برایش هست. مقدار قبلی هم ثبت می‌شود تا «چه شد» قابل بازسازی باشد.
+    log_event(
+        db,
+        actor_user_id=current_user.id,
+        event_type="special_score_set",
+        evaluation_record_id=record.id,
+        old_value=previous,
+        new_value={"bonus_points": payload.bonus_points, "bonus_reason": record.bonus_reason},
+    )
     db.commit()
     db.refresh(record)
     return _to_read(db, record)

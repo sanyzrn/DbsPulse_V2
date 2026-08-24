@@ -13,7 +13,10 @@ from app.models.personnel import Personnel
 from app.models.user import User
 from app.services.workflow import is_manager_path
 
-SNAPSHOT_VERSION = 1
+# ۲: افزودن امتیاز ویژه (`bonus_points` / `bonus_reason` / `base_weighted_pct`).
+# افزودنی است، پس قالب PDF هر دو نسخه را رندر می‌کند: در snapshot نسخهٔ ۱ این
+# کلیدها نیستند و بخشِ مربوطه اصلاً چاپ نمی‌شود.
+SNAPSHOT_VERSION = 2
 
 
 def build_final_snapshot(db: Session, record: EvaluationRecord) -> dict:
@@ -57,6 +60,13 @@ def build_final_snapshot(db: Session, record: EvaluationRecord) -> dict:
         "final_weighted_pct": float(record.final_weighted_pct)
         if record.final_weighted_pct is not None
         else None,
+        # امتیازِ فرم پیش از امتیاز ویژه. سند نهایی باید بتواند بگوید عدد نهایی
+        # از کجا آمده — «۸۴ از فرم + ۳ بابتِ فلان کار»، نه یک ۸۷ بی‌منشأ.
+        "base_weighted_pct": float(record.base_weighted_pct)
+        if record.base_weighted_pct is not None
+        else None,
+        "bonus_points": float(record.bonus_points) if record.bonus_points else None,
+        "bonus_reason": record.bonus_reason,
         "recommendation": record.recommendation,
         "evaluator_comment": record.evaluator_comment,
         # اگر شاخصی پس از امتیازدهی حذف شده باشد، snapshot نباید 500 بدهد؛ ردیف با

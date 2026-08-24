@@ -2,6 +2,7 @@ import hashlib
 import logging
 
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
@@ -67,8 +68,22 @@ def archive_final_pdf(db: Session, record: EvaluationRecord) -> EvaluationDocume
     document = EvaluationDocument(
         evaluation_record_id=record.id, pdf_bytes=pdf_bytes, sha256=sha256
     )
-    db.add(document)
-    db.flush()
+    # بررسیِ «از قبل هست؟» در بالای تابع در برابر هم‌زمانی کافی نیست، و پنجره‌اش
+    # هم تئوریک نیست: پس از نهایی‌سازی، ساخت سند در پس‌زمینه شروع می‌شود و رندر
+    # WeasyPrint چند ثانیه طول می‌کشد. هر دانلودی که در همان چند ثانیه برسد،
+    # «نیست» می‌بیند، خودش رندر می‌کند و موقع درج به قید یکتا می‌خورد — یعنی
+    # کاربر دقیقاً در لحظه‌ای که تازه خبر نهایی‌شدن را گرفته، خطای ۵۰۰ می‌گیرد.
+    #
+    # SAVEPOINT لازم است: بدون آن، خطای درج کل تراکنشِ درخواست را می‌سوزاند و
+    # حتی خواندنِ ردیفِ موجود هم دیگر ممکن نیست.
+    try:
+        with db.begin_nested():
+            db.add(document)
+    except IntegrityError:
+        # شیء در حال درج، با برگشتِ SAVEPOINT خودش از session بیرون رفته است.
+        # طرف مقابل commit کرده (وگرنه درج ما منتظر می‌ماند، نه اینکه خطا بدهد)،
+        # پس همان سند حالا خواندنی است. دو رندرِ هم‌زمانِ یک snapshot یکی‌اند.
+        return get_document(db, record.id)
     return document
 
 

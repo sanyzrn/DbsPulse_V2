@@ -65,6 +65,60 @@ def test_the_archived_pdf_is_hashed_and_is_a_real_pdf(client, db_session):
     assert doc.pdf_bytes[:5] == b"%PDF-"
 
 
+def test_a_download_racing_the_background_archival_still_gets_its_pdf(
+    client, db_session, monkeypatch
+):
+    """دو مسیرِ هم‌زمانِ ساخت سند، نباید به خطای ۵۰۰ برای کاربر ختم شود.
+
+    پنجره واقعی است: پس از نهایی‌سازی، ساخت سند در پس‌زمینه شروع می‌شود و رندر
+    WeasyPrint چند ثانیه طول می‌کشد. دانلودی که در همان چند ثانیه برسد، «سندی
+    نیست» می‌بیند و خودش می‌سازد — و درجش به قید یکتا می‌خورد. یعنی کاربر
+    دقیقاً در لحظه‌ای که خبر نهایی‌شدن را گرفته، خطا می‌گیرد.
+
+    این‌جا همان مسابقه بازسازی می‌شود: بررسیِ «از قبل هست؟» را کور می‌کنیم تا
+    درج واقعاً به قیدِ واقعیِ دیتابیس بخورد. ادعا این است که کاربر باز هم سندش
+    را می‌گیرد.
+    """
+    from app.services import documents
+
+    hr, sup, dep, ceo, evaluation_id, code = _finalize(client, db_session)
+    # نسخهٔ اول را می‌سازیم و commit می‌کنیم — نقشِ کارِ پس‌زمینه.
+    assert (
+        client.get(
+            f"/api/evaluations/{evaluation_id}/summary.pdf", headers=auth_header(hr)
+        ).status_code
+        == 200
+    )
+
+    real_get_document = documents.get_document
+    blinded = {"once": True}
+
+    def get_document_blind_once(db, record_id):
+        """فقط اولین فراخوانی (بررسیِ ابتدای تابع) را کور می‌کند."""
+        if blinded["once"]:
+            blinded["once"] = False
+            return None
+        return real_get_document(db, record_id)
+
+    monkeypatch.setattr(documents, "get_document", get_document_blind_once)
+
+    response = client.get(
+        f"/api/evaluations/{evaluation_id}/summary.pdf", headers=auth_header(hr)
+    )
+    assert response.status_code == 200, response.text
+    assert response.content[:5] == b"%PDF-"
+
+    # و هنوز فقط یک سند برای این پرونده هست.
+    documents_count = len(
+        db_session.scalars(
+            select(EvaluationDocument).where(
+                EvaluationDocument.evaluation_record_id == evaluation_id
+            )
+        ).all()
+    )
+    assert documents_count == 1
+
+
 def test_summary_pdf_serves_stored_bytes_stably(client, db_session):
     hr, sup, dep, ceo, evaluation_id, code = _finalize(client, db_session)
 

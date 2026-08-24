@@ -498,3 +498,89 @@ def test_an_employee_cannot_reach_improvement_plans(client, db_session):
         ).status_code
         == 403
     )
+
+
+# ── واجد بودن، با عدد نه با برچسب ───────────────────────────────────────────
+#
+# ممیزی HR ایراد گرفت که واجد بودن فقط یک برچسب را می‌پذیرد: «تمدید مشروط».
+# یعنی نتایج زیر ۶۰٪ — بدترین عملکردها، همان‌هایی که پیش از قطع همکاری بیشتر از
+# همه به سابقهٔ مکتوب نیاز دارند — هیچ مسیر مستندسازی نداشتند.
+
+def _finalize_with_score(client, db, personnel, score: int) -> dict:
+    """یک پروندهٔ نهایی‌شده با امتیازِ دلخواه روی همهٔ شاخص‌ها."""
+    from tests.helpers import active_indicators, full_valid_scores, make_access, make_user
+
+    hr = make_user(db, "hr")
+    sup = make_user(db, "unit_supervisor")
+    dep = make_user(db, "deputy")
+    ceo = make_user(db, "ceo", capabilities=[])
+    make_access(db, personnel, sup, dep, ceo)
+    db.commit()
+
+    record_id = client.post(
+        "/api/evaluations",
+        json={"subject_personnel_id": personnel.id},
+        headers=auth_header(sup),
+    ).json()["id"]
+    # نمرهٔ ۱ شواهد اجباری دارد، پس همیشه همراهش می‌آید.
+    rows = [
+        {**row, "score": score, "evidence_text": "شواهد کافی برای این شاخص ثبت شده است"}
+        for row in full_valid_scores(active_indicators(db))
+    ]
+    client.put(
+        f"/api/evaluations/{record_id}/scores", json={"scores": rows}, headers=auth_header(sup)
+    )
+    client.post(f"/api/evaluations/{record_id}/submit", headers=auth_header(sup))
+    client.post(f"/api/evaluations/{record_id}/hr-approve", headers=auth_header(hr))
+    client.post(f"/api/evaluations/{record_id}/deputy-approve", headers=auth_header(dep))
+    client.post(f"/api/evaluations/{record_id}/ceo-finalize", headers=auth_header(ceo))
+    return {"record_id": record_id, "hr": hr}
+
+
+def test_a_sub_sixty_result_is_now_eligible_for_a_plan(client, db_session):
+    """پیش از این، «عدم تمدید» هیچ برنامهٔ بهبودی نمی‌گرفت — معکوسِ چیزی که باید."""
+    personnel = make_personnel(db_session, full_name="نتیجهٔ بسیار پایین")
+    context = _finalize_with_score(client, db_session, personnel, score=1)
+
+    eligible = client.get(
+        "/api/improvement-plans/eligible", headers=auth_header(context["hr"])
+    ).json()
+    codes = {row["evaluation_record_id"] for row in eligible}
+    assert context["record_id"] in codes
+
+    created = client.post(
+        "/api/improvement-plans",
+        json={
+            "evaluation_record_id": context["record_id"],
+            "title": "برنامهٔ بهبود پس از نتیجهٔ بسیار پایین",
+            "owner_user_id": context["hr"].id,
+            "review_date": "2026-12-01",
+            "summary": "سه هدف مشخص با بازبینی ماهانه",
+        },
+        headers=auth_header(context["hr"]),
+    )
+    assert created.status_code == 201, created.text
+
+
+def test_a_good_result_is_still_not_eligible(client, db_session):
+    """سقف باید سقف بماند؛ وگرنه «واجد بودن» هیچ معنایی ندارد."""
+    personnel = make_personnel(db_session, full_name="نتیجهٔ خوب")
+    context = _finalize_with_score(client, db_session, personnel, score=5)
+
+    eligible = client.get(
+        "/api/improvement-plans/eligible", headers=auth_header(context["hr"])
+    ).json()
+    assert context["record_id"] not in {row["evaluation_record_id"] for row in eligible}
+
+    refused = client.post(
+        "/api/improvement-plans",
+        json={
+            "evaluation_record_id": context["record_id"],
+            "title": "برنامهٔ بی‌مورد",
+            "owner_user_id": context["hr"].id,
+            "review_date": "2026-12-01",
+            "summary": "—",
+        },
+        headers=auth_header(context["hr"]),
+    )
+    assert refused.status_code == 400, refused.text

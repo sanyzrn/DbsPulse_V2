@@ -60,6 +60,7 @@ def _rules_from_input(payload: SchemeInput) -> Rules:
         thresholds=tuple((b.upper_exclusive, b.label) for b in payload.thresholds),
         indicator_weights=dict(payload.indicator_weights),
         bonus_max_points=payload.bonus_max_points,
+        improvement_plan_max_pct=payload.improvement_plan_max_pct,
     )
 
 
@@ -77,6 +78,7 @@ def _to_read(db: Session, scheme: ScoringScheme) -> SchemeRead:
         evidence_min_words=scheme.evidence_min_words,
         evidence_max_words=scheme.evidence_max_words,
         bonus_max_points=float(scheme.bonus_max_points),
+        improvement_plan_max_pct=float(scheme.improvement_plan_max_pct),
         thresholds=scheme.thresholds,
         indicator_weights={int(k): float(v) for k, v in (scheme.indicator_weights or {}).items()},
         created_at=scheme.created_at,
@@ -114,6 +116,7 @@ def create_scheme(
         evidence_min_words=payload.evidence_min_words,
         evidence_max_words=payload.evidence_max_words,
         bonus_max_points=payload.bonus_max_points,
+        improvement_plan_max_pct=payload.improvement_plan_max_pct,
         thresholds=[b.model_dump() for b in payload.thresholds],
         # کلیدهای JSONB باید رشته باشند
         indicator_weights={str(k): v for k, v in payload.indicator_weights.items()},

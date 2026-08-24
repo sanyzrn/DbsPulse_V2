@@ -35,6 +35,7 @@ interface Scheme {
   evidence_min_words: number;
   evidence_max_words: number;
   bonus_max_points: number;
+  improvement_plan_max_pct: number;
   thresholds: ThresholdBand[];
   indicator_weights: Record<string, number>;
   created_at: string;
@@ -68,6 +69,7 @@ interface SchemeForm {
   evidence_min_words: number;
   evidence_max_words: number;
   bonus_max_points: number;
+  improvement_plan_max_pct: number;
   thresholds: ThresholdBand[];
 }
 
@@ -104,6 +106,7 @@ function formFrom(scheme: Scheme): SchemeForm {
     evidence_min_words: scheme.evidence_min_words,
     evidence_max_words: scheme.evidence_max_words,
     bonus_max_points: scheme.bonus_max_points,
+    improvement_plan_max_pct: scheme.improvement_plan_max_pct,
     thresholds: scheme.thresholds.map((b) => ({ ...b })),
   };
 }
@@ -249,6 +252,14 @@ export function ScoringSchemesPage() {
                 <Fact
                   label="سقف امتیاز ویژه"
                   value={scheme.bonus_max_points ? faInt(scheme.bonus_max_points) : "غیرفعال"}
+                />
+                <Fact
+                  label="برنامهٔ بهبود تا"
+                  value={
+                    scheme.improvement_plan_max_pct
+                      ? `${fa1(scheme.improvement_plan_max_pct)}٪`
+                      : "غیرفعال"
+                  }
                 />
               </dl>
 
@@ -484,6 +495,25 @@ function SchemeEditor({
             className={`${fieldClass} w-28`}
             value={form.bonus_max_points}
             onChange={(e) => patch({ bonus_max_points: Number(e.target.value) })}
+          />
+        </div>
+
+        {/* ── سقف برنامهٔ بهبود ── */}
+        <div>
+          <p className="mb-1 text-xs font-medium text-gray-600">برنامهٔ بهبود تا این درصد</p>
+          <p className="mb-2 text-[11px] leading-relaxed text-gray-500">
+            هر پروندهٔ نهایی‌شده‌ای که امتیازش زیر این عدد باشد، واجدِ برنامهٔ بهبود است.
+            با عدد سنجیده می‌شود نه با برچسبِ نتیجه — پس تغییر برچسب‌های جدول بالا این
+            قابلیت را از کار نمی‌اندازد. صفر یعنی هیچ‌کس.
+          </p>
+          <input
+            type="number"
+            min={0}
+            max={100}
+            step={1}
+            className={`${fieldClass} w-28`}
+            value={form.improvement_plan_max_pct}
+            onChange={(e) => patch({ improvement_plan_max_pct: Number(e.target.value) })}
           />
         </div>
 

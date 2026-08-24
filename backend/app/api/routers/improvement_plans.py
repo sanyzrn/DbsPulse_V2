@@ -18,12 +18,13 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, selectinload
 
 from app.api.deps import require_roles
-from app.core.constants import CONDITIONAL_RENEWAL_RECOMMENDATION
+from app.core.constants import IMPROVEMENT_PLAN_MAX_PCT
 from app.db.session import get_db
 from app.models.enums import EvaluationStatus, ImprovementPlanStatus, UserRole
 from app.models.evaluation import EvaluationRecord
 from app.models.improvement_plan import ImprovementPlan, ImprovementPlanGoal
 from app.models.personnel import Personnel
+from app.models.scoring_scheme import ScoringScheme
 from app.models.user import User
 from app.schemas.auth import CurrentUser
 from app.schemas.improvement_plan import (
@@ -40,6 +41,7 @@ from app.schemas.improvement_plan import (
 from app.services.audit import log_event
 from app.services.excel import build_improvement_plans_workbook
 from app.services.notifications import notify
+from app.services.scoring_scheme import rules_for_record
 
 router = APIRouter(prefix="/api/improvement-plans", tags=["improvement-plans"])
 
@@ -106,15 +108,31 @@ def list_eligible_evaluations(
     db: Session = Depends(get_db),
     current_user: CurrentUser = Depends(require_roles(UserRole.hr)),
 ) -> list[EligibleEvaluation]:
-    """ارزیابی‌های نهایی‌شده با نتیجه «تمدید مشروط» که هنوز برنامه بهبود ندارند."""
+    """ارزیابی‌های نهایی‌شدهٔ نیازمند برنامهٔ بهبود که هنوز برنامه ندارند.
+
+    واجد بودن با *عدد* سنجیده می‌شود نه با برچسب، و سقفش از نسخهٔ طرحِ همان
+    پرونده می‌آید (P1-04). دو چیز را با هم درست می‌کند:
+
+    * نتایج زیر ۶۰٪ هم واجد می‌شوند. تا امروز فقط برچسبِ «تمدید مشروط» پذیرفته
+      می‌شد، یعنی بدترین عملکردها — همان‌هایی که پیش از قطع همکاری بیشتر از همه
+      به سابقهٔ مکتوب نیاز دارند — هیچ مسیر مستندسازی نداشتند.
+    * سازمانی که برچسب‌های طرح خودش را نوشته باشد، این قابلیت را بی‌صدا از دست
+      نمی‌دهد؛ مقایسهٔ رشته‌ای برایش هیچ‌وقت جواب نمی‌داد.
+    """
     has_plan = select(ImprovementPlan.id).where(
         ImprovementPlan.evaluation_record_id == EvaluationRecord.id
     ).exists()
     rows = db.scalars(
         select(EvaluationRecord)
+        .outerjoin(ScoringScheme, ScoringScheme.id == EvaluationRecord.scoring_scheme_id)
         .where(
             EvaluationRecord.status == EvaluationStatus.finalized,
-            EvaluationRecord.recommendation == CONDITIONAL_RENEWAL_RECOMMENDATION,
+            EvaluationRecord.final_weighted_pct.is_not(None),
+            # پروندهٔ بی‌مهر (پیش از P1-04) با همان سقفِ ثابتِ قبلی سنجیده می‌شود.
+            EvaluationRecord.final_weighted_pct
+            < func.coalesce(
+                ScoringScheme.improvement_plan_max_pct, IMPROVEMENT_PLAN_MAX_PCT
+            ),
             ~has_plan,
         )
         .order_by(EvaluationRecord.finalized_at.desc())
@@ -176,10 +194,17 @@ def create_plan(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="برنامه بهبود فقط برای ارزیابی نهایی‌شده قابل تعریف است",
         )
-    if record.recommendation != CONDITIONAL_RENEWAL_RECOMMENDATION:
+    rules = rules_for_record(db, record)
+    if (
+        record.final_weighted_pct is None
+        or float(record.final_weighted_pct) >= rules.improvement_plan_max_pct
+    ):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="برنامه بهبود فقط برای نتیجه «تمدید مشروط به برنامه بهبود مکتوب» معنا دارد",
+            detail=(
+                "برنامهٔ بهبود برای امتیازهای زیر "
+                f"{rules.improvement_plan_max_pct:g}٪ معنا دارد؛ امتیاز این پرونده بالاتر است"
+            ),
         )
     _ensure_owner_is_valid(db, payload.owner_user_id)
 

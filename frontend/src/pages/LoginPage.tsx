@@ -16,6 +16,7 @@ import { BrandMark } from "../components/Brand";
 import { Footer } from "../components/Footer";
 import { Button } from "../ui/Button";
 import { PublicInfoLinks } from "../components/PublicInfoDialogs";
+import { ThemeToggle } from "../ui/ThemeToggle";
 
 interface PupilsProps {
   size?: number;
@@ -643,6 +644,12 @@ export function LoginPage() {
         </div>
 
         <div className="mt-4 space-y-3">
+          {/* انتخاب تم پیش از ورود هم لازم است: کسی که تم شب را می‌خواهد،
+              نباید اول صفحهٔ روشنِ ورود را تحمل کند تا به کلیدِ داخل برنامه
+              برسد. همین انتخاب ذخیره می‌شود و پس از ورود هم برجاست. */}
+          <div className="flex justify-center">
+            <ThemeToggle />
+          </div>
           <PublicInfoLinks />
           <Footer />
         </div>

@@ -436,7 +436,7 @@ function ScoreCardList({
         return (
           <li
             key={ind.id}
-            className={`rounded-2xl border bg-white p-4 shadow-card ${
+            className={`rounded-2xl border bg-white p-4 ${
               invalid ? "border-red-200" : draft.score === null ? "border-amber-200" : "border-gray-100"
             }`}
           >

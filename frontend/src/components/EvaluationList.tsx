@@ -108,7 +108,7 @@ export function EvaluationList({
   }
 
   return (
-    <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-card">
+    <div className="rounded-2xl border border-gray-200 bg-white p-5">
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <div>
           <h2 className="text-base font-bold text-gray-900">{title}</h2>

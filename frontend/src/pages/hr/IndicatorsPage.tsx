@@ -220,7 +220,7 @@ export function IndicatorsPage() {
         </Modal>
       )}
 
-      <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-card">
+      <div className="rounded-2xl border border-gray-200 bg-white p-5">
         {loadError != null && (
           <p className="mb-2 text-sm text-red-600">{extractErrorMessage(loadError)}</p>
         )}
@@ -283,7 +283,7 @@ export function IndicatorsPage() {
 function FrameworkNote({ impact }: { impact: FrameworkImpact }) {
   const fa = (n: number) => n.toLocaleString("fa-IR");
   return (
-    <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-card">
+    <div className="rounded-2xl border border-gray-200 bg-white p-5">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <p className="text-sm font-bold text-gray-900">
           نسخهٔ فعلی فرم: {fa(impact.version)}

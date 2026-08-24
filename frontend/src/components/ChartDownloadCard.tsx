@@ -65,7 +65,7 @@ export function ChartDownloadCard({
   }
 
   return (
-    <div className="relative rounded-2xl border border-gray-200 bg-white shadow-card">
+    <div className="relative rounded-2xl border border-gray-200 bg-white">
       {/* دکمه‌ها بیرون از ناحیهٔ ضبط‌اند تا در تصویر خروجی نیایند */}
       <div className="absolute end-5 top-5 z-10 flex min-w-0 max-w-[60%] flex-wrap items-center justify-end gap-2">
         {actions}

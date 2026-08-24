@@ -25,7 +25,7 @@ const DEFAULT_PAGE_SIZE = 20;
 const EVENT_TYPES = Object.keys(AUDIT_EVENT_LABELS);
 
 const filterInputClass =
-  "w-full appearance-none rounded-xl border border-gray-200 bg-gray-100 px-3 py-1.5 text-sm text-gray-700 outline-none transition-colors duration-150 focus:border-pulse-500 focus:bg-white";
+  "w-full appearance-none rounded-xl border border-gray-200 bg-gray-100 px-3 py-1.5 text-sm text-gray-700 outline-none transition-colors duration-150 focus:border-gray-900 focus:bg-white";
 
 
 interface Filters {

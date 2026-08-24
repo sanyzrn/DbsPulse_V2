@@ -65,7 +65,7 @@ function suggestUsername(personnelCode: string): string {
 
 /** کلاس استاندارد فیلد ورودی مدرن. */
 const inputClass =
-  "w-full rounded-xl border border-gray-200 bg-gray-100 px-3 py-2 text-sm text-gray-900 outline-none transition-colors duration-150 focus:border-pulse-500 focus:bg-white";
+  "w-full rounded-xl border border-gray-200 bg-gray-100 px-3 py-2 text-sm text-gray-900 outline-none transition-colors duration-150 focus:border-gray-900 focus:bg-white";
 
 /** حساب کاربری کارمند، داخل همان فرم ثبت پرسنل — تا «دسترسی دادن به فرد» یک
  * مرحلهٔ جدا و فراموش‌شدنی نباشد. */

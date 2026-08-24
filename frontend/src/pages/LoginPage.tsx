@@ -591,7 +591,7 @@ export function LoginPage() {
                     name="username"
                     required
                     autoComplete="username"
-                    className="w-full rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-900 outline-none transition-colors duration-150 focus:border-pulse-500 focus:bg-white"
+                    className="w-full rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-900 outline-none transition-colors duration-150 focus:border-gray-900 focus:bg-white"
                     value={username}
                     onChange={(e) => setUsername(e.target.value)}
                     onFocus={() => setIsTyping(true)}
@@ -608,7 +608,7 @@ export function LoginPage() {
                       type={showPassword ? "text" : "password"}
                       required
                       autoComplete="current-password"
-                      className="w-full rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 pr-11 text-sm text-gray-900 outline-none transition-colors duration-150 focus:border-pulse-500 focus:bg-white"
+                      className="w-full rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 pr-11 text-sm text-gray-900 outline-none transition-colors duration-150 focus:border-gray-900 focus:bg-white"
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
                       onFocus={() => setIsTyping(true)}

@@ -90,24 +90,26 @@ def overview(
         select(
             User.id,
             User.username,
+            User.full_name,
             func.avg(EvaluationRecord.final_weighted_pct),
             func.count(),
         )
         .join(EvaluationRecord, EvaluationRecord.unit_supervisor_user_id == User.id)
         .where(_FINALIZED, EvaluationRecord.final_weighted_pct.is_not(None))
-        .group_by(User.id, User.username)
+        .group_by(User.id, User.username, User.full_name)
     ).all()
     by_evaluator = [
         EvaluatorStat(
             evaluator_user_id=uid,
             username=username,
+            full_name=full_name,
             # میانگین یک ارزیاب که فقط دو پرونده داده، پروفایل او نیست — امتیاز همان
             # دو نفر است. تحلیل رفتار ارزیاب به دادهٔ کافی نیاز دارد.
             avg_final_pct=suppressed_avg(round(float(avg), 1), count),
             subordinate_count=subordinate_counts.get(uid, 0),
             evaluation_count=count,
         )
-        for uid, username, avg, count in evaluator_rows
+        for uid, username, full_name, avg, count in evaluator_rows
     ]
 
     indicator_rows = db.execute(

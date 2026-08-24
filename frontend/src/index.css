@@ -262,6 +262,7 @@
 [data-theme="dark"] .bg-white\/70,
 [data-theme="dark"] .bg-white\/80,
 [data-theme="dark"] .bg-white\/90,
+[data-theme="dark"] .bg-white\/95,
 [data-theme="dark"] .focus\:bg-white:focus,
 [data-theme="dark"] .hover\:bg-white:hover {
   background-color: #1b2031;
@@ -363,6 +364,10 @@ body {
 
 /* فیلدهای متنی خودشان با تغییر رنگ border فوکوس را نشان می‌دهند (مثل UI.html)؛
    اگر روی آن‌ها هم outline پیش‌فرض بالا اضافه شود، دو خط دور فیلد دیده می‌شود. */
+/* ورودی‌ها outline سراسری را خاموش می‌کنند و به‌جایش مرزشان پررنگ می‌شود
+   (`focus:border-gray-900`). تا امروز آن مرز **قرمز** بود — یعنی فیلدِ فوکوس‌شده
+   دقیقاً شبیه فیلدِ نامعتبر (`border-red-400 bg-red-50`) دیده می‌شد. مرزِ قرمز
+   روی یک ورودی در هر رابطی یک معنا دارد: «این را اشتباه پر کرده‌ای». */
 input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):focus-visible,
 textarea:focus-visible,
 select:focus-visible,

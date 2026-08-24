@@ -197,7 +197,7 @@ function SelfAssessmentForm({
                 </button>
               ))}
               <input
-                className="ms-2 min-w-40 flex-1 rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm outline-none focus:border-pulse-400"
+                className="ms-2 min-w-40 flex-1 rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm outline-none focus:border-gray-900"
                 placeholder="توضیح یا دستاورد شما (اختیاری)"
                 value={notes[indicator.id] ?? ""}
                 onChange={(e) => setNotes({ ...notes, [indicator.id]: e.target.value })}
@@ -212,7 +212,7 @@ function SelfAssessmentForm({
           دستاورد کلی شما در این دوره (اختیاری)
         </span>
         <textarea
-          className="w-full resize-none rounded-xl border border-gray-300 bg-white px-3 py-2 text-sm outline-none focus:border-pulse-400"
+          className="w-full resize-none rounded-xl border border-gray-300 bg-white px-3 py-2 text-sm outline-none focus:border-gray-900"
           rows={3}
           value={overallNote}
           onChange={(e) => setOverallNote(e.target.value)}

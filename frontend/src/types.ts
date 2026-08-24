@@ -271,6 +271,7 @@ export interface UnitStat {
 export interface EvaluatorStat {
   evaluator_user_id: number;
   username: string;
+  full_name: string | null;
   avg_final_pct: number | null;
   subordinate_count: number;
   evaluation_count: number;

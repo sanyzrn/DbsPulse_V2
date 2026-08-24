@@ -178,7 +178,14 @@ export function DashboardPage() {
           title="نمرات هر ارزیاب (مسئول واحد)"
           headers={["ارزیاب", "میانگین", "زیرمجموعه", "ارزیابی"]}
           rows={overview.by_evaluator.map((e) => [
-            e.username,
+            // نامِ آدم بالا، نام کاربری زیرش. جدولی که فقط «sup_it» را نشان
+            // می‌دهد، از خواننده می‌خواهد نام‌های کاربری را حفظ باشد.
+            <div key="who">
+              <p className="font-medium text-gray-900">{e.full_name ?? e.username}</p>
+              {e.full_name && (
+                <p dir="ltr" className="text-left text-[11px] text-gray-400">{e.username}</p>
+              )}
+            </div>,
             <PctBadge key="pct" value={e.avg_final_pct} />,
             e.subordinate_count.toLocaleString("fa-IR"),
             e.evaluation_count.toLocaleString("fa-IR"),
@@ -363,7 +370,7 @@ function ExpiringContractsCard() {
           </button>
           <div className="relative">
             <select
-              className="appearance-none rounded-xl border border-gray-200 bg-gray-100 px-3 py-1.5 pl-8 text-sm text-gray-700 outline-none transition-colors duration-150 focus:border-pulse-500 focus:bg-white"
+              className="appearance-none rounded-xl border border-gray-200 bg-gray-100 px-3 py-1.5 pl-8 text-sm text-gray-700 outline-none transition-colors duration-150 focus:border-gray-900 focus:bg-white"
               value={days}
               onChange={(e) => setDays(Number(e.target.value))}
             >
@@ -441,11 +448,14 @@ const PIPELINE_ORDER: PipelineStatus[] = [
 
 // نوار هر مرحله. رنگ‌ها همان زنجیرهٔ StatusBadge‌اند تا کاشی و نشان یک زبان
 // داشته باشند: خاکستری ← آبی ← نیلی ← کهربایی ← سبز.
+// فقط پله‌های ۴۰۰: تم تیره پله‌های روشن‌تر (۵۰ تا ۳۰۰) را به رنگ‌های تیره
+// بازتعریف می‌کند چون آن‌ها آنجا نقشِ «مرز» و «پرکنندهٔ ملایم» دارند — نوارِ
+// `bg-amber-300` در تم تیره یک لکهٔ قهوه‌ای می‌شد کنار نوارهای روشن.
 const PIPELINE_BAR: Record<PipelineStatus, string> = {
-  draft: "bg-gray-300",
-  submitted: "bg-blue-300",
-  hr_approved: "bg-indigo-300",
-  deputy_approved: "bg-amber-300",
+  draft: "bg-gray-400",
+  submitted: "bg-blue-400",
+  hr_approved: "bg-indigo-400",
+  deputy_approved: "bg-amber-400",
   finalized: "bg-green-400",
 };
 
@@ -485,9 +495,9 @@ function PipelineCard() {
               <div className="w-32 shrink-0 sm:w-40">
                 <StatusBadge status={status} />
               </div>
-              <div className="h-8 min-w-0 flex-1 rounded-lg bg-gray-50">
+              <div className="h-7 min-w-0 flex-1 rounded-lg bg-gray-50">
                 <motion.div
-                  className={`flex h-8 items-center justify-end rounded-lg px-2 ${PIPELINE_BAR[status]}`}
+                  className={`h-7 rounded-lg ${PIPELINE_BAR[status]}`}
                   initial={{ width: 0 }}
                   animate={{ width: `${widthPct}%` }}
                   transition={{ duration: 0.5, delay: idx * 0.06, ease: EASE_SOFT }}

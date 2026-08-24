@@ -138,7 +138,7 @@ export function JalaliDatePicker({
         aria-expanded={open}
         className={
           className ??
-          "field-trigger w-full rounded-xl border border-gray-200 bg-gray-100 px-3 py-2 text-right text-sm text-gray-900 outline-none transition-colors duration-150 focus:border-pulse-500 focus:bg-white disabled:cursor-not-allowed disabled:bg-gray-50 disabled:text-gray-400"
+          "field-trigger w-full rounded-xl border border-gray-200 bg-gray-100 px-3 py-2 text-right text-sm text-gray-900 outline-none transition-colors duration-150 focus:border-gray-900 focus:bg-white disabled:cursor-not-allowed disabled:bg-gray-50 disabled:text-gray-400"
         }
       >
         <span className={displayValue ? "" : "text-gray-400"}>{displayValue || placeholder}</span>

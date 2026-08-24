@@ -41,7 +41,7 @@ export function PaginationControls({
               value={pageSize}
               onChange={(e) => onPageSizeChange(Number(e.target.value))}
               aria-label="تعداد نمایش در هر صفحه"
-              className="rounded-lg border border-gray-200 bg-white px-2 py-1 text-xs text-gray-700 outline-none transition-colors focus:border-pulse-500"
+              className="rounded-lg border border-gray-200 bg-white px-2 py-1 text-xs text-gray-700 outline-none transition-colors focus:border-gray-900"
             >
               {PAGE_SIZE_OPTIONS.map((size) => (
                 <option key={size} value={size}>

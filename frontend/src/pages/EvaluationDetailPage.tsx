@@ -406,7 +406,7 @@ export function EvaluationDetailPage() {
                       {replyingTo === c.id ? (
                         <div>
                           <textarea
-                            className="w-full resize-none rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm outline-none transition-colors duration-150 focus:border-pulse-500"
+                            className="w-full resize-none rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm outline-none transition-colors duration-150 focus:border-gray-900"
                             rows={2}
                             autoFocus
                             value={replyText}
@@ -438,7 +438,7 @@ export function EvaluationDetailPage() {
                             setReplyingTo(c.id);
                             setReplyText("");
                           }}
-                          className="cursor-pointer text-xs font-medium text-pulse-600 hover:text-pulse-700"
+                          className="cursor-pointer text-xs font-medium text-gray-500 hover:text-gray-900"
                         >
                           پاسخ
                         </button>
@@ -454,7 +454,7 @@ export function EvaluationDetailPage() {
         {canComment && (
           <div className="mt-3">
             <textarea
-              className="w-full resize-none rounded-xl border border-gray-200 bg-gray-100 px-3 py-2 outline-none transition-colors duration-150 focus:border-pulse-500 focus:bg-white text-sm"
+              className="w-full resize-none rounded-xl border border-gray-200 bg-gray-100 px-3 py-2 outline-none transition-colors duration-150 focus:border-gray-900 focus:bg-white text-sm"
               rows={2}
               value={newComment}
               onChange={(e) => setNewComment(e.target.value)}
@@ -1028,7 +1028,7 @@ function EditableScoring({
         <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-card">
           <h3 className="mb-2 text-base font-bold text-gray-900">{commentLabel}</h3>
           <textarea
-            className="w-full rounded-xl border border-gray-200 bg-gray-100 px-3 py-2 outline-none transition-colors duration-150 focus:border-pulse-500 focus:bg-white text-sm"
+            className="w-full rounded-xl border border-gray-200 bg-gray-100 px-3 py-2 outline-none transition-colors duration-150 focus:border-gray-900 focus:bg-white text-sm"
             rows={3}
             value={evaluatorComment}
             onChange={(e) => setEvaluatorComment(e.target.value)}
@@ -1076,30 +1076,42 @@ function EditableScoring({
         </div>
       )}
 
-      {error && <p className="text-sm text-red-600">{error}</p>}
-
-      <div className="flex justify-end gap-2">
-        <Button variant="secondary" onClick={() => saveDraft()} disabled={saving}>
-          ذخیره پیش‌نویس
-        </Button>
-        <Button
-          onClick={submit}
-          disabled={saving || !isValid}
-          title={!isValid ? "همهٔ شاخص‌ها باید امتیاز داشته باشند و شواهد امتیازهای ۱ و ۵ کامل باشد" : undefined}
-        >
-          ثبت ارزیابی
-        </Button>
+      {/* نوار کنش چسبیده به کف پنجره می‌ماند.
+          فرم بیست شاخص دارد؛ تا امروز هم دکمهٔ «ثبت» و هم پیامِ «هنوز فلان‌قدر
+          شاخص امتیاز ندارد» انتهای همان اسکرول بودند — یعنی ارزیاب فقط وقتی
+          می‌فهمید چیزی جا مانده که به ته صفحه می‌رسید، و برای ذخیره هم باید هر
+          بار تا آخر اسکرول می‌کرد. */}
+      <div className="sticky bottom-4 z-20 rounded-2xl border border-gray-200 bg-white/95 px-4 py-3 shadow-float backdrop-blur">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <p className="min-w-0 text-xs">
+            {error ? (
+              <span className="text-red-600">{error}</span>
+            ) : unscored.length > 0 ? (
+              <span className="text-amber-700">
+                هنوز {unscored.length.toLocaleString("fa-IR")} شاخص امتیازی ندارد.
+              </span>
+            ) : violations.length > 0 ? (
+              <span className="text-amber-700">
+                {violations.length.toLocaleString("fa-IR")} شاخص (امتیاز ۱ یا ۵) هنوز شواهد کافی ندارد.
+              </span>
+            ) : (
+              <span className="text-gray-500">همهٔ شاخص‌ها کامل‌اند؛ آمادهٔ ثبت.</span>
+            )}
+          </p>
+          <div className="flex gap-2">
+            <Button variant="secondary" onClick={() => saveDraft()} disabled={saving}>
+              ذخیره پیش‌نویس
+            </Button>
+            <Button
+              onClick={submit}
+              disabled={saving || !isValid}
+              title={!isValid ? "همهٔ شاخص‌ها باید امتیاز داشته باشند و شواهد امتیازهای ۱ و ۵ کامل باشد" : undefined}
+            >
+              ثبت ارزیابی
+            </Button>
+          </div>
+        </div>
       </div>
-      {unscored.length > 0 && (
-        <p className="text-left text-xs text-red-600">
-          هنوز {unscored.length.toLocaleString("fa-IR")} شاخص امتیازی ندارد.
-        </p>
-      )}
-      {unscored.length === 0 && violations.length > 0 && (
-        <p className="text-left text-xs text-red-600">
-          {violations.length.toLocaleString("fa-IR")} شاخص (امتیاز ۱ یا ۵) هنوز شواهد کافی ندارد.
-        </p>
-      )}
     </div>
   );
 }

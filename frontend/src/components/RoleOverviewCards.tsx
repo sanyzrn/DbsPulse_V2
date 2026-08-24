@@ -7,7 +7,7 @@ import type { RoleOverviewTone } from "../types";
    هیچ‌کدام. حالا همه یک کارتِ سفیدِ یکسان‌اند و رنگ فقط در یک خطِ نازکِ کناری و
    یک نقطه می‌نشیند: ترتیبِ خواندن از عدد شروع می‌شود، نه از رنگِ زمینه. */
 const ACCENT_CLASS: Record<RoleOverviewTone, string> = {
-  neutral: "bg-gray-300",
+  neutral: "bg-gray-400",
   amber: "bg-amber-400",
   pulse: "bg-pulse-500",
   green: "bg-green-500",

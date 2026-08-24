@@ -94,7 +94,7 @@ const STATUS_TONE: Record<Scheme["status"], string> = {
 // ورودی کوچک را تمام‌عرض کند — دقیقاً همان چیزی که ردیف‌های جدول را از مودال
 // بیرون می‌زد. عرض هر جا صریح داده می‌شود.
 const fieldClass =
-  "rounded-xl border border-gray-200 bg-gray-100 px-3 py-2 text-sm text-gray-900 outline-none transition-colors focus:border-pulse-500 focus:bg-white";
+  "rounded-xl border border-gray-200 bg-gray-100 px-3 py-2 text-sm text-gray-900 outline-none transition-colors focus:border-gray-900 focus:bg-white";
 const inputClass = `${fieldClass} w-full`;
 
 function formFrom(scheme: Scheme): SchemeForm {

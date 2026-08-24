@@ -19,7 +19,7 @@ const ROLES: UserRole[] = ["unit_supervisor", "hr", "deputy", "ceo", "employee"]
 const DEFAULT_PAGE_SIZE = 10;
 
 const inputClass =
-  "w-full rounded-xl border border-gray-200 bg-gray-100 px-3 py-2 text-sm text-gray-900 outline-none transition-colors duration-150 focus:border-pulse-500 focus:bg-white";
+  "w-full rounded-xl border border-gray-200 bg-gray-100 px-3 py-2 text-sm text-gray-900 outline-none transition-colors duration-150 focus:border-gray-900 focus:bg-white";
 
 export function UsersPage() {
   const { showSuccess, showError } = useToast();
@@ -317,7 +317,7 @@ export function UsersPage() {
                 </button>
                 {/* حساب خودِ HR قابل غیرفعال‌شدن نیست (محافظ قفل‌نشدن سامانه) */}
                 {u.id !== currentUser?.id && (
-                  <button onClick={() => toggleActive(u)} className="text-sm font-medium text-pulse-600 hover:text-pulse-700">
+                  <button onClick={() => toggleActive(u)} className="text-sm font-medium text-gray-500 hover:text-gray-900">
                     {u.is_active ? "غیرفعال کردن" : "فعال کردن"}
                   </button>
                 )}

@@ -17,7 +17,7 @@ import { SearchInput } from "../ui/SearchInput";
 const DEFAULT_PAGE_SIZE = 10;
 
 const filterInputClass =
-  "w-full rounded-xl border border-gray-200 bg-gray-100 px-3 py-1.5 text-sm text-gray-700 outline-none transition-colors duration-150 focus:border-pulse-500 focus:bg-white";
+  "w-full rounded-xl border border-gray-200 bg-gray-100 px-3 py-1.5 text-sm text-gray-700 outline-none transition-colors duration-150 focus:border-gray-900 focus:bg-white";
 
 export interface EvaluationListTab {
   /** کلید یکتای تب (برای state داخلی) */

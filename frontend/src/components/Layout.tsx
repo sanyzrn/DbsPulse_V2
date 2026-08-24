@@ -129,7 +129,12 @@ export function Layout() {
           </nav>
 
           <div className="flex flex-1 items-center justify-end gap-1 lg:flex-none">
-            <ThemeToggle />
+            {/* روی موبایل، انتخاب تم به کشو می‌رود: یک کنترل سه‌بخشی در نواری که
+                فقط ۳۹۰ پیکسل عرض دارد، جای زنگوله و منوی کاربر را تنگ می‌کند —
+                و تم چیزی نیست که کاربر هر روز عوض کند. */}
+            <span className="hidden lg:inline-flex">
+              <ThemeToggle />
+            </span>
             <NotificationBell />
             <ProfileMenu user={user} onLogout={handleLogout} />
             <button
@@ -167,6 +172,10 @@ export function Layout() {
                     </NavLink>
                   </li>
                 ))}
+                <li className="mt-2 flex items-center justify-between gap-3 border-t border-gray-100 px-3 pt-3">
+                  <span className="text-sm font-medium text-gray-500">نمایش</span>
+                  <ThemeToggle />
+                </li>
               </ul>
             </motion.nav>
           )}

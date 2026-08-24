@@ -101,7 +101,7 @@ export function SessionsPage() {
                 className={`flex flex-wrap items-center justify-between gap-3 rounded-xl border px-4 py-3 ${
                   session.is_current
                     ? "border-pulse-200 bg-pulse-50/50"
-                    : "border-gray-100 bg-white"
+                    : "border-gray-200 bg-white"
                 }`}
               >
                 <div className="min-w-0">

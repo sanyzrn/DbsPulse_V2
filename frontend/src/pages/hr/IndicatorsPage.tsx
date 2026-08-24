@@ -12,7 +12,7 @@ import { TAB_TRANSITION } from "../../ui/motion";
 import type { FrameworkImpact, Indicator, IndicatorSection } from "../../types";
 
 const inputClass =
-  "w-full rounded-xl border border-gray-200 bg-gray-100 px-3 py-2 text-sm text-gray-900 outline-none transition-colors duration-150 focus:border-pulse-500 focus:bg-white";
+  "w-full rounded-xl border border-gray-200 bg-gray-100 px-3 py-2 text-sm text-gray-900 outline-none transition-colors duration-150 focus:border-gray-900 focus:bg-white";
 
 /** «در ۲۳ ارزیابی استفاده شده» — یا سکوت، وقتی هنوز جایی استفاده نشده.
  *
@@ -139,7 +139,7 @@ export function IndicatorsPage() {
       <div
         role="tablist"
         aria-label="بخش شاخص‌ها"
-        className="inline-flex rounded-2xl border border-gray-100 bg-white p-1 shadow-sm"
+        className="inline-flex rounded-2xl border border-gray-200 bg-white p-1 shadow-sm"
       >
         {(["general", "specialized"] as const).map((s) => (
           <button
@@ -220,7 +220,7 @@ export function IndicatorsPage() {
         </Modal>
       )}
 
-      <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-card">
+      <div className="rounded-2xl border border-gray-200 bg-white p-5">
         {loadError != null && (
           <p className="mb-2 text-sm text-red-600">{extractErrorMessage(loadError)}</p>
         )}
@@ -283,7 +283,7 @@ export function IndicatorsPage() {
 function FrameworkNote({ impact }: { impact: FrameworkImpact }) {
   const fa = (n: number) => n.toLocaleString("fa-IR");
   return (
-    <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-card">
+    <div className="rounded-2xl border border-gray-200 bg-white p-5">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <p className="text-sm font-bold text-gray-900">
           نسخهٔ فعلی فرم: {fa(impact.version)}
@@ -504,7 +504,7 @@ function IndicatorRow({
       // که باید ظاهر می‌شوند و جابه‌جایی با درگ دست‌نخورده می‌ماند.
       initial={false}
       layout="position"
-      className="flex items-center gap-3 rounded-xl border border-gray-100 bg-white px-3 py-2.5 text-sm"
+      className="flex items-center gap-3 rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm"
       whileDrag={{ scale: 1.01, boxShadow: "0 12px 32px rgba(0,0,0,0.10)" }}
     >
       <button
@@ -531,14 +531,13 @@ function IndicatorRow({
           : "—"}
       </span>
       <span className="w-16 text-center">
+        {/* فقط استثنا علامت می‌خورد. بیست نشانِ سبزِ «فعال» پشت سر هم هیچ چیزی
+            نمی‌گویند؛ چیزی که خواننده دنبالش می‌گردد شاخصِ *غیرفعال* است. */}
         {indicator.is_active ? (
-          <span className="inline-flex items-center gap-1.5 rounded-full bg-green-50 px-2.5 py-0.5 text-xs font-medium text-green-700">
-            <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-green-500" />
-            فعال
-          </span>
+          <span className="text-xs text-gray-400">فعال</span>
         ) : (
-          <span className="inline-flex items-center gap-1.5 rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-medium text-gray-500">
-            <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-gray-400" />
+          <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-50 px-2.5 py-0.5 text-xs font-medium text-amber-800">
+            <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-amber-500" />
             غیرفعال
           </span>
         )}
@@ -553,7 +552,9 @@ function IndicatorRow({
         </button>
         <button
           onClick={onToggle}
-          className="cursor-pointer text-xs font-medium text-pulse-600 hover:text-pulse-700"
+          // «غیرفعال کردن» یک تغییرِ وضعیت است، نه یک هشدار؛ قرمز اینجا فقط
+          // بیست لکهٔ قرمز در یک ستون می‌ساخت.
+          className="cursor-pointer text-xs font-medium text-gray-500 hover:text-gray-900"
         >
           {indicator.is_active ? "غیرفعال" : "فعال"}
         </button>

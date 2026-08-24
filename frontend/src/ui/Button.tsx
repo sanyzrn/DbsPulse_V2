@@ -2,16 +2,26 @@ import type { ComponentPropsWithRef } from "react";
 
 type Variant = "primary" | "secondary" | "link" | "danger" | "ghost";
 
+/* دکمه‌ها دیگر با hover بالا نمی‌پرند و سایهٔ رنگی ندارند.
+   `hover:-translate-y-0.5` روی هر دکمه یعنی هر بار که ماوس از روی نواری از
+   دکمه‌ها رد می‌شود، رابط تکان می‌خورد؛ و سایهٔ قرمزِ زیر دکمهٔ اصلی، لبهٔ آن را
+   مبهم می‌کرد. بازخوردِ hover حالا فقط تغییر رنگ است — سریع‌تر، آرام‌تر، و روی
+   تم تیره هم درست کار می‌کند (سایهٔ سیاه روی زمینهٔ سیاه دیده نمی‌شود). */
 const STYLES: Record<Variant, string> = {
   primary:
-    "relative overflow-hidden rounded-xl bg-pulse-600 px-5 py-2.5 text-sm font-semibold text-white shadow-md shadow-pulse-500/20 transition-all duration-200 hover:bg-pulse-700 hover:shadow-lg hover:shadow-pulse-500/30 hover:-translate-y-0.5 active:translate-y-0 active:shadow-md disabled:opacity-50 disabled:hover:translate-y-0 disabled:hover:shadow-md",
+    "rounded-xl bg-pulse-600 px-5 py-2.5 text-sm font-semibold text-white transition-colors duration-150 hover:bg-pulse-700 active:bg-pulse-800 disabled:opacity-50",
   secondary:
-    "rounded-xl border border-gray-200 bg-white px-5 py-2.5 text-sm font-medium text-gray-700 shadow-sm transition-all duration-200 hover:bg-gray-50 hover:shadow-md hover:-translate-y-0.5 disabled:opacity-50",
+    "rounded-xl border border-gray-200 bg-white px-5 py-2.5 text-sm font-medium text-gray-700 transition-colors duration-150 hover:bg-gray-50 hover:text-gray-900 disabled:opacity-50",
+  // کهربایی و نه قرمز: قرمزِ این سامانه رنگِ برند است و روی دکمهٔ اصلی می‌نشیند،
+  // پس نمی‌تواند هم‌زمان معنای «خطرناک» را هم حمل کند.
   danger:
-    "rounded-xl bg-amber-600 px-5 py-2.5 text-sm font-semibold text-white shadow-md shadow-amber-500/20 transition-all duration-200 hover:bg-amber-700 hover:shadow-lg hover:-translate-y-0.5 active:translate-y-0 disabled:opacity-50",
-  link: "relative text-sm font-semibold text-pulse-600 hover:text-pulse-700 disabled:opacity-50 underline-offset-4 hover:underline decoration-pulse-300 underline",
+    "rounded-xl bg-amber-600 px-5 py-2.5 text-sm font-semibold text-white transition-colors duration-150 hover:bg-amber-700 active:bg-amber-800 disabled:opacity-50",
+  // زیرخط فقط در hover: در جدولی که این دکمه در هر ردیف تکرار می‌شود، زیرخطِ
+  // همیشگی یک ستونِ کاملاً قرمز و خط‌کشیده می‌ساخت.
+  link:
+    "rounded-lg text-sm font-semibold text-pulse-700 underline-offset-4 transition-colors hover:text-pulse-800 hover:underline disabled:opacity-50",
   ghost:
-    "rounded-xl px-3 py-2 text-sm font-medium text-gray-600 transition-all duration-200 hover:bg-gray-100 hover:text-gray-900 disabled:opacity-50",
+    "rounded-xl px-3 py-2 text-sm font-medium text-gray-600 transition-colors duration-150 hover:bg-gray-100 hover:text-gray-900 disabled:opacity-50",
 };
 
 /** دکمه استاندارد با واریانت‌های مختلف و حالت بارگذاری. */

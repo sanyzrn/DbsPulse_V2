@@ -14,7 +14,7 @@ export function Card({
 }) {
   return (
     <div
-      className={`rounded-2xl border border-gray-100 bg-white p-5 shadow-card transition-shadow duration-300 hover:shadow-card-hover ${className}`}
+      className={`rounded-2xl border border-gray-200 bg-white p-5 ${className}`}
     >
       {(title || actions) && (
         <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
@@ -83,7 +83,7 @@ export function FilterSelect({
     <div className="relative min-w-0 max-w-full">
       <select
         aria-label={ariaLabel}
-        className="max-w-full appearance-none truncate rounded-xl border border-gray-200 bg-gray-100 py-1.5 pr-3 pl-8 text-sm text-gray-700 outline-none transition-colors duration-150 focus:border-pulse-500 focus:bg-white"
+        className="max-w-full appearance-none truncate rounded-xl border border-gray-200 bg-gray-100 py-1.5 pr-3 pl-8 text-sm text-gray-700 outline-none transition-colors duration-150 focus:border-gray-900 focus:bg-white"
         value={value}
         onChange={(e) => onChange(e.target.value)}
       >

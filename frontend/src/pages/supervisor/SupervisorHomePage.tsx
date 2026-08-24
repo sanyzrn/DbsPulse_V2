@@ -3,13 +3,14 @@ import { useNavigate } from "react-router-dom";
 import { apiClient, extractConflictEvaluationId, extractErrorMessage } from "../../api/client";
 import { useDebouncedValue, useEvaluations, usePersonnelList } from "../../api/queries";
 import { EmployeeProfileModal } from "../../components/EmployeeProfileModal";
-import { EvaluationActionButton } from "../../components/EvaluationActionButton";
+import { EvaluationActionButton, type OpenEvaluation } from "../../components/EvaluationActionButton";
 import { EvaluationList } from "../../components/EvaluationList";
 import { RoleOverviewCards } from "../../components/RoleOverviewCards";
+import { StatusBadge } from "../../components/StatusBadge";
 import { PageHeader, TableSkeleton } from "../../ui/Card";
 import { SearchInput } from "../../ui/SearchInput";
 import { Table } from "../../ui/Table";
-import type { Personnel } from "../../types";
+import { isOpenStatus, type Personnel } from "../../types";
 
 export function SupervisorHomePage() {
   const [error, setError] = useState<string | null>(null);
@@ -34,10 +35,16 @@ export function SupervisorHomePage() {
   // کلیک بی‌نتیجه و خطای ۴۰۹) — این فهرست از قبل توسط بک‌اند به ارزیابی‌های
   // خودِ همین مسئول واحد محدود شده است.
   const { data: myEvaluations } = useEvaluations({ limit: 200, offset: 0 });
-  const openEvaluationByPersonnel = new Map<number, { id: number; code: string }>();
+  // `isOpenStatus` و نه `!== "finalized"`: پروندهٔ **لغوشده** پایان‌یافته است و
+  // نباید جلوی شروع ارزیابی تازه را بگیرد.
+  const openEvaluationByPersonnel = new Map<number, OpenEvaluation>();
   for (const e of myEvaluations?.items ?? []) {
-    if (e.status !== "finalized") {
-      openEvaluationByPersonnel.set(e.subject_personnel_id, { id: e.id, code: e.evaluation_code });
+    if (isOpenStatus(e.status)) {
+      openEvaluationByPersonnel.set(e.subject_personnel_id, {
+        id: e.id,
+        code: e.evaluation_code,
+        status: e.status,
+      });
     }
   }
 
@@ -67,7 +74,7 @@ export function SupervisorHomePage() {
     <div className="space-y-4">
       <PageHeader title="افراد زیرمجموعه" subtitle="شروع ارزیابی جدید برای افراد زیرمجموعه شما" />
       <RoleOverviewCards />
-      <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-card">
+      <div className="rounded-2xl border border-gray-200 bg-white p-5">
         <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
           <h2 className="text-base font-bold text-gray-900">فهرست افراد</h2>
           <SearchInput
@@ -86,14 +93,14 @@ export function SupervisorHomePage() {
         ) : (
         <Table
           bordered={false}
-          headers={["نام", "عنوان شغلی", "واحد", ""]}
+          headers={["نام", "عنوان شغلی", "واحد", "وضعیت ارزیابی", ""]}
           rowKeys={personnel.map((p) => p.id)}
           emptyMessage={search ? "کسی با این مشخصات پیدا نشد." : "فردی زیرمجموعه شما نیست."}
           rows={personnel.map((p) => [
             <button
               key="name"
               onClick={() => setProfilePerson(p)}
-              className="font-medium text-pulse-700 transition-colors hover:text-pulse-800 hover:underline"
+              className="font-medium text-gray-900 underline-offset-4 transition-colors hover:text-pulse-700 hover:underline"
               title="مشاهده پروفایل و روند عملکرد"
             >
               {p.full_name}
@@ -104,6 +111,16 @@ export function SupervisorHomePage() {
             <span key="unit" className="text-gray-500">
               {p.org_unit}
             </span>,
+            // وضعیت در همین ردیف می‌آید تا مسئول واحد برای فهمیدن اینکه پروندهٔ
+            // این فرد کجاست، مجبور نباشد به جدول پایین صفحه نگاه کند و اسم‌ها را
+            // بین دو فهرست تطبیق بدهد.
+            openEvaluationByPersonnel.has(p.id) ? (
+              <StatusBadge key="status" status={openEvaluationByPersonnel.get(p.id)!.status} />
+            ) : (
+              <span key="status" className="text-xs text-gray-400">
+                پروندهٔ باز ندارد
+              </span>
+            ),
             <EvaluationActionButton
               key="action"
               open={openEvaluationByPersonnel.get(p.id)}
@@ -117,8 +134,11 @@ export function SupervisorHomePage() {
         )}
       </div>
 
+      {/* جدول بالا «کارِ امروز» است؛ این یکی بایگانی — شامل پرونده‌های نهایی‌شده و
+          دوره‌های گذشته که در فهرست افراد جایی ندارند. */}
       <EvaluationList
-        title="ارزیابی‌های من"
+        title="سوابق ارزیابی‌های من"
+        subtitle="همهٔ پرونده‌هایی که شما نمره داده‌اید، شامل نهایی‌شده‌ها و دوره‌های گذشته"
         tabs={[
           { key: "all", label: "همه" },
           { key: "draft", label: "پیش‌نویس", status: "draft" },

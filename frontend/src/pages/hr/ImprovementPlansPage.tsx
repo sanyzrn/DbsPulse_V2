@@ -41,7 +41,7 @@ const STATUS_DOT: Record<ImprovementPlanStatus, string> = {
 };
 
 const inputClass =
-  "w-full rounded-xl border border-gray-200 bg-gray-100 px-3 py-2 text-sm text-gray-900 outline-none transition-colors duration-150 focus:border-pulse-500 focus:bg-white";
+  "w-full rounded-xl border border-gray-200 bg-gray-100 px-3 py-2 text-sm text-gray-900 outline-none transition-colors duration-150 focus:border-gray-900 focus:bg-white";
 
 function CreatePlanRow({
   item,
@@ -86,7 +86,7 @@ function CreatePlanRow({
       <td className="px-3 py-2.5">
         <button
           onClick={() => onOpenProfile(item.personnel_id, item.personnel_full_name)}
-          className="text-right font-medium text-pulse-700 transition-colors hover:text-pulse-800 hover:underline"
+          className="text-right font-medium text-gray-900 underline-offset-4 transition-colors hover:text-pulse-700 hover:underline"
         >
           {item.personnel_full_name}
         </button>
@@ -234,7 +234,7 @@ export function ImprovementPlansPage() {
             <div className="relative">
             <select
               aria-label="فیلتر وضعیت"
-              className="appearance-none rounded-xl border border-gray-200 bg-gray-100 py-1.5 pr-3 pl-8 text-sm text-gray-700 outline-none transition-colors duration-150 focus:border-pulse-500 focus:bg-white"
+              className="appearance-none rounded-xl border border-gray-200 bg-gray-100 py-1.5 pr-3 pl-8 text-sm text-gray-700 outline-none transition-colors duration-150 focus:border-gray-900 focus:bg-white"
               value={statusFilter}
               onChange={(e) => {
                 setStatusFilter(e.target.value as ImprovementPlanStatus | "");
@@ -292,7 +292,7 @@ export function ImprovementPlansPage() {
                 <span aria-hidden className={`h-1.5 w-1.5 rounded-full ${STATUS_DOT[p.status]}`} />
                 {IMPROVEMENT_PLAN_STATUS_LABELS[p.status]}
               </span>,
-              <Link key="details" to={`/improvement-plans/${p.id}`} className="inline-flex items-center gap-1 text-sm font-medium text-pulse-600 hover:text-pulse-700">
+              <Link key="details" to={`/improvement-plans/${p.id}`} className="inline-flex items-center gap-1 text-sm font-medium text-gray-500 hover:text-gray-900">
                 جزئیات
                 <svg viewBox="0 0 20 20" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M7 5l5 5-5 5" />

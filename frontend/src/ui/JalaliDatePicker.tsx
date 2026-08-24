@@ -138,7 +138,7 @@ export function JalaliDatePicker({
         aria-expanded={open}
         className={
           className ??
-          "field-trigger w-full rounded-xl border border-gray-200 bg-gray-100 px-3 py-2 text-right text-sm text-gray-900 outline-none transition-colors duration-150 focus:border-pulse-500 focus:bg-white disabled:cursor-not-allowed disabled:bg-gray-50 disabled:text-gray-400"
+          "field-trigger w-full rounded-xl border border-gray-200 bg-gray-100 px-3 py-2 text-right text-sm text-gray-900 outline-none transition-colors duration-150 focus:border-gray-900 focus:bg-white disabled:cursor-not-allowed disabled:bg-gray-50 disabled:text-gray-400"
         }
       >
         <span className={displayValue ? "" : "text-gray-400"}>{displayValue || placeholder}</span>
@@ -153,7 +153,7 @@ export function JalaliDatePicker({
           <motion.div
             role="dialog"
             aria-label="انتخاب تاریخ"
-            className="absolute z-40 mt-1.5 w-72 overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-float ring-1 ring-black/5"
+            className="absolute z-40 mt-1.5 w-72 overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-float ring-1 ring-black/5"
             initial={{ opacity: 0, y: -6, scale: 0.97 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: -6, scale: 0.97 }}

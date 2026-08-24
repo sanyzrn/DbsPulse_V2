@@ -31,7 +31,7 @@ function chartEmptyMessage(totalRows: number, visibleRows: number, fallback: str
 }
 
 const inputClass =
-  "w-full rounded-xl border border-gray-200 bg-gray-100 px-3 py-1.5 text-sm text-gray-700 outline-none transition-colors duration-150 focus:border-pulse-500 focus:bg-white";
+  "w-full rounded-xl border border-gray-200 bg-gray-100 px-3 py-1.5 text-sm text-gray-700 outline-none transition-colors duration-150 focus:border-gray-900 focus:bg-white";
 
 /** بخش گزارش‌های تحلیلی فیلترشونده — جدا از کارت‌های خلاصهٔ همیشگیِ بالای داشبورد.
  * همهٔ فیلترها ترکیب‌پذیرند و روی همهٔ نمودارها/خروجی‌های این بخش اعمال می‌شوند.
@@ -249,7 +249,7 @@ export function ReportsSection() {
         </Card>
       ) : (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <div className="flex items-center gap-4 rounded-2xl border border-gray-100 bg-white p-5 shadow-card">
+          <div className="flex items-center gap-4 rounded-2xl border border-gray-200 bg-white p-5">
             <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-pulse-50 text-pulse-600" aria-hidden>
               <svg viewBox="0 0 20 20" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M7 3h6l4 4v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h3z" />
@@ -263,7 +263,7 @@ export function ReportsSection() {
               </p>
             </div>
           </div>
-          <div className="flex items-center justify-between gap-4 rounded-2xl border border-gray-100 bg-white p-5 shadow-card">
+          <div className="flex items-center justify-between gap-4 rounded-2xl border border-gray-200 bg-white p-5">
             <div>
               <p className="text-xs text-gray-500">میانگین امتیاز نهایی (فیلترشده)</p>
               <p className="mt-0.5 text-sm text-gray-400">میانگین ٪ در نتایج فیلترشده</p>

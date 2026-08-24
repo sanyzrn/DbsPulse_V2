@@ -86,7 +86,7 @@ export function ChangePasswordPage() {
     <div className="mx-auto max-w-md py-6">
       <motion.form
         onSubmit={handleSubmit}
-        className="rounded-3xl border border-gray-100 bg-white p-6 shadow-card"
+        className="rounded-3xl border border-gray-200 bg-white p-6"
         initial={{ opacity: 0, y: 16 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.4, ease: "easeOut" }}

@@ -18,7 +18,7 @@ import type { EvaluationPeriod } from "../../types";
 const emptyForm = { name: "", starts_on: "", ends_on: "" };
 
 const inputClass =
-  "w-full rounded-xl border border-gray-200 bg-gray-100 px-3 py-2 text-sm text-gray-900 outline-none transition-colors duration-150 focus:border-pulse-500 focus:bg-white";
+  "w-full rounded-xl border border-gray-200 bg-gray-100 px-3 py-2 text-sm text-gray-900 outline-none transition-colors duration-150 focus:border-gray-900 focus:bg-white";
 
 export function PeriodsPage() {
   const { showSuccess, showError } = useToast();
@@ -152,7 +152,7 @@ export function PeriodsPage() {
 
       {openPeriod && <OpenPeriodCard period={openPeriod} onClose={() => closePeriod(openPeriod)} />}
 
-      <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-card">
+      <div className="rounded-2xl border border-gray-200 bg-white p-5">
         <h2 className="mb-4 text-base font-bold text-gray-900">تاریخچه دوره‌ها</h2>
         {loadError != null && (
           <p className="mb-2 text-sm text-red-600">{extractErrorMessage(loadError)}</p>
@@ -199,7 +199,7 @@ function OpenPeriodCard({ period, onClose }: { period: EvaluationPeriod; onClose
 
   return (
     <motion.div
-      className="rounded-2xl border-2 border-pulse-100 bg-white p-5 shadow-card"
+      className="rounded-2xl border-2 border-pulse-100 bg-white p-5"
       initial={{ opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.4 }}
@@ -235,8 +235,8 @@ function OpenPeriodCard({ period, onClose }: { period: EvaluationPeriod; onClose
               </p>
             </div>
             <div className="rounded-2xl bg-pulse-50/50 p-4">
-              <p className="text-xs text-pulse-600">آغاز شده</p>
-              <p className="mt-1 text-2xl font-extrabold tabular-nums text-pulse-700">
+              <p className="text-xs text-gray-500">آغاز شده</p>
+              <p className="mt-1 text-2xl font-extrabold tabular-nums text-gray-900">
                 <CountUp value={started} format="plain" />
                 <span className="mr-1 text-sm font-semibold">
                   ({pct(started).toLocaleString("fa-IR")}٪)

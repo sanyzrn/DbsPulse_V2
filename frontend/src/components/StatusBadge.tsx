@@ -3,7 +3,9 @@ import { STATUS_LABELS, type EvaluationStatus } from "../types";
 const STYLE_BY_STATUS: Record<EvaluationStatus, string> = {
   draft: "bg-gray-100 text-gray-700",
   submitted: "bg-blue-50 text-blue-700",
-  hr_approved: "bg-pulse-50 text-pulse-700",
+  // نه قرمزِ برند: قرمز در این رابط یعنی «کنش لازم است»، و این فقط یک
+  // مرحلهٔ میانیِ سالم است. زنجیرهٔ رنگ‌ها خاکستری ← آبی ← نیلی ← کهربایی ← سبز.
+  hr_approved: "bg-indigo-50 text-indigo-700",
   deputy_approved: "bg-amber-50 text-amber-800",
   finalized: "bg-green-50 text-green-700",
   // لغوشده عمداً خنثی و کم‌رنگ است، نه قرمزِ خطا: یک تصمیم اداری است، نه شکست.
@@ -13,7 +15,7 @@ const STYLE_BY_STATUS: Record<EvaluationStatus, string> = {
 const DOT_BY_STATUS: Record<EvaluationStatus, string> = {
   draft: "bg-gray-400",
   submitted: "bg-blue-500",
-  hr_approved: "bg-pulse-500",
+  hr_approved: "bg-indigo-500",
   deputy_approved: "bg-amber-500",
   finalized: "bg-green-500",
   cancelled: "bg-gray-400",

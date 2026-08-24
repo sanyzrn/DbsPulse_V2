@@ -24,6 +24,8 @@ interface RecommendationSlice {
   recommendation: string;
   count: number;
   share_pct: number;
+  /** جای این بند در نردبانِ طرحِ فعال؛ `null` برای برچسبِ نسخه‌های قدیمی‌تر. */
+  band_index: number | null;
 }
 
 interface ExecutiveOverview {
@@ -80,7 +82,7 @@ export function ExecutivePage() {
 
       {/* ── سه عدد سرصفحه ── */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <div className="flex items-center justify-between gap-4 rounded-2xl border border-gray-100 bg-white p-5 shadow-card">
+        <div className="flex items-center justify-between gap-4 rounded-2xl border border-gray-200 bg-white p-5">
           <div>
             <p className="text-xs text-gray-500">میانگین امتیاز نهایی سازمان</p>
             <p className="mt-0.5 text-sm text-gray-400">در همهٔ ارزیابی‌های نهایی‌شده</p>
@@ -117,7 +119,7 @@ export function ExecutivePage() {
               className={`rounded-2xl border p-4 ${
                 horizon.without_finalized_evaluation > 0
                   ? "border-amber-200 bg-amber-50/40"
-                  : "border-gray-100 bg-white"
+                  : "border-gray-200 bg-white"
               }`}
             >
               <p className="text-xs text-gray-500">
@@ -161,7 +163,7 @@ export function ExecutivePage() {
                   </div>
                   <span className="block h-2 overflow-hidden rounded-full bg-gray-100">
                     <span
-                      className="block h-full rounded-full bg-pulse-500"
+                      className={`block h-full rounded-full ${bandColor(slice.band_index, data.recommendation_mix.length)}`}
                       style={{ width: `${slice.share_pct}%` }}
                     />
                   </span>
@@ -177,25 +179,21 @@ export function ExecutivePage() {
             <CycleStat
               label="میانهٔ زمان از آغاز تا نهایی‌شدن"
               value={
-                data.cycle_time.median_days !== null
-                  ? `${fa1(data.cycle_time.median_days)} روز`
-                  : "—"
+                days(data.cycle_time.median_days)
               }
               hint={`بر پایهٔ ${faInt(data.cycle_time.finalized_count)} پروندهٔ نهایی‌شده`}
             />
             <CycleStat
               label="۹۰ درصد پرونده‌ها زیر این زمان"
               value={
-                data.cycle_time.p90_days !== null ? `${fa1(data.cycle_time.p90_days)} روز` : "—"
+                days(data.cycle_time.p90_days)
               }
               hint="میانه می‌گوید حالت عادی چقدر است؛ این عدد می‌گوید بدترین حالتِ معمول چقدر."
             />
             <CycleStat
               label="قدیمی‌ترین پروندهٔ باز"
               value={
-                data.cycle_time.oldest_open_stage_days !== null
-                  ? `${fa1(data.cycle_time.oldest_open_stage_days)} روز`
-                  : "—"
+                days(data.cycle_time.oldest_open_stage_days)
               }
               hint="چند روز است در همان مرحله مانده — نه از آغاز پرونده."
             />
@@ -273,8 +271,8 @@ function HeadlineStat({
 }) {
   return (
     <div
-      className={`rounded-2xl border p-5 shadow-card ${
-        tone === "amber" ? "border-amber-200 bg-amber-50/40" : "border-gray-100 bg-white"
+      className={`rounded-2xl border p-5 ${
+        tone === "amber" ? "border-amber-200 bg-amber-50/40" : "border-gray-200 bg-white"
       }`}
     >
       <p className="text-xs text-gray-500">{label}</p>
@@ -284,6 +282,33 @@ function HeadlineStat({
       <p className="mt-1 text-[11px] text-gray-400">{hint}</p>
     </div>
   );
+}
+
+/** رنگِ هر بندِ نتیجه بر پایهٔ جایش در نردبان، نه بر پایهٔ برچسبش.
+ *
+ *  برچسب‌ها در «طرح نمره‌دهی» قابل تغییرند، پس نمی‌شود رنگ را به متن گره زد.
+ *  ولی ترتیبشان همیشه از بدترین به بهترین است — و همین کافی است: پایین‌ترین بند
+ *  قرمز، بالاترین سبز، میانی‌ها کهربایی و آبی.
+ *
+ *  تا امروز هر چهار میله `bg-pulse-500` بودند: «عدم تمدید» و «تمدید با شرایط
+ *  استاندارد» دقیقاً یک شکل دیده می‌شدند، و نموداری که قرار بود تفاوت نتایج را
+ *  نشان بدهد، فقط چهار میلهٔ قرمز بود. */
+/** شمارِ روز برای نمایش.
+ *
+ *  زیر یک روز به «کمتر از یک روز» تبدیل می‌شود. عددِ اعشاریِ کوچک برای مدت‌زمان
+ *  چیزی به خواننده نمی‌گوید، و در حالت‌های مرزی حتی می‌تواند منفی از آب دربیاید
+ *  («۰٫۲- روز») که برای یک مدت‌زمان بی‌معناست. */
+function days(value: number | null): string {
+  if (value === null) return "—";
+  if (value < 1) return "کمتر از یک روز";
+  return `${fa1(value)} روز`;
+}
+
+function bandColor(bandIndex: number | null, bandCount: number): string {
+  if (bandIndex === null) return "bg-gray-400";
+  if (bandIndex === 0) return "bg-pulse-500";
+  if (bandIndex >= bandCount - 1) return "bg-green-500";
+  return bandIndex === 1 ? "bg-amber-400" : "bg-blue-400";
 }
 
 function CycleStat({ label, value, hint }: { label: string; value: string; hint: string }) {

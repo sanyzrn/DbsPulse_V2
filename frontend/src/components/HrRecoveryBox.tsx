@@ -21,7 +21,7 @@ const STAGE_OPTIONS: { field: StageField; label: string; role: UserRole }[] = [
 ];
 
 const inputClass =
-  "w-full resize-none rounded-xl border border-gray-300 bg-white px-3 py-2 text-sm outline-none transition-all focus:border-pulse-400 focus:ring-2 focus:ring-pulse-100";
+  "w-full resize-none rounded-xl border border-gray-300 bg-white px-3 py-2 text-sm outline-none transition-all focus:border-gray-900 focus:ring-2 focus:ring-gray-900/10";
 
 /** نوار «مسئول این پرونده» — پیش از این، مرحلهٔ HR تنها مرحله‌ای بود که صاحب نداشت،
  *  پس در سازمانی با چند کاربر HR معلوم نبود مسئولیتش با کیست. */

@@ -141,7 +141,7 @@ export function EvaluationDetailPage() {
   }
   if (loadError || !evaluation || !personnel || !user) {
     return (
-      <div className="rounded-2xl border border-gray-100 bg-white p-8 text-center shadow-card">
+      <div className="rounded-2xl border border-gray-200 bg-white p-8 text-center">
         <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-red-50">
           <svg viewBox="0 0 24 24" className="h-6 w-6 text-red-500" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
             <circle cx="12" cy="12" r="10" />
@@ -254,7 +254,7 @@ export function EvaluationDetailPage() {
         بازگشت
       </button>
 
-      <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-card">
+      <div className="rounded-2xl border border-gray-200 bg-white p-5">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div>
             <h1 className="text-xl font-bold text-gray-900">{personnel.full_name}</h1>
@@ -358,7 +358,7 @@ export function EvaluationDetailPage() {
         />
       )}
 
-      <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-card">
+      <div className="rounded-2xl border border-gray-200 bg-white p-5">
         <h2 className="mb-3 text-base font-bold text-gray-900">کامنت‌ها</h2>
         {topLevelComments.length === 0 && <p className="text-sm text-gray-400">کامنتی ثبت نشده است.</p>}
         <ul className="space-y-2">
@@ -406,7 +406,7 @@ export function EvaluationDetailPage() {
                       {replyingTo === c.id ? (
                         <div>
                           <textarea
-                            className="w-full resize-none rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm outline-none transition-colors duration-150 focus:border-pulse-500"
+                            className="w-full resize-none rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm outline-none transition-colors duration-150 focus:border-gray-900"
                             rows={2}
                             autoFocus
                             value={replyText}
@@ -438,7 +438,7 @@ export function EvaluationDetailPage() {
                             setReplyingTo(c.id);
                             setReplyText("");
                           }}
-                          className="cursor-pointer text-xs font-medium text-pulse-600 hover:text-pulse-700"
+                          className="cursor-pointer text-xs font-medium text-gray-500 hover:text-gray-900"
                         >
                           پاسخ
                         </button>
@@ -454,7 +454,7 @@ export function EvaluationDetailPage() {
         {canComment && (
           <div className="mt-3">
             <textarea
-              className="w-full resize-none rounded-xl border border-gray-200 bg-gray-100 px-3 py-2 outline-none transition-colors duration-150 focus:border-pulse-500 focus:bg-white text-sm"
+              className="w-full resize-none rounded-xl border border-gray-200 bg-gray-100 px-3 py-2 outline-none transition-colors duration-150 focus:border-gray-900 focus:bg-white text-sm"
               rows={2}
               value={newComment}
               onChange={(e) => setNewComment(e.target.value)}
@@ -672,7 +672,7 @@ function ReadOnlyScoring({
 }) {
   if (scores.length === 0) {
     return (
-      <div className="rounded-2xl border border-gray-100 bg-white p-8 text-center shadow-card text-sm text-gray-400">
+      <div className="rounded-2xl border border-gray-200 bg-white p-8 text-center text-sm text-gray-400">
         هنوز امتیازی ثبت نشده است.
       </div>
     );
@@ -721,7 +721,7 @@ function ReadOnlyScoring({
       ) : null}
 
       {evaluatorComment && (
-        <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-card">
+        <div className="rounded-2xl border border-gray-200 bg-white p-5">
           <h3 className="mb-1 text-base font-bold text-gray-900">{commentLabel}</h3>
           <p className="text-sm text-gray-700">{evaluatorComment}</p>
         </div>
@@ -917,7 +917,7 @@ function EditableScoring({
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-pulse-100 bg-pulse-50/50 px-4 py-3 shadow-card">
+      <div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-pulse-100 bg-pulse-50/50 px-4 py-3">
         <p className="flex items-center gap-2 text-sm text-gray-600">
           <svg viewBox="0 0 20 20" className="h-4 w-4 text-pulse-500" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
             <circle cx="10" cy="10" r="8" />
@@ -1025,10 +1025,10 @@ function EditableScoring({
       )}
 
       {showEvaluatorComment && (
-        <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-card">
+        <div className="rounded-2xl border border-gray-200 bg-white p-5">
           <h3 className="mb-2 text-base font-bold text-gray-900">{commentLabel}</h3>
           <textarea
-            className="w-full rounded-xl border border-gray-200 bg-gray-100 px-3 py-2 outline-none transition-colors duration-150 focus:border-pulse-500 focus:bg-white text-sm"
+            className="w-full rounded-xl border border-gray-200 bg-gray-100 px-3 py-2 outline-none transition-colors duration-150 focus:border-gray-900 focus:bg-white text-sm"
             rows={3}
             value={evaluatorComment}
             onChange={(e) => setEvaluatorComment(e.target.value)}
@@ -1037,7 +1037,7 @@ function EditableScoring({
       )}
 
       {preview && (
-        <div className="rounded-2xl border border-gray-100 bg-white p-4 shadow-card">
+        <div className="rounded-2xl border border-gray-200 bg-white p-4">
           <p className="mb-3 flex items-center gap-1.5 text-xs text-gray-500">
             <svg viewBox="0 0 20 20" className="h-3.5 w-3.5 text-pulse-500" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
               <path d="M10 3v14M3 10h14" />
@@ -1076,30 +1076,42 @@ function EditableScoring({
         </div>
       )}
 
-      {error && <p className="text-sm text-red-600">{error}</p>}
-
-      <div className="flex justify-end gap-2">
-        <Button variant="secondary" onClick={() => saveDraft()} disabled={saving}>
-          ذخیره پیش‌نویس
-        </Button>
-        <Button
-          onClick={submit}
-          disabled={saving || !isValid}
-          title={!isValid ? "همهٔ شاخص‌ها باید امتیاز داشته باشند و شواهد امتیازهای ۱ و ۵ کامل باشد" : undefined}
-        >
-          ثبت ارزیابی
-        </Button>
+      {/* نوار کنش چسبیده به کف پنجره می‌ماند.
+          فرم بیست شاخص دارد؛ تا امروز هم دکمهٔ «ثبت» و هم پیامِ «هنوز فلان‌قدر
+          شاخص امتیاز ندارد» انتهای همان اسکرول بودند — یعنی ارزیاب فقط وقتی
+          می‌فهمید چیزی جا مانده که به ته صفحه می‌رسید، و برای ذخیره هم باید هر
+          بار تا آخر اسکرول می‌کرد. */}
+      <div className="sticky bottom-4 z-20 rounded-2xl border border-gray-200 bg-white/95 px-4 py-3 shadow-float backdrop-blur">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <p className="min-w-0 text-xs">
+            {error ? (
+              <span className="text-red-600">{error}</span>
+            ) : unscored.length > 0 ? (
+              <span className="text-amber-700">
+                هنوز {unscored.length.toLocaleString("fa-IR")} شاخص امتیازی ندارد.
+              </span>
+            ) : violations.length > 0 ? (
+              <span className="text-amber-700">
+                {violations.length.toLocaleString("fa-IR")} شاخص (امتیاز ۱ یا ۵) هنوز شواهد کافی ندارد.
+              </span>
+            ) : (
+              <span className="text-gray-500">همهٔ شاخص‌ها کامل‌اند؛ آمادهٔ ثبت.</span>
+            )}
+          </p>
+          <div className="flex gap-2">
+            <Button variant="secondary" onClick={() => saveDraft()} disabled={saving}>
+              ذخیره پیش‌نویس
+            </Button>
+            <Button
+              onClick={submit}
+              disabled={saving || !isValid}
+              title={!isValid ? "همهٔ شاخص‌ها باید امتیاز داشته باشند و شواهد امتیازهای ۱ و ۵ کامل باشد" : undefined}
+            >
+              ثبت ارزیابی
+            </Button>
+          </div>
+        </div>
       </div>
-      {unscored.length > 0 && (
-        <p className="text-left text-xs text-red-600">
-          هنوز {unscored.length.toLocaleString("fa-IR")} شاخص امتیازی ندارد.
-        </p>
-      )}
-      {unscored.length === 0 && violations.length > 0 && (
-        <p className="text-left text-xs text-red-600">
-          {violations.length.toLocaleString("fa-IR")} شاخص (امتیاز ۱ یا ۵) هنوز شواهد کافی ندارد.
-        </p>
-      )}
     </div>
   );
 }

@@ -87,7 +87,7 @@ function PageFallback() {
 /** جای‌گزین بخش‌های موقتاً غیرفعال — به‌جای ۴۰۴ یک پیام دوستانه نشان می‌دهد. */
 function DisabledFeature({ title }: { title: string }) {
   return (
-    <div className="rounded-2xl border border-gray-100 bg-white p-10 text-center shadow-card">
+    <div className="rounded-2xl border border-gray-200 bg-white p-10 text-center">
       <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-gray-100 text-gray-400">
         <svg viewBox="0 0 24 24" className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
           <circle cx="12" cy="12" r="9" />

@@ -16,6 +16,9 @@ class UnitStat(BaseModel):
 class EvaluatorStat(BaseModel):
     evaluator_user_id: int
     username: str
+    # نام کامل، چون این جدول را آدم می‌خواند نه سامانه: «sup_it» به کارشناس
+    # منابع انسانی نمی‌گوید کدام ارزیاب سخت‌گیرتر بوده است.
+    full_name: str | None = None
     avg_final_pct: float | None
     subordinate_count: int
     evaluation_count: int

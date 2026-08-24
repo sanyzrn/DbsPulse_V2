@@ -32,7 +32,7 @@ export function SearchInput({
       </svg>
       <input
         type="search"
-        className={`w-full ${widthClass} rounded-xl border border-gray-200 bg-gray-100 py-1.5 pr-9 pl-3 text-sm text-gray-700 outline-none transition-colors duration-150 focus:border-pulse-500 focus:bg-white`}
+        className={`w-full ${widthClass} rounded-xl border border-gray-200 bg-gray-100 py-1.5 pr-9 pl-3 text-sm text-gray-700 outline-none transition-colors duration-150 focus:border-gray-900 focus:bg-white`}
         {...props}
       />
     </div>

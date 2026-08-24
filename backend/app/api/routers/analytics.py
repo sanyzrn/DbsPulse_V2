@@ -44,6 +44,7 @@ from app.schemas.analytics import (
 from app.schemas.auth import CurrentUser
 from app.services.org_unit import site_of
 from app.services.privacy import is_below_cohort, suppressed_avg
+from app.services.scoring_scheme import current_rules
 from app.services.workflow import IS_OPEN_RECORD
 
 router = APIRouter(prefix="/api/analytics", tags=["analytics"])
@@ -310,16 +311,26 @@ def executive_overview(
         select(EvaluationRecord.recommendation, func.count())
         .where(_FINALIZED, EvaluationRecord.recommendation.is_not(None))
         .group_by(EvaluationRecord.recommendation)
-        .order_by(func.count().desc())
     ).all()
     recommendation_total = sum(count for _, count in recommendation_rows)
+    # ترتیب از بدترین بند به بهترین، نه از پرتکرار به کم‌تکرار: این نمودار یک
+    # نردبان است و خواننده‌اش دنبال «چند نفر ته نردبان‌اند» می‌گردد.
+    band_of = {
+        label: index
+        for index, (_, label) in enumerate(current_rules(db).thresholds)
+    }
     recommendation_mix = [
         RecommendationSlice(
             recommendation=label,
             count=count,
             share_pct=round(count * 100 / recommendation_total, 1),
+            band_index=band_of.get(label),
         )
-        for label, count in recommendation_rows
+        for label, count in sorted(
+            recommendation_rows,
+            # برچسبِ ناشناخته (از نسخهٔ قدیمی‌ترِ طرح) ته فهرست می‌رود.
+            key=lambda row: (band_of.get(row[0], len(band_of)), -row[1]),
+        )
     ]
 
     # --- زمان چرخه ----------------------------------------------------------

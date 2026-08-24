@@ -436,7 +436,7 @@ function ScoreCardList({
         return (
           <li
             key={ind.id}
-            className={`rounded-2xl border bg-white p-4 shadow-card ${
+            className={`rounded-2xl border bg-white p-4 ${
               invalid ? "border-red-200" : draft.score === null ? "border-amber-200" : "border-gray-100"
             }`}
           >
@@ -485,7 +485,7 @@ function ScoreCardList({
                     className={`mt-1 w-full resize-none rounded-xl border px-3 py-2 text-sm text-gray-800 outline-none transition-colors ${
                       invalid
                         ? "border-red-400 bg-red-50 focus:border-red-500"
-                        : "border-gray-200 bg-gray-100 focus:border-pulse-500 focus:bg-white"
+                        : "border-gray-200 bg-gray-100 focus:border-gray-900 focus:bg-white"
                     }`}
                     rows={3}
                     value={draft.evidence_text}
@@ -540,13 +540,16 @@ function ScoreFormTableWide({
   }
 
   return (
-    <div className="overflow-x-auto rounded-2xl border border-gray-100 bg-white shadow-card">
+    <div className="overflow-x-auto rounded-2xl border border-gray-200 bg-white">
       <table className="w-full text-sm">
         <thead className="border-b border-gray-100 text-xs text-gray-600">
           <tr>
-            <th className="px-3 py-3 text-right font-semibold">شاخص کلیدی</th>
-            <th className="px-3 py-3 text-right font-semibold">مصداق رفتاری/عملکردی</th>
-            <th className="w-52 px-3 py-3 text-right font-semibold">امتیاز</th>
+            {/* عرض‌ها صریح‌اند چون بدونشان ستونِ «مصداق» — که فقط خوانده می‌شود —
+                دو سومِ عرض را می‌گرفت و دو ستونی که کاربر واقعاً با آن‌ها کار
+                می‌کند (امتیاز و شواهد) در باریک‌ترین جای جدول فشرده می‌شدند. */}
+            <th className="w-40 px-3 py-3 text-right font-semibold">شاخص کلیدی</th>
+            <th className="w-[34%] px-3 py-3 text-right font-semibold">مصداق رفتاری/عملکردی</th>
+            <th className="w-60 px-3 py-3 text-right font-semibold">امتیاز</th>
             <th className="px-3 py-3 text-right font-semibold">شواهد عینی</th>
           </tr>
         </thead>
@@ -559,7 +562,7 @@ function ScoreFormTableWide({
             const invalid = needsEvidence && count < config.evidence_min_words;
             const scoreLabel = draft.score !== null ? SCORE_LABELS[draft.score] : "امتیازی انتخاب نشده";
             return (
-              <tr key={ind.id} className="min-h-16 border-t border-gray-50 align-top transition-colors hover:bg-pulse-50/20">
+              <tr key={ind.id} className="min-h-16 border-t border-gray-100 align-top transition-colors hover:bg-gray-50">
                 <td className="px-3 py-3 font-medium text-gray-800">{ind.category}</td>
                 <td className="px-3 py-3 text-gray-600">{ind.description}</td>
                 <td className="px-3 py-3">
@@ -595,7 +598,7 @@ function ScoreFormTableWide({
                       className={`w-full resize-none rounded-xl border px-3 py-2 text-sm text-gray-800 outline-none transition-colors duration-150 ${
                         invalid
                           ? "border-red-400 bg-red-50 focus:border-red-500"
-                          : "border-gray-200 bg-gray-100 focus:border-pulse-500 focus:bg-white"
+                          : "border-gray-200 bg-gray-100 focus:border-gray-900 focus:bg-white"
                       }`}
                       rows={2}
                       value={draft.evidence_text}

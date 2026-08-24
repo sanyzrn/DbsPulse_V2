@@ -112,7 +112,7 @@ export function PersonPicker({
           aria-label={ariaLabel}
           onClick={() => setOpen((v) => !v)}
           onKeyDown={onKeyDown}
-          className="flex min-w-0 flex-1 items-center justify-between gap-2 rounded-xl border border-gray-200 bg-gray-100 px-3 py-2 text-start text-sm text-gray-700 outline-none transition-colors duration-150 hover:bg-gray-50 focus:border-pulse-500 focus:bg-white"
+          className="flex min-w-0 flex-1 items-center justify-between gap-2 rounded-xl border border-gray-200 bg-gray-100 px-3 py-2 text-start text-sm text-gray-700 outline-none transition-colors duration-150 hover:bg-gray-50 focus:border-gray-900 focus:bg-white"
         >
           <span className={`truncate ${selected ? "" : "text-gray-400"}`}>
             {selected ? personLabel(selected) : placeholder}
@@ -153,7 +153,7 @@ export function PersonPicker({
               onKeyDown={onKeyDown}
               placeholder="نام یا کد پرسنلی…"
               aria-label="جست‌وجوی پرسنل"
-              className="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-1.5 text-sm text-gray-700 outline-none focus:border-pulse-500 focus:bg-white"
+              className="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-1.5 text-sm text-gray-700 outline-none focus:border-gray-900 focus:bg-white"
             />
           </div>
 

@@ -25,7 +25,7 @@ const DEFAULT_PAGE_SIZE = 20;
 const EVENT_TYPES = Object.keys(AUDIT_EVENT_LABELS);
 
 const filterInputClass =
-  "w-full appearance-none rounded-xl border border-gray-200 bg-gray-100 px-3 py-1.5 text-sm text-gray-700 outline-none transition-colors duration-150 focus:border-pulse-500 focus:bg-white";
+  "w-full appearance-none rounded-xl border border-gray-200 bg-gray-100 px-3 py-1.5 text-sm text-gray-700 outline-none transition-colors duration-150 focus:border-gray-900 focus:bg-white";
 
 
 interface Filters {
@@ -313,7 +313,7 @@ export function AuditLogPage() {
                 <span key="time" className="whitespace-nowrap text-gray-500">
                   {formatDateTime(entry.created_at)}
                 </span>,
-                <span key="event" className="inline-flex items-center rounded-lg bg-pulse-50 px-2 py-0.5 text-xs font-medium text-pulse-700">
+                <span key="event" className="inline-flex items-center rounded-lg bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-700">
                   {AUDIT_EVENT_LABELS[entry.event_type] ?? entry.event_type}
                 </span>,
                 // نام و نام کاربری با هم: در یک لاگ حسابرسی «چه کسی» و «با کدام

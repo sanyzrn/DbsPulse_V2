@@ -443,7 +443,10 @@ async def commit_personnel_import(
             )
 
         if row.username:
-            password = generate_temp_password()
+            # رمزِ دادهٔ فایل مقدم است. سامانه فقط وقتی خودش می‌سازد که ستون
+            # خالی باشد — وگرنه کاربر رمزی را که خودش تعیین کرده در گزارش
+            # پایانی دوباره می‌دید و نمی‌دانست کدام‌یک واقعی است.
+            password = row.initial_password or generate_temp_password()
             user = User(
                 username=row.username,
                 password_hash=hash_password(password),

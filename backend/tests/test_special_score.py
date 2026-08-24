@@ -156,7 +156,6 @@ def test_it_closes_once_the_case_leaves_the_scoring_stage(client, db_session, or
 
 def test_the_manager_path_evaluator_can_award_it(client, db_session):
     """در مسیر «مدیر» نمره‌دهندهٔ اول معاونت است، پس همو باید بتواند ثبتش کند."""
-    hr = make_user(db_session, "hr")
     dep = make_user(db_session, "deputy")
     ceo = make_user(db_session, "ceo")
     manager = make_personnel(db_session, full_name="یک مدیر", org_unit="واحد ب", is_manager=True)

@@ -540,7 +540,7 @@ function ScoreFormTableWide({
   }
 
   return (
-    <div className="overflow-x-auto rounded-2xl border border-gray-100 bg-white shadow-card">
+    <div className="overflow-x-auto rounded-2xl border border-gray-200 bg-white shadow-card">
       <table className="w-full text-sm">
         <thead className="border-b border-gray-100 text-xs text-gray-600">
           <tr>

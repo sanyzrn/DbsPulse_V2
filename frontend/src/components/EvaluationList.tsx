@@ -64,11 +64,15 @@ function filtersToParams(filters: AdvancedFilters) {
  * فعال اضافه می‌شود. */
 export function EvaluationList({
   title,
+  subtitle,
   tabs,
   enableAdvancedFilters = false,
   enableExcelExport = false,
 }: {
   title: string;
+  /** یک خط توضیح زیر عنوان — برای وقتی که این فهرست کنار فهرست دیگری می‌نشیند و
+   *  باید معلوم باشد کدام‌یک «کار» است و کدام «سابقه». */
+  subtitle?: string;
   tabs: EvaluationListTab[];
   enableAdvancedFilters?: boolean;
   enableExcelExport?: boolean;
@@ -104,9 +108,12 @@ export function EvaluationList({
   }
 
   return (
-    <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-card">
+    <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-card">
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-        <h2 className="text-base font-bold text-gray-900">{title}</h2>
+        <div>
+          <h2 className="text-base font-bold text-gray-900">{title}</h2>
+          {subtitle && <p className="mt-0.5 text-xs text-gray-400">{subtitle}</p>}
+        </div>
         <div className="flex flex-wrap items-center gap-2">
           <SearchInput
             widthClass="sm:w-64"
@@ -328,7 +335,7 @@ export function EvaluationList({
               <button
                 key="action"
                 onClick={() => navigate(`/evaluations/${e.id}`)}
-                className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-sm font-medium text-pulse-600 transition-colors hover:bg-pulse-50 hover:text-pulse-700"
+                className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-sm font-medium text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-900"
               >
                 مشاهده
                 <svg viewBox="0 0 20 20" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">

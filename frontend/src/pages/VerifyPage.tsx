@@ -55,7 +55,7 @@ export function VerifyPage() {
 
       <div className="flex flex-1 items-center justify-center p-4">
         <motion.div
-          className="w-full max-w-md rounded-3xl border border-gray-100 bg-white p-6 shadow-float"
+          className="w-full max-w-md rounded-3xl border border-gray-200 bg-white p-6 shadow-float"
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5, ease: "easeOut" }}

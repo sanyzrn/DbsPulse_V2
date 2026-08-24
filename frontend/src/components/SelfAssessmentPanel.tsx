@@ -34,7 +34,7 @@ export function SelfAssessmentPanel({
     .sort((a, b) => Math.abs(b.gap) - Math.abs(a.gap));
 
   return (
-    <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-card">
+    <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-card">
       <div className="mb-1 flex flex-wrap items-center justify-between gap-2">
         <h2 className="text-base font-bold text-gray-900">خودارزیابی کارمند</h2>
         <span className="text-xs text-gray-500">ثبت‌شده در {formatDateTime(self.submitted_at)}</span>

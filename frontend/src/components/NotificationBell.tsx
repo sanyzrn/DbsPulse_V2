@@ -100,7 +100,7 @@ export function NotificationBell() {
       <AnimatePresence>
         {open && (
           <motion.div
-            className="absolute left-0 top-full z-40 mt-2 w-80 overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-float ring-1 ring-black/5"
+            className="absolute left-0 top-full z-40 mt-2 w-80 overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-float ring-1 ring-black/5"
             initial={{ opacity: 0, y: -8, scale: 0.97 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: -8, scale: 0.97 }}

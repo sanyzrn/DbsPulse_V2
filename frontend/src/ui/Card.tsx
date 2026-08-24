@@ -14,7 +14,7 @@ export function Card({
 }) {
   return (
     <div
-      className={`rounded-2xl border border-gray-100 bg-white p-5 shadow-card transition-shadow duration-300 hover:shadow-card-hover ${className}`}
+      className={`rounded-2xl border border-gray-200 bg-white p-5 shadow-card transition-shadow duration-300 hover:shadow-card-hover ${className}`}
     >
       {(title || actions) && (
         <div className="mb-4 flex flex-wrap items-center justify-between gap-2">

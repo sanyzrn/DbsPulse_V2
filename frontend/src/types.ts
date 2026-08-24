@@ -446,6 +446,23 @@ export const STATUS_LABELS: Record<EvaluationStatus, string> = {
   cancelled: "لغوشده",
 };
 
+/** وضعیت‌های «باز» — یعنی پرونده هنوز در جریان است.
+ *
+ *  قرینهٔ `OPEN_STATUSES` در بک‌اند. تا امروز فرانت همه‌جا `status !== "finalized"`
+ *  می‌نوشت، که پروندهٔ **لغوشده** را هم «باز» می‌شمرد: نتیجه‌اش دکمهٔ «ادامه
+ *  ارزیابی باز» روی فردی بود که هیچ پروندهٔ بازی نداشت و در واقع باید ارزیابی
+ *  تازه‌ای برایش شروع می‌شد. وضعیت پایانیِ بعدی فقط همین‌جا اضافه می‌شود.
+ */
+export const OPEN_STATUSES: EvaluationStatus[] = [
+  "draft",
+  "submitted",
+  "hr_approved",
+  "deputy_approved",
+];
+
+export const isOpenStatus = (status: EvaluationStatus): boolean =>
+  OPEN_STATUSES.includes(status);
+
 export interface Page<T> {
   total: number;
   items: T[];

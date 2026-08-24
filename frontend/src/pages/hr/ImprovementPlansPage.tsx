@@ -86,7 +86,7 @@ function CreatePlanRow({
       <td className="px-3 py-2.5">
         <button
           onClick={() => onOpenProfile(item.personnel_id, item.personnel_full_name)}
-          className="text-right font-medium text-pulse-700 transition-colors hover:text-pulse-800 hover:underline"
+          className="text-right font-medium text-gray-900 underline-offset-4 transition-colors hover:text-pulse-700 hover:underline"
         >
           {item.personnel_full_name}
         </button>

@@ -139,7 +139,7 @@ export function IndicatorsPage() {
       <div
         role="tablist"
         aria-label="بخش شاخص‌ها"
-        className="inline-flex rounded-2xl border border-gray-100 bg-white p-1 shadow-sm"
+        className="inline-flex rounded-2xl border border-gray-200 bg-white p-1 shadow-sm"
       >
         {(["general", "specialized"] as const).map((s) => (
           <button
@@ -220,7 +220,7 @@ export function IndicatorsPage() {
         </Modal>
       )}
 
-      <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-card">
+      <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-card">
         {loadError != null && (
           <p className="mb-2 text-sm text-red-600">{extractErrorMessage(loadError)}</p>
         )}
@@ -283,7 +283,7 @@ export function IndicatorsPage() {
 function FrameworkNote({ impact }: { impact: FrameworkImpact }) {
   const fa = (n: number) => n.toLocaleString("fa-IR");
   return (
-    <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-card">
+    <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-card">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <p className="text-sm font-bold text-gray-900">
           نسخهٔ فعلی فرم: {fa(impact.version)}
@@ -504,7 +504,7 @@ function IndicatorRow({
       // که باید ظاهر می‌شوند و جابه‌جایی با درگ دست‌نخورده می‌ماند.
       initial={false}
       layout="position"
-      className="flex items-center gap-3 rounded-xl border border-gray-100 bg-white px-3 py-2.5 text-sm"
+      className="flex items-center gap-3 rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm"
       whileDrag={{ scale: 1.01, boxShadow: "0 12px 32px rgba(0,0,0,0.10)" }}
     >
       <button

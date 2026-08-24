@@ -3,12 +3,12 @@ import { useNavigate } from "react-router-dom";
 import { apiClient, extractConflictEvaluationId, extractErrorMessage } from "../../api/client";
 import { useEvaluations, usePersonnelList } from "../../api/queries";
 import { EmployeeProfileModal } from "../../components/EmployeeProfileModal";
-import { EvaluationActionButton } from "../../components/EvaluationActionButton";
+import { EvaluationActionButton, type OpenEvaluation } from "../../components/EvaluationActionButton";
 import { EvaluationList } from "../../components/EvaluationList";
 import { RoleOverviewCards } from "../../components/RoleOverviewCards";
 import { PageHeader } from "../../ui/Card";
 import { Table } from "../../ui/Table";
-import type { Personnel } from "../../types";
+import { isOpenStatus, type Personnel } from "../../types";
 
 export function DeputyHomePage() {
   const [error, setError] = useState<string | null>(null);
@@ -25,10 +25,16 @@ export function DeputyHomePage() {
 
   // برای غیرفعال‌کردن «شروع ارزیابی جدید» وقتی ارزیابی باز از قبل هست
   const { data: myEvaluations } = useEvaluations({ limit: 200, offset: 0 });
-  const openEvaluationByPersonnel = new Map<number, { id: number; code: string }>();
+  // `isOpenStatus` و نه `!== "finalized"`: پروندهٔ **لغوشده** پایان‌یافته است و
+  // نباید جلوی شروع ارزیابی تازه را بگیرد.
+  const openEvaluationByPersonnel = new Map<number, OpenEvaluation>();
   for (const e of myEvaluations?.items ?? []) {
-    if (e.status !== "finalized") {
-      openEvaluationByPersonnel.set(e.subject_personnel_id, { id: e.id, code: e.evaluation_code });
+    if (isOpenStatus(e.status)) {
+      openEvaluationByPersonnel.set(e.subject_personnel_id, {
+        id: e.id,
+        code: e.evaluation_code,
+        status: e.status,
+      });
     }
   }
 
@@ -63,7 +69,7 @@ export function DeputyHomePage() {
       )}
       {error && <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p>}
       {managers.length > 0 && (
-        <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-card">
+        <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-card">
           <h2 className="mb-4 flex items-center gap-2 text-base font-bold text-gray-900">
             <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-amber-50 text-amber-600">
               <svg viewBox="0 0 20 20" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
@@ -80,7 +86,7 @@ export function DeputyHomePage() {
               <button
                 key="name"
                 onClick={() => setProfilePerson(p)}
-                className="font-medium text-pulse-700 transition-colors hover:text-pulse-800 hover:underline"
+                className="font-medium text-gray-900 underline-offset-4 transition-colors hover:text-pulse-700 hover:underline"
                 title="مشاهده پروفایل و روند عملکرد"
               >
                 {p.full_name}

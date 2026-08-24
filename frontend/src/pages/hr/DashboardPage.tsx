@@ -11,7 +11,7 @@ import { PersonScorecard } from "./PersonScorecard";
 import { ReportsSection } from "./ReportsSection";
 import { PageHeader } from "../../ui/Card";
 import { CountUp, PctBadge, ScoreRing, SuppressedValue } from "../../ui/Meters";
-import { TAB_TRANSITION } from "../../ui/motion";
+import { EASE_SOFT, TAB_TRANSITION } from "../../ui/motion";
 import { DotPlot } from "../../ui/plot";
 import { Table } from "../../ui/Table";
 import { formatDate } from "../../utils/dates";
@@ -95,7 +95,7 @@ export function DashboardPage() {
 
       {/* تب‌ها: نمای کلی (خلاصه) و تحلیل/گزارش‌ها — تا صفحه به‌جای یک اسکرول طولانی و
           شلوغ، به دو بخش تمیز تقسیم شود. */}
-      <div role="tablist" className="inline-flex flex-wrap gap-1 rounded-2xl border border-gray-100 bg-white p-1 shadow-sm">
+      <div role="tablist" className="inline-flex flex-wrap gap-1 rounded-2xl border border-gray-200 bg-white p-1 shadow-sm">
         {DASHBOARD_TABS.map((t) => (
           <button
             key={t.key}
@@ -113,64 +113,32 @@ export function DashboardPage() {
 
       {tab === "overview" && (
       <motion.div key="overview-tab" {...TAB_TRANSITION} className="space-y-5">
-      {/* ── کارت‌های خلاصه بالایی ── */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {/* کل ارزیابی‌ها */}
-        <motion.div
-          className="flex items-center gap-4 rounded-2xl border border-gray-100 bg-white p-5 shadow-card transition-shadow duration-300 hover:shadow-card-hover"
-          initial={{ opacity: 0, y: 12 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.4 }}
-        >
-          <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-pulse-50 text-pulse-600" aria-hidden>
-            <svg viewBox="0 0 20 20" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M7 3h6l4 4v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h3z" />
-              <path d="M7 11l2 2 4-4" />
-            </svg>
-          </span>
-          <div>
-            <p className="text-xs text-gray-500">کل ارزیابی‌های نهایی‌شده</p>
-            <p className="mt-0.5 text-2xl font-extrabold tabular-nums text-gray-900">
-              <CountUp value={overview.total_evaluations} format="plain" />
-            </p>
-          </div>
-        </motion.div>
-
-        {/* میانگین امتیاز */}
-        <motion.div
-          className="flex items-center justify-between gap-4 rounded-2xl border border-gray-100 bg-white p-5 shadow-card transition-shadow duration-300 hover:shadow-card-hover"
-          initial={{ opacity: 0, y: 12 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.4, delay: 0.05 }}
-        >
-          <div>
-            <p className="text-xs text-gray-500">میانگین امتیاز نهایی</p>
-            <p className="mt-0.5 text-sm text-gray-400">در همه ارزیابی‌های نهایی‌شده</p>
-          </div>
-          <ScoreRing value={overview.avg_final_pct} size={64} />
-        </motion.div>
-
-        {/* تعداد واحدها — از by_org_unit */}
-        <motion.div
-          className="flex items-center gap-4 rounded-2xl border border-gray-100 bg-white p-5 shadow-card transition-shadow duration-300 hover:shadow-card-hover"
-          initial={{ opacity: 0, y: 12 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.4, delay: 0.1 }}
-        >
-          <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gray-100 text-gray-600" aria-hidden>
-            <svg viewBox="0 0 20 20" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M3 7l7-4 7 4-7 4-7-4z" />
-              <path d="M3 7v6l7 4 7-4V7" />
-            </svg>
-          </span>
-          <div>
-            <p className="text-xs text-gray-500">واحدهای سازمانی</p>
-            <p className="mt-0.5 text-2xl font-extrabold tabular-nums text-gray-900">
-              <CountUp value={overview.by_org_unit.length} format="plain" />
-            </p>
-          </div>
-        </motion.div>
-      </div>
+      {/* یک جمله به‌جای سه کارت.
+          «کل ارزیابی‌های نهایی‌شده» عیناً همان عددی بود که نوار بالا نشان می‌دهد،
+          و «واحدهای سازمانی» یک عدد کمکی است نه یک شاخص. حالا هر سه در یک
+          کارت‌اند: عدد اصلی بزرگ، بقیه به‌عنوان زمینهٔ همان عدد. */}
+      <motion.div
+        className="flex flex-wrap items-center justify-between gap-5 rounded-2xl border border-gray-200 bg-white p-5"
+        initial={{ opacity: 0, y: 12 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.4 }}
+      >
+        <div>
+          <p className="text-sm font-medium text-gray-500">میانگین امتیاز نهایی سازمان</p>
+          <p className="mt-1 text-sm text-gray-400">
+            بر پایهٔ{" "}
+            <span className="font-semibold tabular-nums text-gray-600">
+              {overview.total_evaluations.toLocaleString("fa-IR")}
+            </span>{" "}
+            ارزیابی نهایی‌شده در{" "}
+            <span className="font-semibold tabular-nums text-gray-600">
+              {overview.by_org_unit.length.toLocaleString("fa-IR")}
+            </span>{" "}
+            واحد سازمانی
+          </p>
+        </div>
+        <ScoreRing value={overview.avg_final_pct} size={72} />
+      </motion.div>
 
       <PipelineCard />
 
@@ -189,7 +157,7 @@ export function DashboardPage() {
             aria-selected={analysisTab === t.key}
             onClick={() => setAnalysisTab(t.key)}
             className={`rounded-lg px-3.5 py-1.5 text-sm font-medium transition-all duration-300 ${
-              analysisTab === t.key ? "bg-white text-pulse-700 shadow-sm" : "text-gray-500 hover:text-gray-800"
+              analysisTab === t.key ? "bg-white text-gray-900 shadow-sm" : "text-gray-500 hover:text-gray-800"
             }`}
           >
             {t.label}
@@ -330,7 +298,7 @@ function BarByOrgUnitCard({
   }));
 
   return (
-    <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-card">
+    <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-card">
       <h2 className="mb-1 text-base font-bold text-gray-900">میانگین امتیاز به تفکیک واحد</h2>
       {hiddenCount > 0 && (
         <p className="mb-3 text-xs text-gray-500">
@@ -471,56 +439,76 @@ const PIPELINE_ORDER: PipelineStatus[] = [
   "finalized",
 ];
 
-// رنگ هر مرحله قیف — از خاکستری به سبز
-const PIPELINE_COLORS: Record<PipelineStatus, string> = {
-  draft: "from-gray-300 to-gray-400",
-  submitted: "from-blue-400 to-blue-500",
-  hr_approved: "from-pulse-400 to-pulse-500",
-  deputy_approved: "from-pulse-violet-400 to-pulse-violet-500",
-  finalized: "from-green-400 to-green-500",
+// نوار هر مرحله. رنگ‌ها همان زنجیرهٔ StatusBadge‌اند تا کاشی و نشان یک زبان
+// داشته باشند: خاکستری ← آبی ← نیلی ← کهربایی ← سبز.
+const PIPELINE_BAR: Record<PipelineStatus, string> = {
+  draft: "bg-gray-300",
+  submitted: "bg-blue-300",
+  hr_approved: "bg-indigo-300",
+  deputy_approved: "bg-amber-300",
+  finalized: "bg-green-400",
 };
 
+/** قیف گردش‌کار.
+ *
+ *  پیش از این پنج کاشیِ **هم‌اندازه** بود — یعنی دقیقاً آن چیزی را پنهان می‌کرد
+ *  که قرار بود نشان بدهد: کجا پرونده تلنبار شده. حالا هر مرحله یک نوارِ افقی
+ *  است که طولش با تعدادش نسبت دارد و مراحل از بالا به پایین ترتیبِ واقعیِ
+ *  گردش‌کار را دارند؛ چشم در یک نگاه بلندترین نوار را پیدا می‌کند.
+ *
+ *  نکته: این اعداد «چند پرونده همین حالا اینجا نشسته‌اند» است، نه جریانِ تجمعی.
+ *  به همین دلیل زیرعنوان این را صریح می‌گوید. */
 function PipelineCard() {
   const { data: pipeline = [] } = usePipeline();
   const byStatus = new Map(pipeline.map((p) => [p.status, p]));
-  const maxCount = Math.max(1, ...pipeline.map((p) => p.count));
+  const maxCount = Math.max(1, ...PIPELINE_ORDER.map((st) => byStatus.get(st)?.count ?? 0));
+  const total = PIPELINE_ORDER.reduce((sum, st) => sum + (byStatus.get(st)?.count ?? 0), 0);
 
   return (
-    <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-card">
-      <h2 className="mb-4 text-base font-bold text-gray-900">قیف گردش‌کار (همه پرونده‌ها)</h2>
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
+    <div className="rounded-2xl border border-gray-200 bg-white p-5">
+      <div className="mb-1 flex flex-wrap items-baseline justify-between gap-2">
+        <h2 className="text-base font-bold text-gray-900">قیف گردش‌کار</h2>
+        <p className="text-xs text-gray-400">
+          مجموع <span className="tabular-nums">{total.toLocaleString("fa-IR")}</span> پرونده
+        </p>
+      </div>
+      <p className="mb-4 text-xs text-gray-400">هر پرونده هم‌اکنون در کدام مرحله است</p>
+
+      <ol className="space-y-2">
         {PIPELINE_ORDER.map((status, idx) => {
           const stat = byStatus.get(status);
           const count = stat?.count ?? 0;
-          const widthPct = (count / maxCount) * 100;
+          // نوارِ صفر هم یک ردِ نازک می‌گیرد تا مرحله از قلم نیفتد.
+          const widthPct = count === 0 ? 0 : Math.max(6, (count / maxCount) * 100);
           return (
-            <motion.div
-              key={status}
-              className="relative overflow-hidden rounded-2xl border border-gray-100 bg-gray-50/50 p-3 text-center"
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ duration: 0.3, delay: idx * 0.05 }}
-            >
-              {/* نوار گرادیانت پس‌زمینه بر اساس نسبت */}
-              <div
-                className={`absolute inset-x-0 bottom-0 bg-gradient-to-t ${PIPELINE_COLORS[status]} opacity-10`}
-                style={{ height: `${widthPct}%` }}
-              />
-              <div className="relative">
+            <li key={status} className="flex items-center gap-3">
+              <div className="w-32 shrink-0 sm:w-40">
                 <StatusBadge status={status} />
-                <p className="mt-2 text-2xl font-extrabold tabular-nums text-gray-900">
+              </div>
+              <div className="h-8 min-w-0 flex-1 rounded-lg bg-gray-50">
+                <motion.div
+                  className={`flex h-8 items-center justify-end rounded-lg px-2 ${PIPELINE_BAR[status]}`}
+                  initial={{ width: 0 }}
+                  animate={{ width: `${widthPct}%` }}
+                  transition={{ duration: 0.5, delay: idx * 0.06, ease: EASE_SOFT }}
+                />
+              </div>
+              {/* text-right در RTL یعنی «چسبیده به نوار»: عددها روی یک خط عمودی
+                  می‌نشینند، چه تاریخ داشته باشند چه نه. */}
+              <div className="flex w-24 shrink-0 items-baseline gap-2 text-right sm:w-36">
+                <span className="text-lg font-extrabold tabular-nums text-gray-900">
                   <CountUp value={count} format="plain" />
-                </p>
+                </span>
                 {stat?.oldest_created_at && status !== "finalized" && count > 0 && (
-                  <p className="mt-1 text-[10px] text-gray-400">
-                    قدیمی‌ترین: {formatDate(stat.oldest_created_at)}
-                  </p>
+                  <span className="hidden text-[10px] text-gray-400 sm:inline">
+                    از {formatDate(stat.oldest_created_at)}
+                  </span>
                 )}
               </div>
-            </motion.div>
+            </li>
           );
         })}
-      </div>
+      </ol>
     </div>
   );
 }

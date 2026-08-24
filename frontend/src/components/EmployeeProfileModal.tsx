@@ -159,7 +159,7 @@ export function EmployeeProfileModal({
 
         {/* پرونده‌های ارزیابی ثبت‌شدهٔ این فرد — با دکمهٔ مشاهده برای هر پرونده */}
         {evaluations.length > 0 && (
-          <div className="rounded-2xl border border-gray-100 bg-white p-4">
+          <div className="rounded-2xl border border-gray-200 bg-white p-4">
             <h3 className="mb-2 text-sm font-semibold text-gray-600">
               پرونده‌های ارزیابی این فرد ({evaluations.length.toLocaleString("fa-IR")})
             </h3>

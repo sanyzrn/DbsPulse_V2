@@ -313,7 +313,7 @@ export function AuditLogPage() {
                 <span key="time" className="whitespace-nowrap text-gray-500">
                   {formatDateTime(entry.created_at)}
                 </span>,
-                <span key="event" className="inline-flex items-center rounded-lg bg-pulse-50 px-2 py-0.5 text-xs font-medium text-pulse-700">
+                <span key="event" className="inline-flex items-center rounded-lg bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-700">
                   {AUDIT_EVENT_LABELS[entry.event_type] ?? entry.event_type}
                 </span>,
                 // نام و نام کاربری با هم: در یک لاگ حسابرسی «چه کسی» و «با کدام

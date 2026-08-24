@@ -491,7 +491,7 @@ export function PersonnelPage() {
           </Modal>
         )}
 
-        <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-card">
+        <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-card">
           <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
             <div className="flex items-center gap-3">
               <h2 className="text-base font-bold text-gray-900">فهرست پرسنل</h2>
@@ -608,7 +608,7 @@ export function PersonnelPage() {
                 <button
                   key="name"
                   onClick={() => setProfilePerson(p)}
-                  className="rounded-md text-right font-medium text-pulse-700 underline decoration-pulse-200 decoration-dotted underline-offset-4 transition-colors hover:text-pulse-800"
+                  className="rounded-md text-right font-medium text-gray-900 underline decoration-gray-300 decoration-dotted underline-offset-4 transition-colors hover:text-pulse-700 hover:decoration-pulse-300"
                   title="مشاهده پروفایل"
                 >
                   {p.full_name}
@@ -651,7 +651,7 @@ export function PersonnelPage() {
                 <div key="actions" className="flex items-center gap-3">
                   <button
                     onClick={() => setEditingPersonnel(p)}
-                    className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-sm font-medium text-pulse-600 transition-colors hover:bg-pulse-50"
+                    className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-sm font-medium text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-900"
                   >
                     <svg viewBox="0 0 20 20" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
                       <path d="M4 13.5V16h2.5l7.4-7.4-2.5-2.5L4 13.5z" />

@@ -113,12 +113,16 @@ def notify_for_workflow_action(db: Session, record: EvaluationRecord, action: st
 
     recipients: list[int] = []
     message = ""
-    if action == "submit":
+    if action in ("submit", "manager_submit"):
         recipients = _active_user_ids_with_role(db, UserRole.hr)
         message = f"پرونده {code} ({name}) در صف بررسی منابع انسانی قرار گرفت"
     elif action == "hr_approve":
         recipients = [after_hr_id]
         message = f"پرونده {code} ({name}) در انتظار بررسی و تأیید شماست"
+    elif action == "hr_approve_manager":
+        # مسیر «مدیر»: مرحلهٔ معاونت مصرف شده، پس نفرِ بعدی مدیرعامل است.
+        recipients = [record.ceo_user_id]
+        message = f"پرونده {code} ({name}) در انتظار تأیید نهایی شماست"
     elif action == "deputy_approve":
         recipients = [record.ceo_user_id]
         message = f"پرونده {code} ({name}) در انتظار تأیید نهایی شماست"
@@ -126,7 +130,10 @@ def notify_for_workflow_action(db: Session, record: EvaluationRecord, action: st
         recipients = [evaluator_id] if evaluator_id is not None else []
         message = f"پرونده {code} ({name}) تأیید نهایی شد"
     elif action == "hr_return":
-        recipients = [record.unit_supervisor_user_id] if record.unit_supervisor_user_id else []
+        # `evaluator_id` نه `unit_supervisor_user_id`: در مسیر «مدیر» دومی خالی
+        # است، پس برگشتِ منابع انسانی به هیچ‌کس اعلان نمی‌داد و معاونت هیچ‌وقت
+        # نمی‌فهمید پرونده‌اش برگشته — پرونده در `draft` می‌ماند و کسی خبر ندارد.
+        recipients = [evaluator_id] if evaluator_id is not None else []
         message = f"پرونده {code} ({name}) توسط منابع انسانی برگشت داده شد؛ دلیل در کامنت‌های پرونده"
     elif action == "deputy_return":
         recipients = _active_user_ids_with_role(db, UserRole.hr)
@@ -134,6 +141,10 @@ def notify_for_workflow_action(db: Session, record: EvaluationRecord, action: st
     elif action == "ceo_return":
         # برگشت از مدیرعامل هم به همان کسی می‌رود که پرونده را به او داده بود.
         recipients = [after_hr_id]
+        message = f"پرونده {code} ({name}) توسط مدیرعامل برگشت داده شد؛ دلیل در کامنت‌های پرونده"
+    elif action == "ceo_return_manager":
+        # در مسیر «مدیر» پرونده به صف منابع انسانی برمی‌گردد، نه به معاونت.
+        recipients = _active_user_ids_with_role(db, UserRole.hr)
         message = f"پرونده {code} ({name}) توسط مدیرعامل برگشت داده شد؛ دلیل در کامنت‌های پرونده"
     elif action == "cancel":
         # همهٔ کسانی که روی این پرونده نقشی داشتند باید بدانند دیگر منتظرشان نیست.

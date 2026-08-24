@@ -11,7 +11,10 @@ from app.models.user import User
 from app.schemas.auth import CurrentUser
 from app.schemas.evaluation_access import EvaluationAccessRead, EvaluationAccessUpsert
 from app.services.audit import log_event
-from app.services.self_evaluation import ensure_evaluators_are_not_the_subject
+from app.services.self_evaluation import (
+    ensure_chain_stages_are_not_redundant,
+    ensure_evaluators_are_not_the_subject,
+)
 from app.services.workflow import may_act_at
 
 router = APIRouter(prefix="/api/personnel/{personnel_id}/access", tags=["evaluation-access"])
@@ -92,6 +95,12 @@ def upsert_access(
         db,
         personnel_id,
         [payload.unit_supervisor_user_id, payload.deputy_user_id, payload.ceo_user_id],
+    )
+    ensure_chain_stages_are_not_redundant(
+        db,
+        payload.unit_supervisor_user_id,
+        payload.deputy_user_id,
+        payload.ceo_user_id,
     )
 
     access = db.scalar(select(EvaluationAccess).where(EvaluationAccess.personnel_id == personnel_id))

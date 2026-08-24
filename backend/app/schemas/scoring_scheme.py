@@ -35,6 +35,10 @@ class SchemeInput(BaseModel):
     #: سقف امتیاز ویژه. صفر یعنی این قابلیت زیر این طرح در دسترس نیست. سقفِ سقف
     #: عمداً کوچک است: امتیاز ویژه باید یک تعدیل باشد، نه راهی برای دور زدن فرم.
     bonus_max_points: float = Field(default=constants.BONUS_MAX_POINTS, ge=0, le=20)
+    #: تا این درصد، پرونده واجدِ برنامهٔ بهبود است. صفر یعنی هیچ‌کس.
+    improvement_plan_max_pct: float = Field(
+        default=constants.IMPROVEMENT_PLAN_MAX_PCT, ge=0, le=100
+    )
     thresholds: list[ThresholdBand] = Field(min_length=1, max_length=MAX_THRESHOLDS)
     #: {indicator_id: weight}. شاخصِ غایب وزن ۱ می‌گیرد.
     indicator_weights: dict[int, float] = Field(default_factory=dict)
@@ -89,6 +93,7 @@ class SchemeRead(BaseModel):
     evidence_min_words: int
     evidence_max_words: int
     bonus_max_points: float
+    improvement_plan_max_pct: float
     thresholds: list[ThresholdBand]
     indicator_weights: dict[int, float]
     created_at: datetime

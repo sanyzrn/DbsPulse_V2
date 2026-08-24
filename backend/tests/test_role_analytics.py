@@ -303,10 +303,11 @@ def test_the_deputy_sees_both_views(client, db_session):
 
 
 def test_the_deputys_mirror_counts_the_manager_path(client, db_session):
-    """در مسیر «مدیر» معاونت خودش نمره‌دهندهٔ اول است (unit_supervisor خالی) و
-    پرونده مستقیماً در وضعیت hr_approved ساخته می‌شود — بدون submit و hr-approve.
+    """در مسیر «مدیر» معاونت خودش نمره‌دهندهٔ اول است (unit_supervisor خالی).
+
     اگر این پرونده‌ها از آمار معاونت جا بیفتند، آینه‌اش نیمه‌خالی است و دقیقاً
     همان بخشی جا می‌ماند که خودش نمره داده."""
+    hr = make_user(db_session, "hr")
     dep = make_user(db_session, "deputy")
     ceo = make_user(db_session, "ceo")
     manager = make_personnel(
@@ -328,7 +329,9 @@ def test_the_deputys_mirror_counts_the_manager_path(client, db_session):
         json={"scores": full_valid_scores(active_indicators(db_session))},
         headers=auth_header(dep),
     )
-    client.post(f"/api/evaluations/{record_id}/deputy-approve", headers=auth_header(dep))
+    # مسیر کامل: معاونت ثبت می‌کند، منابع انسانی بررسی می‌کند، مدیرعامل نهایی.
+    client.post(f"/api/evaluations/{record_id}/submit", headers=auth_header(dep))
+    client.post(f"/api/evaluations/{record_id}/hr-approve", headers=auth_header(hr))
     client.post(f"/api/evaluations/{record_id}/ceo-finalize", headers=auth_header(ceo))
 
     record = db_session.get(EvaluationRecord, record_id)

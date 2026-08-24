@@ -76,6 +76,14 @@ class ScoringScheme(Base):
         Numeric(4, 2), nullable=False, server_default="5"
     )
 
+    # --- برنامهٔ بهبود ------------------------------------------------------
+    #: تا این درصد، پرونده واجدِ برنامهٔ بهبود است. با عدد سنجیده می‌شود نه با
+    #: برچسب، تا سازمانی که برچسب‌های خودش را نوشته باشد این قابلیت را بی‌صدا
+    #: از دست ندهد.
+    improvement_plan_max_pct: Mapped[float] = mapped_column(
+        Numeric(5, 2), nullable=False, server_default="75"
+    )
+
     #: جدول آستانه‌ها: [{"upper_exclusive": 60, "label": "..."}, ...]
     #: بازه‌ها نیم‌باز و پیوسته‌اند تا کل [0, 100] بدون شکاف پوشش داده شود.
     thresholds: Mapped[list] = mapped_column(JSONB, nullable=False)

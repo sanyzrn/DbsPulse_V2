@@ -35,6 +35,8 @@ class Rules:
     #: سقف امتیاز ویژه (صفر = غیرفعال). پیش‌فرضِ اینجا فقط برای فراخوان‌های
     #: قدیمی است که این قاعده را نمی‌شناسند؛ مسیرهای واقعی مقدارش را می‌دهند.
     bonus_max_points: float = constants.BONUS_MAX_POINTS
+    #: تا این درصد، پرونده واجدِ برنامهٔ بهبود است
+    improvement_plan_max_pct: float = constants.IMPROVEMENT_PLAN_MAX_PCT
 
     def weight_for(self, indicator_id: int) -> float:
         return self.indicator_weights.get(indicator_id, 1.0)
@@ -58,6 +60,7 @@ LEGACY_RULES = Rules(
     thresholds=tuple((float(u), label) for u, label in constants.FINAL_RESULT_THRESHOLDS),
     indicator_weights={},
     bonus_max_points=constants.BONUS_MAX_POINTS,
+    improvement_plan_max_pct=constants.IMPROVEMENT_PLAN_MAX_PCT,
 )
 
 
@@ -76,6 +79,7 @@ def rules_from(scheme: ScoringScheme) -> Rules:
         indicator_weights={int(k): float(v) for k, v in (scheme.indicator_weights or {}).items()},
         version=scheme.version,
         bonus_max_points=float(scheme.bonus_max_points),
+        improvement_plan_max_pct=float(scheme.improvement_plan_max_pct),
     )
 
 

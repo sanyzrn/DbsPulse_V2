@@ -13,10 +13,11 @@ from app.models.personnel import Personnel
 from app.models.user import User
 from app.services.workflow import is_manager_path
 
+# ۳: افزودن `single_decider` — نمره‌دهندهٔ اول و تأییدکنندهٔ نهایی یک نفر بوده‌اند.
 # ۲: افزودن امتیاز ویژه (`bonus_points` / `bonus_reason` / `base_weighted_pct`).
 # افزودنی است، پس قالب PDF هر دو نسخه را رندر می‌کند: در snapshot نسخهٔ ۱ این
 # کلیدها نیستند و بخشِ مربوطه اصلاً چاپ نمی‌شود.
-SNAPSHOT_VERSION = 2
+SNAPSHOT_VERSION = 3
 
 
 def build_final_snapshot(db: Session, record: EvaluationRecord) -> dict:
@@ -49,6 +50,9 @@ def build_final_snapshot(db: Session, record: EvaluationRecord) -> dict:
             "username": evaluator.username if evaluator else None,
             "role_label": "معاونت" if manager_path else "مسئول واحد",
         },
+        # اگر نمره‌دهندهٔ اول و تأییدکنندهٔ نهایی یک نفر بوده‌اند، سند باید همین
+        # را بگوید. دو تأیید در لاگ، بدون این جمله، دو بررسی مستقل به‌نظر می‌رسد.
+        "single_decider": record.single_decider,
         "evaluation_started_at": record.created_at.isoformat(),
         "evaluation_code": record.evaluation_code,
         "general_score_pct": float(record.general_score_pct)

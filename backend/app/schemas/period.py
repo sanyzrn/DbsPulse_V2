@@ -52,6 +52,11 @@ class PeriodProgress(BaseModel):
     # سازمان بزرگ، «۵۰ نفر شروع نکرده‌اند» به‌غلط کل ماجرا به‌نظر می‌رسید.
     not_started_total: int
     not_started: list[NotStartedPersonnel]
+    # پرسنل فعالی که زنجیرهٔ ارزیابی ندارند. تا امروز این‌ها از *مخرج* حذف
+    # می‌شدند، پس پوشش می‌توانست ۱۰۰٪ نشان بدهد در حالی که کسی ارزیابی‌شان
+    # نکرده. حالا یک شکافِ دیده‌شدنی‌اند، نه یک حذفِ خاموش.
+    without_chain_total: int = 0
+    without_chain: list[NotStartedPersonnel] = []
 
 
 class BulkCreateRequest(BaseModel):

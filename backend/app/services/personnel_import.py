@@ -311,6 +311,28 @@ def _resolve_chain(
     if item.is_manager:
         item.unit_supervisor_user_id = None
 
+    # صندلیِ تکراری. فقط جفت‌هایی رد می‌شوند که بیان درست‌تری دارند — «مسئول
+    # مستقیم = مدیرعامل» عمداً مجاز است، چون تنها راه ثبتِ کسی است که مستقیم زیر
+    # نظر مدیرعامل کار می‌کند (توضیح کامل در services/self_evaluation.py).
+    redundant = [
+        (
+            item.unit_supervisor_user_id,
+            item.deputy_user_id,
+            "«مسئول مستقیم» و «معاونت مربوطه» یک نفرند؛ اگر این فرد مستقیماً توسط "
+            "معاونت ارزیابی می‌شود، «مسئول مستقیم» را خالی بگذارید",
+        ),
+        (
+            item.deputy_user_id,
+            item.ceo_user_id,
+            "«معاونت مربوطه» و «مدیرعامل» یک نفرند؛ اگر معاونتی بالای سر این فرد "
+            "نیست، «معاونت مربوطه» را خالی بگذارید",
+        ),
+    ]
+    for first, second, message in redundant:
+        if first is not None and first == second:
+            item.errors.append(message)
+            break
+
 
 def parse_workbook(content: bytes, db: Session) -> ImportPreview:
     """فایل را می‌خواند، هر ردیف را اعتبارسنجی می‌کند و گزارش می‌دهد. چیزی نمی‌نویسد."""

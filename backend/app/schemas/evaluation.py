@@ -150,6 +150,10 @@ class EvaluationRead(BaseModel):
     objection_resolved_at: datetime | None = None
     objection_resolution: str | None = None
 
+    # نمره‌دهندهٔ اول و تأییدکنندهٔ نهایی یک نفرند (کسی که مستقیم زیر نظر
+    # مدیرعامل است). حالتی مجاز، ولی نه حالتی که باید پنهان بماند.
+    single_decider: bool = False
+
     @computed_field  # type: ignore[prop-decorator]
     @property
     def stage(self) -> EvaluationStage | None:

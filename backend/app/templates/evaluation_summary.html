@@ -80,6 +80,14 @@
   <div class="recommendation">دلیل امتیاز ویژه: {{ snapshot.bonus_reason }}</div>
   {% endif %}
 
+  {% if snapshot.single_decider %}
+  {# سند نباید دو بررسی مستقل را ادعا کند وقتی یک نفر هر دو را انجام داده. #}
+  <div class="recommendation">
+    توجه: در این پرونده نمره‌دهندهٔ اول و تأییدکنندهٔ نهایی یک نفر بوده‌اند
+    (این فرد مستقیماً زیر نظر مدیرعامل کار می‌کند).
+  </div>
+  {% endif %}
+
   <div class="recommendation">نتیجه پیشنهادی: {{ snapshot.recommendation }}</div>
 
   <h2>شاخص‌های عمومی</h2>

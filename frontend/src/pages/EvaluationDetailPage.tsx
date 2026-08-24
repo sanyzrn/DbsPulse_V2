@@ -161,17 +161,21 @@ export function EvaluationDetailPage() {
     );
   }
 
+  // مسیر «مدیر»: مسئول واحد ندارد و معاونت خودش نمره‌دهندهٔ اول است. حالا این
+  // مسیر هم از `draft` شروع می‌شود و مرحلهٔ بررسی منابع انسانی را دارد — پس
+  // تفاوت دو مسیر فقط در *کیست*، نه در وضعیت.
+  const isManagerPath = evaluation.unit_supervisor_user_id === null;
+  const scorerUserId = isManagerPath
+    ? evaluation.deputy_user_id
+    : evaluation.unit_supervisor_user_id;
+
   const isSupervisorDraft =
-    user.role === "unit_supervisor" &&
-    evaluation.status === "draft" &&
-    evaluation.stage === "supervisor_scoring" &&
-    evaluation.unit_supervisor_user_id === user.id;
+    user.role === "unit_supervisor" && evaluation.status === "draft" && scorerUserId === user.id;
 
   const isManagerInitialScoring =
     user.role === "deputy" &&
-    evaluation.status === "hr_approved" &&
-    evaluation.stage === "deputy_review" &&
-    evaluation.unit_supervisor_user_id === null &&
+    evaluation.status === "draft" &&
+    isManagerPath &&
     evaluation.deputy_user_id === user.id;
 
   const isEditableScoring = isSupervisorDraft || isManagerInitialScoring;
@@ -182,7 +186,7 @@ export function EvaluationDetailPage() {
     evaluation.status === "hr_approved" &&
     evaluation.stage === "deputy_review" &&
     evaluation.deputy_user_id === user.id &&
-    evaluation.unit_supervisor_user_id !== null;
+    !isManagerPath;
   const canCeoFinalize =
     user.role === "ceo" &&
     evaluation.status === "deputy_approved" &&
@@ -340,7 +344,6 @@ export function EvaluationDetailPage() {
           setBonusPoints={setBonusPoints}
           bonusReason={bonusReason}
           setBonusReason={setBonusReason}
-          nextAction={isSupervisorDraft ? "submit" : "deputy_approve"}
           onSubmitted={load}
         />
       ) : (
@@ -740,7 +743,6 @@ function EditableScoring({
   setBonusPoints,
   bonusReason,
   setBonusReason,
-  nextAction,
   onSubmitted,
 }: {
   config: AppConfig;
@@ -755,7 +757,6 @@ function EditableScoring({
   setBonusPoints: (v: string) => void;
   bonusReason: string;
   setBonusReason: (v: string) => void;
-  nextAction: "submit" | "deputy_approve";
   onSubmitted: () => void;
 }) {
   const { showSuccess, showError } = useToast();
@@ -896,7 +897,10 @@ function EditableScoring({
       // پیش از گذارِ وضعیت، وگرنه محاسبهٔ سرور امتیاز ویژه را نمی‌بیند و همان
       // مرحله هم بسته می‌شود — یعنی عدد برای همیشه از قلم می‌افتاد.
       await saveSpecialScore();
-      await apiClient.post(`/evaluations/${evaluationId}/${nextAction === "submit" ? "submit" : "deputy-approve"}`);
+      // یک مسیر برای هر دو حالت: پایانِ نمره‌دهی همیشه «ثبت» است. پیش از این
+      // مسیر «مدیر» به‌جای ثبت، تأیید معاونت را صدا می‌زد — یعنی نمره‌دهنده
+      // خودش تأییدکننده هم بود.
+      await apiClient.post(`/evaluations/${evaluationId}/submit`);
       showSuccess("ارزیابی با موفقیت ثبت شد");
       onSubmitted();
       // پس از ثبت نهایی، ارزیاب به صفحهٔ اصلی نقش خود بازمی‌گردد (مسیر «/» توسط

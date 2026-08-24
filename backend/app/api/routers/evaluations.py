@@ -56,7 +56,11 @@ from app.services.indicator_framework import (
 from app.services.notifications import notify, notify_stage_owner_reassigned
 from app.services.pdf import weasyprint_available
 from app.services.scoring_scheme import active_scheme, rules_for_record
-from app.services.self_evaluation import ensure_evaluators_are_not_the_subject
+from app.services.self_evaluation import (
+    ensure_chain_stages_are_not_redundant,
+    ensure_evaluators_are_not_the_subject,
+    ensure_not_deciding_about_oneself,
+)
 from app.services.snapshot import build_final_snapshot
 from app.services.workflow import (
     IS_OPEN_RECORD,
@@ -98,7 +102,32 @@ def _get_record_or_404_for_update(db: Session, evaluation_id: int) -> Evaluation
     return record
 
 
+def _is_the_scorer(record: EvaluationRecord, current_user: CurrentUser) -> bool:
+    """آیا این کاربر همان کسی است که *الان* باید به این پرونده نمره بدهد.
+
+    سه جا (ثبت امتیاز، نظر ارزیاب، امتیاز ویژه) هر کدام کپیِ خودشان از این شرط
+    را داشتند و هر سه با دو شرطِ تقریباً یکسان `or` می‌شدند. حالا که مسیر «مدیر»
+    هم از `draft` شروع می‌شود، تفاوتِ دو مسیر فقط در *کیست* است، نه در وضعیت —
+    و همین یک تابع کافی است.
+    """
+    if record.status is not EvaluationStatus.draft:
+        return False
+    manager_path = is_manager_path(record)
+    stage_role = UserRole.deputy if manager_path else UserRole.unit_supervisor
+    scorer_id = record.deputy_user_id if manager_path else record.unit_supervisor_user_id
+    return (
+        scorer_id is not None
+        and current_user.id == scorer_id
+        and may_act_at(current_user.role, stage_role)
+    )
+
+
 def _ensure_can_view(record: EvaluationRecord, current_user: CurrentUser) -> None:
+    # پیش از هر چیز: موضوعِ پرونده آن را از این‌جا نمی‌بیند. پروندهٔ در جریان
+    # شواهدِ ارزیاب را دارد و پنل HR کاملش را نشان می‌دهد؛ کارمندِ منابع انسانی
+    # نباید ارزیابیِ خودش را از آن‌جا بخواند. مسیر خودش
+    # (`/api/me/evaluations`) جداست و فقط نتیجهٔ نهایی را می‌دهد.
+    ensure_not_deciding_about_oneself(record, current_user)
     if current_user.role == UserRole.hr:
         return
     allowed_ids = {record.unit_supervisor_user_id, record.deputy_user_id, record.ceo_user_id}
@@ -250,9 +279,15 @@ def create_evaluation(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="فقط معاونت مربوطه می‌تواند ارزیابی این فرد را آغاز کند",
             )
-        # مسیر «مدیر»: معاونت خودش نمره‌دهنده اول است، پس پرونده مستقیماً در وضعیت
-        # hr_approved (مرحله بررسی معاونت) ساخته می‌شود.
-        record_status = EvaluationStatus.hr_approved
+        # مسیر «مدیر»: معاونت خودش نمره‌دهندهٔ اول است، پس پرونده مثل هر پروندهٔ
+        # دیگری از `draft` شروع می‌شود — فقط نمره‌دهنده‌اش معاونت است.
+        #
+        # پیش از این مستقیماً در `hr_approved` ساخته می‌شد، یعنی *مرحلهٔ بررسی
+        # منابع انسانی را رد می‌کرد*: معاونت نمره می‌داد و خودش همان نمره را
+        # تأیید می‌کرد و پرونده می‌رفت روی میز مدیرعامل. پروندهٔ مدیران —
+        # پرامدترین ارزیابی‌های سازمان — با دو چشم بسته می‌شد، در حالی که پروندهٔ
+        # یک کارشناس با چهار.
+        record_status = EvaluationStatus.draft
         unit_supervisor_user_id = None
     else:
         if access.unit_supervisor_user_id is None:
@@ -577,18 +612,7 @@ def upsert_scores(
     # پس این پنجره در عمل باز است، نه تئوریک.
     record = _get_record_or_404_for_update(db, evaluation_id)
 
-    is_supervisor_draft = (
-        record.status == EvaluationStatus.draft
-        and may_act_at(current_user.role, UserRole.unit_supervisor)
-        and current_user.id == record.unit_supervisor_user_id
-    )
-    is_manager_initial_scoring = (
-        record.status == EvaluationStatus.hr_approved
-        and is_manager_path(record)
-        and may_act_at(current_user.role, UserRole.deputy)
-        and current_user.id == record.deputy_user_id
-    )
-    if not (is_supervisor_draft or is_manager_initial_scoring):
+    if not _is_the_scorer(record, current_user):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="در این مرحله امکان ثبت/ویرایش امتیاز برای شما وجود ندارد",
@@ -617,20 +641,8 @@ def set_evaluator_comment(
     # همان دلیل upsert_scores: نظر ارزیاب هم روی رکوردی نوشته می‌شود که یک گذار
     # هم‌زمان ممکن است داشته از زیرش عوضش کند.
     record = _get_record_or_404_for_update(db, evaluation_id)
-    # نمره‌دهنده اول این نظر را ثبت می‌کند: مسیر عادی مسئول واحد در draft است؛
-    # مسیر «مدیر» معاونت خودش نمره‌دهندهٔ اول است و در hr_approved این کار را می‌کند.
-    is_supervisor_draft = (
-        may_act_at(current_user.role, UserRole.unit_supervisor)
-        and record.status == EvaluationStatus.draft
-        and current_user.id == record.unit_supervisor_user_id
-    )
-    is_manager_initial_scoring = (
-        may_act_at(current_user.role, UserRole.deputy)
-        and record.status == EvaluationStatus.hr_approved
-        and is_manager_path(record)
-        and current_user.id == record.deputy_user_id
-    )
-    if not (is_supervisor_draft or is_manager_initial_scoring):
+    # نمره‌دهندهٔ اول این نظر را ثبت می‌کند — در هر دو مسیر، در مرحلهٔ نمره‌دهی.
+    if not _is_the_scorer(record, current_user):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN, detail="امکان ثبت نظر در این مرحله وجود ندارد"
         )
@@ -656,18 +668,7 @@ def set_special_score(
     برمی‌گرداند — همان مسیری که برای هر مخالفتِ دیگری هست.
     """
     record = _get_record_or_404_for_update(db, evaluation_id)
-    is_supervisor_draft = (
-        may_act_at(current_user.role, UserRole.unit_supervisor)
-        and record.status == EvaluationStatus.draft
-        and current_user.id == record.unit_supervisor_user_id
-    )
-    is_manager_initial_scoring = (
-        may_act_at(current_user.role, UserRole.deputy)
-        and record.status == EvaluationStatus.hr_approved
-        and is_manager_path(record)
-        and current_user.id == record.deputy_user_id
-    )
-    if not (is_supervisor_draft or is_manager_initial_scoring):
+    if not _is_the_scorer(record, current_user):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="امکان ثبت امتیاز ویژه در این مرحله برای شما وجود ندارد",
@@ -711,9 +712,18 @@ def submit_evaluation(
     db: Session = Depends(get_db),
     current_user: CurrentUser = Depends(require_chain_stage(UserRole.unit_supervisor)),
 ) -> EvaluationRead:
+    """ثبت نهاییِ نمره‌دهی — پایانِ کارِ نمره‌دهندهٔ اول، در هر دو مسیر.
+
+    گاردِ نقش روی «مسئول واحد» است و برای معاونت هم می‌گذرد (`may_act_at`)؛
+    مالکیت واقعی را خودِ گذار می‌سنجد.
+    """
     record = _get_record_or_404_for_update(db, evaluation_id)
+    # در مسیر «مدیر» نمره‌دهنده معاونت است، پس گذارِ دیگری با همان مقصد لازم
+    # است. محاسبهٔ نتیجه در هر دو مسیر همین‌جا انجام می‌شود — جایی که نمره‌دهی
+    # تمام می‌شود — نه در تأیید معاونت.
+    action = "manager_submit" if is_manager_path(record) else "submit"
     apply_transition(
-        db, record, "submit", current_user,
+        db, record, action, current_user,
         before=lambda: finalize_scoring(db, record, current_user),
     )
     db.commit()
@@ -728,7 +738,13 @@ def hr_approve(
     current_user: CurrentUser = Depends(require_roles(UserRole.hr)),
 ) -> EvaluationRead:
     record = _get_record_or_404_for_update(db, evaluation_id)
-    apply_transition(db, record, "hr_approve", current_user)
+    # اقدام HR روی پروندهٔ خودش. مسیر گذارها از `_ensure_can_view` نمی‌گذرد،
+    # پس گارد این‌جا صریح است نه ضمنی.
+    ensure_not_deciding_about_oneself(record, current_user)
+    # در مسیر «مدیر»، تأیید منابع انسانی پرونده را مستقیم روی میز مدیرعامل
+    # می‌گذارد: مرحلهٔ معاونت مصرف شده، چون خودش نمره داده است.
+    action = "hr_approve_manager" if is_manager_path(record) else "hr_approve"
+    apply_transition(db, record, action, current_user)
     db.commit()
     db.refresh(record)
     return _to_read(db, record)
@@ -741,13 +757,10 @@ def deputy_approve(
     current_user: CurrentUser = Depends(require_chain_stage(UserRole.deputy)),
 ) -> EvaluationRead:
     record = _get_record_or_404_for_update(db, evaluation_id)
-
-    def _before() -> None:
-        # معاونت برای پرسنل «مدیر» نقش نمره‌دهنده اول را هم بازی می‌کند
-        if is_manager_path(record):
-            finalize_scoring(db, record, current_user)
-
-    apply_transition(db, record, "deputy_approve", current_user, before=_before)
+    # محاسبهٔ نتیجه دیگر این‌جا انجام نمی‌شود: در مسیر «مدیر» هم نمره‌دهی با
+    # `submit` تمام می‌شود، و پروندهٔ آن مسیر هرگز به `hr_approved` — تنها
+    # وضعیتِ ورودیِ این گذار — نمی‌رسد.
+    apply_transition(db, record, "deputy_approve", current_user)
     db.commit()
     db.refresh(record)
     return _to_read(db, record)
@@ -802,6 +815,10 @@ def return_evaluation(
     record = _get_record_or_404_for_update(db, evaluation_id)
     action, comment_stage = _RETURN_ACTION_BY_ROLE[current_user.role]
 
+    if action == "ceo_return" and is_manager_path(record):
+        # در این مسیر مرحلهٔ معاونت مصرف شده؛ پرونده به صف منابع انسانی برمی‌گردد.
+        action = "ceo_return_manager"
+
     if action == "deputy_return" and is_manager_path(record):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -846,6 +863,8 @@ def cancel_evaluation(
     غیرقابل‌ارزیابی می‌ماند و تنها درمانش SQL دستی روی پروداکشن بود.
     """
     record = _get_record_or_404_for_update(db, evaluation_id)
+    # اقدام HR روی پروندهٔ خودش (همان دلیل بالا).
+    ensure_not_deciding_about_oneself(record, current_user)
 
     def _before() -> None:
         # دلیل هم به‌صورت کامنت در خود پرونده می‌ماند و هم در audit — تصمیم است، نه پاک‌کردن.
@@ -885,6 +904,8 @@ def hr_claim(
     هم‌زمان روی یک پرونده کار نکنند.
     """
     record = _get_record_or_404_for_update(db, evaluation_id)
+    # اقدام HR روی پروندهٔ خودش (همان دلیل بالا).
+    ensure_not_deciding_about_oneself(record, current_user)
 
     if record.status not in OPEN_STATUSES:
         raise HTTPException(
@@ -928,6 +949,8 @@ def hr_handover(
     تفکیک واقعی نقش‌های HR گام میان‌مدت همین یافته است.
     """
     record = _get_record_or_404_for_update(db, evaluation_id)
+    # اقدام HR روی پروندهٔ خودش (همان دلیل بالا).
+    ensure_not_deciding_about_oneself(record, current_user)
 
     if record.status not in OPEN_STATUSES:
         raise HTTPException(
@@ -945,6 +968,14 @@ def hr_handover(
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="این پرونده از قبل در اختیار همین کاربر است",
+        )
+    # واگذاری به خودِ ارزیابی‌شونده، دقیقاً همان چیزی است که گارد بالا جلویش را
+    # می‌گیرد — فقط از راهِ دیگر. بدون این، هر HRای می‌توانست پروندهٔ یک همکارِ
+    # HR را به خودِ او بدهد.
+    if new_owner.personnel_id is not None and new_owner.personnel_id == record.subject_personnel_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="نمی‌توان پرونده را به کسی واگذار کرد که خودش موضوع همان پرونده است",
         )
 
     previous_owner_id = record.hr_user_id
@@ -987,6 +1018,8 @@ def resolve_objection(
     شود، مسیرش ارزیابی تازه است نه بازنویسی سندی که هش و امضا دارد.
     """
     record = _get_record_or_404_for_update(db, evaluation_id)
+    # اقدام HR روی پروندهٔ خودش (همان دلیل بالا).
+    ensure_not_deciding_about_oneself(record, current_user)
 
     if record.objection_at is None:
         raise HTTPException(
@@ -1085,6 +1118,21 @@ def reassign_stage_owner(
     # همان نامساوی P0-10: جایگزین نباید خودِ ارزیابی‌شونده باشد.
     ensure_evaluators_are_not_the_subject(
         db, record.subject_personnel_id, [payload.new_user_id]
+    )
+    # و نباید از قبل در مرحلهٔ دیگری از همین پرونده نشسته باشد. بدون این، همین
+    # endpoint راهِ دور زدنِ قید «سه نفر متفاوت» بود: زنجیره درست ساخته می‌شد و
+    # بعد یک جابه‌جایی، دو صندلی را به یک نفر می‌داد.
+    stages = {
+        "unit_supervisor_user_id": record.unit_supervisor_user_id,
+        "deputy_user_id": record.deputy_user_id,
+        "ceo_user_id": record.ceo_user_id,
+    }
+    stages[payload.stage_field] = payload.new_user_id
+    ensure_chain_stages_are_not_redundant(
+        db,
+        stages["unit_supervisor_user_id"],
+        stages["deputy_user_id"],
+        stages["ceo_user_id"],
     )
 
     setattr(record, payload.stage_field, payload.new_user_id)

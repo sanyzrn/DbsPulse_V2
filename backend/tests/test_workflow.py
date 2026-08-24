@@ -98,8 +98,10 @@ def test_manager_job_title_skips_supervisor_stage(client, db_session):
     r = client.post("/api/evaluations", json={"subject_personnel_id": manager.id}, headers=auth_header(dep))
     assert r.status_code == 201, r.text
     evaluation = r.json()
-    assert evaluation["status"] == "hr_approved"
-    assert evaluation["stage"] == "deputy_review"
+    # پرونده مثل هر پروندهٔ دیگری از `draft` شروع می‌شود؛ تفاوت مسیر «مدیر» فقط
+    # در این است که نمره‌دهنده‌اش معاونت است، نه در این‌که مرحله‌ای را رد کند.
+    assert evaluation["status"] == "draft"
+    assert evaluation["stage"] == "supervisor_scoring"
     assert evaluation["unit_supervisor_user_id"] is None
 
     indicators = active_indicators(db_session)
@@ -135,12 +137,32 @@ def test_manager_job_title_skips_supervisor_stage(client, db_session):
     )
     assert r.status_code == 403
 
-    r = client.post(f"/api/evaluations/{evaluation['id']}/deputy-approve", headers=auth_header(dep))
+    # و مثل هر پرونده‌ای، با ثبتِ نمره‌دهنده به صف بررسی منابع انسانی می‌رود.
+    # این مرحله تا امروز در این مسیر *وجود نداشت*: معاونت نمره می‌داد و خودش
+    # همان نمره را تأیید می‌کرد و پرونده می‌رفت روی میز مدیرعامل.
+    r = client.post(f"/api/evaluations/{evaluation['id']}/submit", headers=auth_header(dep))
     assert r.status_code == 200, r.text
     evaluation = r.json()
-    assert evaluation["status"] == "deputy_approved"
-    assert evaluation["stage"] == "ceo_final"
+    assert evaluation["status"] == "submitted"
+    assert evaluation["stage"] == "hr_review"
     assert evaluation["final_weighted_pct"] is not None
+
+    # معاونت نمی‌تواند تأییدِ خودش را هم بزند: مرحلهٔ معاونت مصرف شده است.
+    assert (
+        client.post(
+            f"/api/evaluations/{evaluation['id']}/deputy-approve", headers=auth_header(dep)
+        ).status_code
+        == 403
+    )
+
+    hr = make_user(db_session, "hr")
+    db_session.commit()
+    r = client.post(f"/api/evaluations/{evaluation['id']}/hr-approve", headers=auth_header(hr))
+    assert r.status_code == 200, r.text
+    # تأیید منابع انسانی مستقیم به مرحلهٔ مدیرعامل می‌رود؛ مرحلهٔ معاونت پریده
+    # می‌شود چون *انجام شده*، نه چون وجود ندارد.
+    assert r.json()["status"] == "deputy_approved"
+    assert r.json()["stage"] == "ceo_final"
 
     r = client.post(f"/api/evaluations/{evaluation['id']}/ceo-finalize", headers=auth_header(ceo))
     assert r.status_code == 200

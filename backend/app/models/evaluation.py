@@ -170,6 +170,22 @@ class EvaluationRecord(Base):
             "bonus_points IS NULL OR bonus_points = 0 OR bonus_reason IS NOT NULL",
             name="ck_evaluation_records_bonus_needs_reason",
         ),
+        # سه مرحله باید سه نفر باشند. در مایگریشن با NOT VALID اضافه شده‌اند
+        # (توضیحش آن‌جاست)؛ اعلامشان این‌جا فقط برای این است که
+        # `alembic --autogenerate` آن‌ها را «اضافی» نبیند و DROP پیشنهاد ندهد.
+        CheckConstraint(
+            "unit_supervisor_user_id IS NULL OR deputy_user_id IS NULL "
+            "OR unit_supervisor_user_id <> deputy_user_id",
+            name="ck_evaluation_records_supervisor_not_deputy",
+        ),
+        CheckConstraint(
+            "unit_supervisor_user_id IS NULL OR unit_supervisor_user_id <> ceo_user_id",
+            name="ck_evaluation_records_supervisor_not_ceo",
+        ),
+        CheckConstraint(
+            "deputy_user_id IS NULL OR deputy_user_id <> ceo_user_id",
+            name="ck_evaluation_records_deputy_not_ceo",
+        ),
         Index("ix_evaluation_records_subject", "subject_personnel_id"),
         Index("ix_evaluation_records_supervisor", "unit_supervisor_user_id"),
         Index("ix_evaluation_records_deputy", "deputy_user_id"),
@@ -198,6 +214,20 @@ class EvaluationRecord(Base):
             postgresql_where=text("status NOT IN ('finalized', 'cancelled')"),
         ),
     )
+
+    @property
+    def single_decider(self) -> bool:
+        """نمره‌دهندهٔ اول و تأییدکنندهٔ نهایی، یک نفرند.
+
+        فقط برای کسی رخ می‌دهد که مستقیماً زیر نظر مدیرعامل کار می‌کند — و آن
+        حالت مجاز است، چون بالای سرش کسِ دیگری وجود ندارد. ولی مجاز بودن یعنی
+        «قابل ثبت»، نه «قابل کتمان»: بدون این پرچم، لاگ دو تأیید نشان می‌داد و
+        خواننده‌اش دو بررسی مستقل می‌فهمید. سند نهایی همین را چاپ می‌کند.
+        """
+        return (
+            self.unit_supervisor_user_id is not None
+            and self.unit_supervisor_user_id == self.ceo_user_id
+        )
 
     @property
     def subject_full_name(self) -> str:

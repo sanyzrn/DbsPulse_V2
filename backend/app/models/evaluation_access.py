@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import DateTime, ForeignKey, UniqueConstraint, func
+from sqlalchemy import CheckConstraint, DateTime, ForeignKey, UniqueConstraint, func
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import Base
@@ -32,5 +32,21 @@ class EvaluationAccess(Base):
     # پس `alembic revision --autogenerate` آن‌ها را «اضافی» می‌دید و DROP پیشنهاد
     # می‌داد. اعلامشان این‌جا یعنی autogenerate واقعیتِ دیتابیس را می‌بیند.
     __table_args__ = (
+        # سه مرحله باید سه نفر باشند. در مایگریشن با NOT VALID اضافه شده‌اند
+        # (توضیحش آن‌جاست)؛ اعلامشان این‌جا فقط برای این است که
+        # `alembic --autogenerate` آن‌ها را «اضافی» نبیند و DROP پیشنهاد ندهد.
+        CheckConstraint(
+            "unit_supervisor_user_id IS NULL OR deputy_user_id IS NULL "
+            "OR unit_supervisor_user_id <> deputy_user_id",
+            name="ck_evaluation_access_supervisor_not_deputy",
+        ),
+        CheckConstraint(
+            "unit_supervisor_user_id IS NULL OR unit_supervisor_user_id <> ceo_user_id",
+            name="ck_evaluation_access_supervisor_not_ceo",
+        ),
+        CheckConstraint(
+            "deputy_user_id IS NULL OR deputy_user_id <> ceo_user_id",
+            name="ck_evaluation_access_deputy_not_ceo",
+        ),
         UniqueConstraint("personnel_id", name="uq_evaluation_access_personnel_id"),
     )

@@ -65,12 +65,33 @@ class Transition:
     guard: "Callable[[EvaluationRecord], bool] | None" = None
 
 
+def is_manager_path(record: EvaluationRecord) -> bool:
+    """مسیر «مدیر»: مسئول واحد ندارد؛ معاونت خودش نمره‌دهنده اول است."""
+    return record.unit_supervisor_user_id is None
+
+
+# `is_manager_path` عمداً پیش از این جدول تعریف شده: چند گذار مستقیماً به آن
+# ارجاع می‌دهند (نه از راه lambda)، و پایین‌تر بودنش یعنی NameError در import.
 TRANSITIONS: dict[str, Transition] = {
     "submit": Transition(
         from_statuses=frozenset({EvaluationStatus.draft}),
         to_status=EvaluationStatus.submitted,
         allowed_role=UserRole.unit_supervisor,
         assignee_field="unit_supervisor_user_id",
+        guard=lambda record: not is_manager_path(record),
+        error_status=http_status.HTTP_403_FORBIDDEN,
+        error_detail="این ارزیابی در مرحله ثبت توسط شما نیست",
+    ),
+    # مسیر «مدیر»: همان گذار، ولی نمره‌دهنده‌اش معاونت است. تا امروز این مسیر
+    # اصلاً به `submitted` نمی‌رسید — یعنی *مرحلهٔ بررسی منابع انسانی را نداشت*
+    # — و پروندهٔ مدیران، پرامدترین ارزیابی‌های سازمان، با دو چشم بسته می‌شد در
+    # حالی که پروندهٔ یک کارشناس با چهار چشم.
+    "manager_submit": Transition(
+        from_statuses=frozenset({EvaluationStatus.draft}),
+        to_status=EvaluationStatus.submitted,
+        allowed_role=UserRole.deputy,
+        assignee_field="deputy_user_id",
+        guard=is_manager_path,
         error_status=http_status.HTTP_403_FORBIDDEN,
         error_detail="این ارزیابی در مرحله ثبت توسط شما نیست",
     ),
@@ -80,6 +101,21 @@ TRANSITIONS: dict[str, Transition] = {
         allowed_role=UserRole.hr,
         assignee_field="hr_user_id",
         claimable_if_unassigned=True,
+        guard=lambda record: not is_manager_path(record),
+        error_status=http_status.HTTP_400_BAD_REQUEST,
+        error_detail="این ارزیابی در انتظار بررسی منابع انسانی نیست",
+        owner_error_detail="این پرونده در اختیار کاربر دیگری از منابع انسانی است",
+    ),
+    # در مسیر «مدیر» معاونت نمره را از قبل داده و ثبت کرده، پس تأیید منابع انسانی
+    # مستقیماً پرونده را روی میز مدیرعامل می‌گذارد. مرحلهٔ معاونت پریده می‌شود چون
+    # *انجام شده*، نه چون وجود ندارد.
+    "hr_approve_manager": Transition(
+        from_statuses=frozenset({EvaluationStatus.submitted}),
+        to_status=EvaluationStatus.deputy_approved,
+        allowed_role=UserRole.hr,
+        assignee_field="hr_user_id",
+        claimable_if_unassigned=True,
+        guard=is_manager_path,
         error_status=http_status.HTTP_400_BAD_REQUEST,
         error_detail="این ارزیابی در انتظار بررسی منابع انسانی نیست",
         owner_error_detail="این پرونده در اختیار کاربر دیگری از منابع انسانی است",
@@ -131,6 +167,19 @@ TRANSITIONS: dict[str, Transition] = {
         to_status=EvaluationStatus.hr_approved,
         allowed_role=UserRole.ceo,
         assignee_field="ceo_user_id",
+        guard=lambda record: not is_manager_path(record),
+        error_status=http_status.HTTP_403_FORBIDDEN,
+        error_detail="این ارزیابی در مرحله تأیید نهایی توسط شما نیست",
+    ),
+    # برگشت مدیرعامل در مسیر «مدیر» به منابع انسانی می‌رود، نه به مرحلهٔ معاونت:
+    # آن مرحله در این مسیر مصرف شده (معاونت نمره داده و ثبت کرده). بی این گذار،
+    # پرونده به `hr_approved` برمی‌گشت و معاونت باید یک تأییدِ توخالی می‌زد.
+    "ceo_return_manager": Transition(
+        from_statuses=frozenset({EvaluationStatus.deputy_approved}),
+        to_status=EvaluationStatus.submitted,
+        allowed_role=UserRole.ceo,
+        assignee_field="ceo_user_id",
+        guard=is_manager_path,
         error_status=http_status.HTTP_403_FORBIDDEN,
         error_detail="این ارزیابی در مرحله تأیید نهایی توسط شما نیست",
     ),
@@ -253,11 +302,6 @@ def may_act_at(user_role: UserRole, stage_role: UserRole) -> bool:
     if user_rank is None or stage_rank is None:
         return False
     return user_rank >= stage_rank
-
-
-def is_manager_path(record: EvaluationRecord) -> bool:
-    """مسیر «مدیر»: مسئول واحد ندارد؛ معاونت خودش نمره‌دهنده اول است."""
-    return record.unit_supervisor_user_id is None
 
 
 def skips_deputy(record: EvaluationRecord) -> bool:

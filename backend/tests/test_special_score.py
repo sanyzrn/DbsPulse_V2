@@ -156,14 +156,14 @@ def test_it_closes_once_the_case_leaves_the_scoring_stage(client, db_session, or
 
 def test_the_manager_path_evaluator_can_award_it(client, db_session):
     """در مسیر «مدیر» نمره‌دهندهٔ اول معاونت است، پس همو باید بتواند ثبتش کند."""
+    hr = make_user(db_session, "hr")
     dep = make_user(db_session, "deputy")
     ceo = make_user(db_session, "ceo")
     manager = make_personnel(db_session, full_name="یک مدیر", org_unit="واحد ب", is_manager=True)
     make_access(db_session, manager, None, dep, ceo)
     db_session.commit()
 
-    # مسیر «مدیر»: معاونت خودش پرونده را باز می‌کند و پرونده مستقیماً در مرحلهٔ
-    # نمره‌دهیِ او (hr_approved) می‌نشیند.
+    # مسیر «مدیر»: معاونت خودش پرونده را باز می‌کند و نمره‌دهنده‌اش هم خودش است.
     record_id = client.post(
         "/api/evaluations",
         json={"subject_personnel_id": manager.id},
@@ -177,7 +177,7 @@ def test_the_manager_path_evaluator_can_award_it(client, db_session):
     assert _set_bonus(client, dep, record_id, 2, "بازطراحی فرایند انبار").status_code == 200
 
     result = client.post(
-        f"/api/evaluations/{record_id}/deputy-approve", headers=auth_header(dep)
+        f"/api/evaluations/{record_id}/submit", headers=auth_header(dep)
     ).json()
     assert result["bonus_points"] == 2
     assert result["final_weighted_pct"] == pytest.approx(result["base_weighted_pct"] + 2)

@@ -59,6 +59,8 @@ export interface Personnel {
   status: PersonnelStatus;
   separation_date: string | null;
   separation_reason: SeparationReason | null;
+  /** نام کاربریِ حساب این فرد، اگر دارد. null یعنی هنوز نمی‌تواند وارد شود. */
+  account_username: string | null;
   created_at: string;
   updated_at: string;
 }

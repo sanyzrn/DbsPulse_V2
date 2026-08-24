@@ -17,6 +17,7 @@ function person(id: number, full_name: string, over: Partial<Personnel> = {}): P
     status: "active",
     separation_date: null,
     separation_reason: null,
+    account_username: null,
     created_at: "",
     updated_at: "",
     ...over,

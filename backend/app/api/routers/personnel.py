@@ -129,6 +129,29 @@ def _can_view_personnel(db: Session, personnel_id: int, current_user: CurrentUse
     return involved_record is not None
 
 
+def _with_accounts(db: Session, rows: list[Personnel]) -> list[PersonnelRead]:
+    """نام کاربریِ هر پرسنل، با یک کوئری برای کل صفحه (نه N+1).
+
+    بدون این، «آیا این فرد حساب دارد؟» فقط با رفتن به صفحهٔ کاربران و گشتن
+    جواب داشت — و ساختِ حساب برای پرسنلِ موجود عملاً پیدا نمی‌شد.
+    """
+    if not rows:
+        return []
+    usernames = dict(
+        db.execute(
+            select(User.personnel_id, User.username).where(
+                User.personnel_id.in_([r.id for r in rows])
+            )
+        ).all()
+    )
+    items = []
+    for row in rows:
+        item = PersonnelRead.model_validate(row)
+        item.account_username = usernames.get(row.id)
+        items.append(item)
+    return items
+
+
 @router.get("", response_model=PersonnelPage)
 def list_personnel(
     accessible_to_me: bool = False,
@@ -170,7 +193,7 @@ def list_personnel(
             query.order_by(_personnel_order_by(sort_by, sort_dir)).limit(limit).offset(offset)
         )
     )
-    return PersonnelPage(total=total, items=[PersonnelRead.model_validate(p) for p in items])
+    return PersonnelPage(total=total, items=_with_accounts(db, items))
 
 
 # توجه: این دو مسیر ثابت باید پیش از "/{personnel_id}" تعریف شوند وگرنه FastAPI

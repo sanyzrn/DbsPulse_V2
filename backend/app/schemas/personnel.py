@@ -80,6 +80,9 @@ class PersonnelRead(BaseModel):
     status: PersonnelStatus
     separation_date: date | None = None
     separation_reason: SeparationReason | None = None
+    #: نام کاربریِ حساب این فرد، اگر دارد. None یعنی هنوز حسابی برایش ساخته
+    #: نشده — تا آن موقع نمی‌تواند کارنامهٔ خودش را ببیند.
+    account_username: str | None = None
     created_at: datetime
     updated_at: datetime
 

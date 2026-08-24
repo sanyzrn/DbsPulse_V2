@@ -126,7 +126,10 @@ export function Modal({
               </svg>
             </button>
           </div>
-          <div className="px-6">
+          {/* بدونِ footer، همین بخش کفِ مودال است — و padding پایین لازم دارد.
+              وگرنه آخرین سطرِ متن به لبهٔ کارت می‌چسبد؛ جایی که footer هست،
+              خودش `py-4` دارد و فاصله را می‌دهد. */}
+          <div className={`px-6 ${footer ? "" : "pb-6"}`}>
             {children}
           </div>
           {footer && (

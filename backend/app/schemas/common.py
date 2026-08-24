@@ -11,3 +11,5 @@ class AppConfig(BaseModel):
     evidence_required_scores: list[int]
     general_section_weight: float
     specialized_section_weight: float
+    # سقف امتیاز ویژه در طرح فعال؛ صفر یعنی فرم اصلاً این بخش را نشان ندهد.
+    bonus_max_points: float

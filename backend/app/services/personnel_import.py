@@ -31,6 +31,9 @@ from sqlalchemy.orm import Session
 from app.models.enums import PersonnelStatus, UserRole
 from app.models.personnel import Personnel
 from app.models.user import User
+
+# همان حداقلی که فرم ساخت کاربر اعمال می‌کند؛ دو مسیر ورود نباید دو قانون داشته باشند.
+from app.schemas.user import _PASSWORD_MIN_LENGTH as PASSWORD_MIN_LENGTH
 from app.services.workflow import may_act_at
 
 # همان ستون‌های build_personnel_workbook، به‌علاوهٔ یک ستون اختیاری برای نام کاربری
@@ -44,6 +47,13 @@ COLUMNS = [
     "شروع قرارداد",
     "پایان قرارداد",
     "نام کاربری",
+    # رمز اولیه، اختیاری. اگر خالی بماند سامانه خودش یکی می‌سازد و *یک‌بار* در
+    # گزارش پایانِ ایمپورت نشان می‌دهد. پرکردنش یعنی رمزها را از قبل خودتان
+    # می‌دانید و لازم نیست از آن صفحه برداریدشان.
+    #
+    # هر دو حالت `must_change_password` را روشن می‌گذارند: رمزی که در یک فایل
+    # اکسل نوشته شده، رمز نیست — یک بلیط ورود یک‌بارمصرف است.
+    "رمز اولیه",
     # سه ستون زنجیرهٔ ارزیابی. هر سه اختیاری‌اند و با *نام* پر می‌شوند، نه با
     # شناسه: کسی که فایل پرسنلی را در اکسل پر می‌کند، id کاربر را نمی‌داند.
     #
@@ -160,6 +170,8 @@ class ImportRow:
     contract_start_date: date | None = None
     contract_end_date: date | None = None
     username: str | None = None
+    #: رمزِ دادهٔ کاربر. None یعنی سامانه خودش می‌سازد.
+    initial_password: str | None = None
     # شناسهٔ کاربرِ هر مرحله، پس از تطبیق نام. None یعنی یا ستون خالی بوده یا
     # نامش پیدا نشد — که دومی خودش یک خطای ردیف است، پس این دو با هم قاطی
     # نمی‌شوند.
@@ -408,6 +420,18 @@ def parse_workbook(content: bytes, db: Session) -> ImportPreview:
             else:
                 seen_usernames[username] = number
                 item.username = username
+
+        # رمز فقط وقتی معنا دارد که حسابی در کار باشد.
+        given_password = _text(cell(raw, "رمز اولیه"))
+        if given_password and not username:
+            item.errors.append("«رمز اولیه» بدون «نام کاربری» معنا ندارد")
+        elif given_password:
+            if len(given_password) < PASSWORD_MIN_LENGTH:
+                item.errors.append(
+                    f"«رمز اولیه» باید دست‌کم {PASSWORD_MIN_LENGTH} نویسه باشد"
+                )
+            else:
+                item.initial_password = given_password
 
         _resolve_chain(item, raw, cell, by_name, by_username, sole_ceo)
 

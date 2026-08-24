@@ -66,10 +66,37 @@ def validate_evidence(
         raise ValueError(" | ".join(messages))
 
 
+def validate_bonus(
+    bonus_points: float,
+    bonus_reason: str | None,
+    rules: Rules = LEGACY_RULES,
+) -> None:
+    """امتیاز ویژه را در برابر قواعدِ همان پرونده می‌سنجد.
+
+    `compute_result` عدد خارج از بازه را بی‌صدا می‌بُرد تا محاسبه هرگز نتیجهٔ
+    بی‌معنا ندهد؛ ولی در لحظهٔ *ثبت*، بریدن بی‌صدا بدترین کار ممکن است: ارزیاب ۸
+    می‌زند، سامانه ۵ ذخیره می‌کند و چیزی نمی‌گوید. این تابع همان‌جا خطا می‌دهد.
+    """
+    if bonus_points < 0:
+        raise ValueError("امتیاز ویژه نمی‌تواند منفی باشد")
+    if bonus_points > 0 and rules.bonus_max_points <= 0:
+        raise ValueError("امتیاز ویژه در طرح نمره‌دهی این پرونده فعال نیست")
+    if bonus_points > rules.bonus_max_points:
+        raise ValueError(
+            f"امتیاز ویژه حداکثر می‌تواند {_fa(rules.bonus_max_points)} باشد "
+            f"(مقدار واردشده: {_fa(bonus_points)})"
+        )
+    # دلیل، بخشِ اجباریِ این قابلیت است نه تزئین آن: نمره‌ای که کسی نتواند
+    # توضیحش را بخواند، در سند تصمیمِ تمدید قرارداد قابل دفاع نیست.
+    if bonus_points > 0 and not (bonus_reason or "").strip():
+        raise ValueError("برای امتیاز ویژه باید دلیل نوشته شود")
+
+
 def compute_result(
     scores: list[dict],
     indicators_by_id: dict[int, Indicator],
     rules: Rules = LEGACY_RULES,
+    bonus_points: float = 0.0,
 ) -> dict:
     """درصد هر بخش و امتیاز نهایی وزنی، بر اساس قواعد داده‌شده.
 
@@ -90,15 +117,38 @@ def compute_result(
 
     general_pct = round((general_sum / general_max) * 100, 1) if general_max else 0.0
     specialized_pct = round((specialized_sum / specialized_max) * 100, 1) if specialized_max else 0.0
-    final_pct = round(
+    base_pct = round(
         general_pct * rules.general_section_weight
         + specialized_pct * rules.specialized_section_weight,
         1,
     )
 
+    # امتیاز ویژه: کارِ خارج از شرح وظایف که در هیچ شاخصی جا نمی‌شود. دو مهار
+    # دارد و هر دو لازم‌اند —
+    #   ۱) سقفِ نسخهٔ طرح، تا یک ارزیاب نتواند فرم را با عددی دلخواه دور بزند؛
+    #   ۲) سقفِ ۱۰۰، چون این ستون در همه‌جای سامانه «درصد» است: میانگین واحد،
+    #      مقایسهٔ افراد و جدول آستانه‌ها همه روی بازهٔ [۰,۱۰۰] معنا دارند.
+    # سقف دوم روی *امتیازِ اضافه‌شده* اعمال می‌شود نه روی حاصل جمع، تا این تساوی
+    # همیشه برقرار بماند: «امتیاز فرم + امتیاز ویژه = امتیاز نهایی». اگر جمع را
+    # می‌بریدیم، سند نهایی سه عددی نشان می‌داد که با هم جمع نمی‌شوند.
+    # مقدار خامِ *ثبت‌شده* دست‌نخورده در خود پرونده می‌ماند؛ این‌جا فقط اثرش روی
+    # نتیجه محاسبه می‌شود.
+    applied_bonus = round(
+        max(
+            0.0,
+            min(float(bonus_points or 0.0), rules.bonus_max_points, 100.0 - base_pct),
+        ),
+        2,
+    )
+    final_pct = round(base_pct + applied_bonus, 1)
+
     return {
         "general_score_pct": general_pct,
         "specialized_score_pct": specialized_pct,
+        # امتیازِ فرم، پیش از امتیاز ویژه. در سند نهایی و لاگ ممیزی می‌نشیند تا
+        # بعداً بشود گفت این عدد از کجا آمده، نه فقط اینکه چند شد.
+        "base_weighted_pct": base_pct,
+        "bonus_points": applied_bonus,
         "final_weighted_pct": final_pct,
         "recommendation": rules.recommendation_for(final_pct),
         # نسخهٔ طرحی که این نتیجه با آن حساب شده — در لاگ ممیزی و سند نهایی

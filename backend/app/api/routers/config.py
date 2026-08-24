@@ -28,4 +28,5 @@ def get_config(
         evidence_required_scores=list(rules.evidence_required_scores),
         general_section_weight=rules.general_section_weight,
         specialized_section_weight=rules.specialized_section_weight,
+        bonus_max_points=rules.bonus_max_points,
     )

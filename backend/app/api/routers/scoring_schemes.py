@@ -59,6 +59,7 @@ def _rules_from_input(payload: SchemeInput) -> Rules:
         evidence_max_words=payload.evidence_max_words,
         thresholds=tuple((b.upper_exclusive, b.label) for b in payload.thresholds),
         indicator_weights=dict(payload.indicator_weights),
+        bonus_max_points=payload.bonus_max_points,
     )
 
 
@@ -75,6 +76,7 @@ def _to_read(db: Session, scheme: ScoringScheme) -> SchemeRead:
         evidence_required_scores=[int(s) for s in scheme.evidence_required_scores],
         evidence_min_words=scheme.evidence_min_words,
         evidence_max_words=scheme.evidence_max_words,
+        bonus_max_points=float(scheme.bonus_max_points),
         thresholds=scheme.thresholds,
         indicator_weights={int(k): float(v) for k, v in (scheme.indicator_weights or {}).items()},
         created_at=scheme.created_at,
@@ -111,6 +113,7 @@ def create_scheme(
         evidence_required_scores=payload.evidence_required_scores,
         evidence_min_words=payload.evidence_min_words,
         evidence_max_words=payload.evidence_max_words,
+        bonus_max_points=payload.bonus_max_points,
         thresholds=[b.model_dump() for b in payload.thresholds],
         # کلیدهای JSONB باید رشته باشند
         indicator_weights={str(k): v for k, v in payload.indicator_weights.items()},
@@ -171,7 +174,12 @@ def preview_scheme(
         if not scores or any(row["indicator_id"] not in indicators_by_id for row in scores):
             continue
 
-        proposed = compute_result(scores, indicators_by_id, rules)
+        # امتیاز ویژهٔ همان پرونده هم وارد محاسبهٔ فرضی می‌شود، وگرنه ستون
+        # «الان» و ستون «با طرح پیشنهادی» دو چیز متفاوت را می‌سنجند و
+        # جابه‌جایی‌هایی گزارش می‌شود که هیچ‌وقت اتفاق نمی‌افتند.
+        proposed = compute_result(
+            scores, indicators_by_id, rules, bonus_points=float(record.bonus_points or 0)
+        )
         personnel = db.get(Personnel, record.subject_personnel_id)
         current_recommendation = record.recommendation or "—"
         case = ReclassifiedCase(

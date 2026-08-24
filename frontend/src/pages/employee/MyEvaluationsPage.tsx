@@ -90,6 +90,24 @@ function MyEvaluationCard({ item, index }: { item: MyEvaluation; index: number }
             </div>
           </dl>
         </div>
+        {/* امتیاز ویژه، اگر گرفته باشد. عدد بدون دلیلش برای کسی که نمره‌اش را
+            گرفته یک تعدیل بی‌توضیح است؛ این‌جا هر دو کنار هم می‌آیند. */}
+        {item.bonus_points ? (
+          <p className="mt-3 rounded-xl border border-amber-200 bg-amber-50/70 px-3 py-2 text-sm text-amber-900">
+            <span className="font-semibold">
+              <span aria-hidden>★</span> امتیاز ویژه: {item.bonus_points.toLocaleString("fa-IR")}{" "}
+              امتیاز
+            </span>
+            {item.base_weighted_pct !== null && (
+              <span className="text-xs text-amber-800">
+                {" "}
+                (امتیاز فرم {item.base_weighted_pct.toLocaleString("fa-IR")}٪ + این امتیاز)
+              </span>
+            )}
+            {item.bonus_reason && <span className="block mt-0.5 text-xs">{item.bonus_reason}</span>}
+          </p>
+        ) : null}
+
         {/* «پیشنهاد سامانه» بود، که مثل حکمِ یک ماشین خوانده می‌شد — دربارهٔ
             آیندهٔ شغلی خودِ خواننده. در واقع خروجی جدول آستانه‌هایی است که
             سازمان تصویب کرده؛ گفتنِ همین، آن را از حکم به قاعده تبدیل می‌کند. */}

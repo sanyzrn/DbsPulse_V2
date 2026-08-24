@@ -33,6 +33,9 @@ _HEADERS = [
     "وضعیت",
     "امتیاز عمومی ٪",
     "امتیاز تخصصی ٪",
+    # امتیاز ویژه ستون خودش را دارد: در خروجی تحلیلی، تفاوت «۹۲ از فرم» و
+    # «۸۹ + ۳ ویژه» همان چیزی است که باید دیده شود، نه پنهان در یک عدد.
+    "امتیاز ویژه",
     "امتیاز نهایی ٪",
     "نتیجه پیشنهادی",
     "تاریخ شروع",
@@ -123,6 +126,7 @@ def build_evaluations_workbook(records: list[EvaluationRecord]) -> bytes:
                 _STATUS_LABELS.get(r.status.value, r.status.value),
                 float(r.general_score_pct) if r.general_score_pct is not None else None,
                 float(r.specialized_score_pct) if r.specialized_score_pct is not None else None,
+                float(r.bonus_points) if r.bonus_points else None,
                 float(r.final_weighted_pct) if r.final_weighted_pct is not None else None,
                 r.recommendation or "",
                 to_jalali(r.created_at.isoformat()),

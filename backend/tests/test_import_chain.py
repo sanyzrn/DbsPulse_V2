@@ -213,3 +213,70 @@ def test_capability_still_required(client, db_session):
     )
     assert response.status_code == 403
     assert UserRole.deputy is not None
+
+
+# ── رمز اولیه از داخل فایل ─────────────────────────────────────────────────
+
+def test_a_password_from_the_file_is_the_one_that_works(client, db_session):
+    """رمزی که خودتان تعیین کرده‌اید، نباید دوباره از گزارش پایانی برداشته شود."""
+    hr = make_user(db_session, "hr")
+    db_session.commit()
+    content = _workbook(
+        [_row("PWD-1", "کارمند رمزدار", **{"نام کاربری": "karmand1", "رمز اولیه": "Chosen-Pass-99"})]
+    )
+
+    response = client.post(
+        "/api/personnel/import",
+        files={"file": ("p.xlsx", content, XLSX)},
+        headers=auth_header(hr),
+    )
+    assert response.status_code == 200, response.text
+    assert response.json()["created_accounts"] == 1
+
+    login = client.post(
+        "/api/auth/login", json={"username": "karmand1", "password": "Chosen-Pass-99"}
+    )
+    assert login.status_code == 200, login.text
+    # و همچنان باید در نخستین ورود عوضش کند: رمزی که در یک فایل اکسل نوشته
+    # شده، رمز نیست — یک بلیط ورود یک‌بارمصرف است.
+    assert login.json()["must_change_password"] is True
+
+
+def test_a_short_password_is_refused(client, db_session):
+    hr = make_user(db_session, "hr")
+    db_session.commit()
+    content = _workbook(
+        [_row("PWD-2", "کارمند دو", **{"نام کاربری": "karmand2", "رمز اولیه": "kotah"})]
+    )
+    preview = parse_workbook(content, db_session)
+    assert len(preview.invalid) == 1
+    assert "نویسه" in preview.invalid[0].errors[0]
+    assert hr is not None
+
+
+def test_a_password_without_a_username_is_refused(client, db_session):
+    """رمز بدون حساب، چیزی جز یک رشتهٔ رهاشده در فایل نیست."""
+    hr = make_user(db_session, "hr")
+    db_session.commit()
+    content = _workbook([_row("PWD-3", "کارمند سه", **{"رمز اولیه": "Orphan-Pass-1"})])
+    preview = parse_workbook(content, db_session)
+    assert len(preview.invalid) == 1
+    assert "بدون «نام کاربری»" in preview.invalid[0].errors[0]
+    assert hr is not None
+
+
+def test_an_empty_password_column_still_generates_one(client, db_session):
+    """رفتار قبلی باید دست‌نخورده بماند: ستون خالی یعنی سامانه خودش بسازد."""
+    hr = make_user(db_session, "hr")
+    db_session.commit()
+    content = _workbook([_row("PWD-4", "کارمند چهار", **{"نام کاربری": "karmand4"})])
+
+    response = client.post(
+        "/api/personnel/import",
+        files={"file": ("p.xlsx", content, XLSX)},
+        headers=auth_header(hr),
+    )
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["created_accounts"] == 1
+    assert body["accounts"][0]["temporary_password"]

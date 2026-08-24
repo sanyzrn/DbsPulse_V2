@@ -494,6 +494,16 @@ function IndicatorRow({
       dragListener={false}
       dragControls={controls}
       onDragEnd={onDrop}
+      // `Reorder.Item` به‌صورت پیش‌فرض انیمیشن layout دارد، که برای جابه‌جایی
+      // با کشیدن دقیقاً همان چیزی است که می‌خواهیم. ولی محتوای تب با
+      // `key={section}` عوض می‌شود، یعنی با هر تعویض تب کل ردیف‌ها از نو mount
+      // می‌شوند و هرکدام انیمیشن ورودشان را از موقعیت اولیه اجرا می‌کنند —
+      // پشت سر هم، که به‌صورت یک آبشار دیده می‌شود.
+      //
+      // `initial={false}` فقط انیمیشنِ *ورود* را خاموش می‌کند؛ ردیف‌ها همان‌جا
+      // که باید ظاهر می‌شوند و جابه‌جایی با درگ دست‌نخورده می‌ماند.
+      initial={false}
+      layout="position"
       className="flex items-center gap-3 rounded-xl border border-gray-100 bg-white px-3 py-2.5 text-sm"
       whileDrag={{ scale: 1.01, boxShadow: "0 12px 32px rgba(0,0,0,0.10)" }}
     >

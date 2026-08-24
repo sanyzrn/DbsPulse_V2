@@ -32,6 +32,9 @@ class Rules:
     indicator_weights: dict[int, float]
     #: شمارهٔ نسخه، یا None وقتی از ثابت‌ها آمده (فقط مسیر بازگشتی)
     version: int | None = None
+    #: سقف امتیاز ویژه (صفر = غیرفعال). پیش‌فرضِ اینجا فقط برای فراخوان‌های
+    #: قدیمی است که این قاعده را نمی‌شناسند؛ مسیرهای واقعی مقدارش را می‌دهند.
+    bonus_max_points: float = constants.BONUS_MAX_POINTS
 
     def weight_for(self, indicator_id: int) -> float:
         return self.indicator_weights.get(indicator_id, 1.0)
@@ -54,6 +57,7 @@ LEGACY_RULES = Rules(
     evidence_max_words=constants.EVIDENCE_MAX_WORDS,
     thresholds=tuple((float(u), label) for u, label in constants.FINAL_RESULT_THRESHOLDS),
     indicator_weights={},
+    bonus_max_points=constants.BONUS_MAX_POINTS,
 )
 
 
@@ -71,6 +75,7 @@ def rules_from(scheme: ScoringScheme) -> Rules:
         # کد لازم نباشد بداند این داده از JSON آمده.
         indicator_weights={int(k): float(v) for k, v in (scheme.indicator_weights or {}).items()},
         version=scheme.version,
+        bonus_max_points=float(scheme.bonus_max_points),
     )
 
 

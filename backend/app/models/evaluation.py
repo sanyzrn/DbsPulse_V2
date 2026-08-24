@@ -18,6 +18,7 @@ from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.text_limits import (
+    BONUS_REASON_MAX,
     COMMENT_MAX,
     EVALUATOR_COMMENT_MAX,
     EVIDENCE_MAX,
@@ -88,10 +89,24 @@ class EvaluationRecord(Base):
         Enum(EvaluationStatus, name="evaluation_status", values_callable=lambda e: [m.value for m in e]),
         nullable=False,
     )
+    # امتیازِ فرم، پیش از افزودن امتیاز ویژه. مشتق‌کردنش از (نهایی منهای ویژه)
+    # وسوسه‌انگیز بود ولی نادرست است: وقتی جمع از ۱۰۰ بگذرد، نهایی روی ۱۰۰
+    # می‌ایستد و آن تفریق عددی می‌داد که هیچ‌وقت محاسبه نشده بود. سند رسمی
+    # نباید عددی نشان بدهد که از یک تفریقِ حدسی درآمده.
+    base_weighted_pct: Mapped[float | None] = mapped_column(Numeric(5, 2), nullable=True)
     general_score_pct: Mapped[float | None] = mapped_column(Numeric(5, 2), nullable=True)
     specialized_score_pct: Mapped[float | None] = mapped_column(Numeric(5, 2), nullable=True)
     final_weighted_pct: Mapped[float | None] = mapped_column(Numeric(5, 2), nullable=True)
     recommendation: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # امتیاز ویژه: نمرهٔ اختیاریِ ارزیاب بابت کاری خارج از شرح وظایف — کاری که در
+    # هیچ شاخصی نمی‌گنجد و بدون این ستون هیچ جایی در نتیجه ندارد. عمداً جدا از
+    # `final_weighted_pct` نگه داشته می‌شود، نه در آن حل: سند نهایی باید بتواند
+    # بگوید «۸۴ از فرم + ۳ بابتِ فلان کار»، نه یک عدد ۸۷ که منشأش پیدا نیست.
+    #
+    # NULL و صفر یک معنا دارند (امتیاز ویژه‌ای در کار نیست)؛ NULL برای پرونده‌های
+    # پیش از این قابلیت است.
+    bonus_points: Mapped[float | None] = mapped_column(Numeric(4, 2), nullable=True)
+    bonus_reason: Mapped[str | None] = mapped_column(String(BONUS_REASON_MAX), nullable=True)
     evaluator_comment: Mapped[str | None] = mapped_column(String(EVALUATOR_COMMENT_MAX), nullable=True)
     final_snapshot: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
@@ -144,6 +159,17 @@ class EvaluationRecord(Base):
     # پس `alembic revision --autogenerate` آن‌ها را «اضافی» می‌دید و DROP پیشنهاد
     # می‌داد. اعلامشان این‌جا یعنی autogenerate واقعیتِ دیتابیس را می‌بیند.
     __table_args__ = (
+        # امتیاز ویژه هرگز منفی نیست، و امتیازِ بی‌دلیل هم ثبت نمی‌شود: عددی که
+        # کسی نتواند توضیحش را بخواند، در سند تصمیمِ تمدید قرارداد جایی ندارد.
+        # سقفِ بالا این‌جا نیست چون از نسخهٔ طرحِ همان پرونده می‌آید، نه از یک عدد ثابت.
+        CheckConstraint(
+            "bonus_points IS NULL OR bonus_points >= 0",
+            name="ck_evaluation_records_bonus_not_negative",
+        ),
+        CheckConstraint(
+            "bonus_points IS NULL OR bonus_points = 0 OR bonus_reason IS NOT NULL",
+            name="ck_evaluation_records_bonus_needs_reason",
+        ),
         Index("ix_evaluation_records_subject", "subject_personnel_id"),
         Index("ix_evaluation_records_supervisor", "unit_supervisor_user_id"),
         Index("ix_evaluation_records_deputy", "deputy_user_id"),

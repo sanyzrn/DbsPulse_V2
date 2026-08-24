@@ -722,6 +722,7 @@ function EditPersonnelModal({
   });
   const [access, setAccess] = useState<AccessDraft>(emptyAccess);
   const [accessLoaded, setAccessLoaded] = useState(false);
+  const [newAccount, setNewAccount] = useState<AccountDraft>(emptyAccount);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
@@ -769,6 +770,16 @@ function EditPersonnelModal({
         `/personnel/${personnel.id}/access`,
         accessPayload(access, form.is_manager)
       );
+      // حساب بعد از ذخیرهٔ پرسنل ساخته می‌شود، نه قبلش: اگر نام کاربری تکراری
+      // باشد، ویرایشِ درستِ پرسنل نباید به‌خاطرش دور ریخته شود.
+      if (!personnel.account_username && newAccount.enabled) {
+        await apiClient.post("/users", {
+          username: newAccount.username.trim() || suggestUsername(form.personnel_code),
+          password: newAccount.password,
+          role: "employee",
+          personnel_id: personnel.id,
+        });
+      }
       await queryClient.invalidateQueries({ queryKey: ["personnel"] });
       showSuccess("پرسنل و دسترسی به‌روزرسانی شد");
       onClose();
@@ -909,6 +920,30 @@ function EditPersonnelModal({
             isManager={form.is_manager}
             access={access}
             setAccess={setAccess}
+          />
+        )}
+      </div>
+
+      {/* حساب کاربری — تا امروز فقط در فرم *ثبت* پرسنل بود، یعنی برای کسی که
+          از قبل در سامانه بود هیچ راهی از این صفحه وجود نداشت و باید از صفحهٔ
+          کاربران دنبالش می‌گشتید. */}
+      <div className="mt-5 border-t border-gray-100 pt-4">
+        <h3 className="mb-3 text-sm font-semibold text-gray-800">حساب کاربری</h3>
+        {personnel.account_username ? (
+          <p className="text-sm text-gray-600">
+            این فرد حساب دارد:{" "}
+            <code className="rounded bg-gray-100 px-2 py-0.5 font-mono text-gray-800" dir="ltr">
+              {personnel.account_username}
+            </code>
+            <span className="mt-1 block text-xs text-gray-400">
+              تغییر رمز یا غیرفعال‌کردن حساب، از صفحهٔ «کاربران» انجام می‌شود.
+            </span>
+          </p>
+        ) : (
+          <AccountFields
+            personnelCode={form.personnel_code}
+            account={newAccount}
+            setAccount={setNewAccount}
           />
         )}
       </div>

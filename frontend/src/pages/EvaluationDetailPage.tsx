@@ -77,6 +77,11 @@ export function EvaluationDetailPage() {
   );
 
   const [evaluatorComment, setEvaluatorComment] = useState("");
+  // امتیاز ویژه به‌صورت رشته نگه داشته می‌شود، نه عدد: فیلدِ نیمه‌تایپ‌شده («۲.»)
+  // با number باید به NaN یا صفر تبدیل شود و هر دو زیر انگشت کاربر عدد را
+  // می‌پرانند. تبدیل فقط در لحظهٔ ارسال انجام می‌شود.
+  const [bonusPoints, setBonusPoints] = useState("");
+  const [bonusReason, setBonusReason] = useState("");
   const [newComment, setNewComment] = useState("");
   const [replyingTo, setReplyingTo] = useState<number | null>(null);
   const [replyText, setReplyText] = useState("");
@@ -86,6 +91,15 @@ export function EvaluationDetailPage() {
   useEffect(() => {
     setEvaluatorComment(evaluation?.evaluator_comment ?? "");
   }, [evaluation?.id, evaluation?.evaluator_comment]);
+
+  useEffect(() => {
+    // صفر و «نداشتن» یک چیزند و هر دو باید فیلد را خالی نشان بدهند؛ «۰» در
+    // کادر، شبیه امتیازی است که کسی عمداً گذاشته.
+    // با ارقام فارسی نمایش داده می‌شود، چون کاربر هم با همان می‌نویسد؛
+    // `toMachineNumber` در مسیر ارسال دوباره برشان می‌گرداند.
+    setBonusPoints(evaluation?.bonus_points ? evaluation.bonus_points.toLocaleString("fa-IR") : "");
+    setBonusReason(evaluation?.bonus_reason ?? "");
+  }, [evaluation?.id, evaluation?.bonus_points, evaluation?.bonus_reason]);
 
   async function load() {
     await queryClient.invalidateQueries({ queryKey: ["evaluation", evaluationId] });
@@ -322,6 +336,10 @@ export function EvaluationDetailPage() {
           setEvaluatorComment={setEvaluatorComment}
           showEvaluatorComment={isSupervisorDraft || isManagerInitialScoring}
           commentLabel={isManagerInitialScoring ? "نظر کلی معاونت" : "نظر کلی مسئول واحد"}
+          bonusPoints={bonusPoints}
+          setBonusPoints={setBonusPoints}
+          bonusReason={bonusReason}
+          setBonusReason={setBonusReason}
           nextAction={isSupervisorDraft ? "submit" : "deputy_approve"}
           onSubmitted={load}
         />
@@ -330,6 +348,8 @@ export function EvaluationDetailPage() {
           config={config}
           indicators={indicators}
           scores={evaluation.scores}
+          bonusPoints={evaluation.bonus_points}
+          bonusReason={evaluation.bonus_reason}
           evaluatorComment={evaluation.evaluator_comment}
           commentLabel={evaluation.unit_supervisor_user_id === null ? "نظر کلی معاونت" : "نظر کلی مسئول واحد"}
         />
@@ -609,6 +629,19 @@ function ReturnReasonBanner({ comment }: { comment: EvaluationCommentRow }) {
   );
 }
 
+/** ارقام فارسی/عربی و ممیز فارسی را به شکل ماشین‌خوان برمی‌گرداند.
+ *
+ *  کاربرِ این سامانه با صفحه‌کلید فارسی «۲٫۵» می‌نویسد. `Number("۲٫۵")` NaN است،
+ *  یعنی بدون این تبدیل، کاربر عددِ درست را می‌دید و فرم می‌گفت عدد نیست. کادر
+ *  عمداً `type="number"` نیست، چون آن هم ارقام فارسی را اصلاً نمی‌پذیرد. */
+export function toMachineNumber(value: string): string {
+  return value
+    .replace(/[۰-۹]/g, (d) => String("۰۱۲۳۴۵۶۷۸۹".indexOf(d)))
+    .replace(/[٠-٩]/g, (d) => String("٠١٢٣٤٥٦٧٨٩".indexOf(d)))
+    .replace(/[٫،]/g, ".")
+    .trim();
+}
+
 function ActionButton({ label, busy, onClick }: { label: string; busy: boolean; onClick: () => void }) {
   return (
     <Button disabled={busy} onClick={onClick}>
@@ -621,12 +654,16 @@ function ReadOnlyScoring({
   config,
   indicators,
   scores,
+  bonusPoints,
+  bonusReason,
   evaluatorComment,
   commentLabel,
 }: {
   config: AppConfig;
   indicators: Indicator[];
   scores: EvaluationDetail["scores"];
+  bonusPoints: number | null;
+  bonusReason: string | null;
   evaluatorComment: string | null;
   commentLabel: string;
 }) {
@@ -668,6 +705,18 @@ function ReadOnlyScoring({
           config={config}
         />
       </div>
+      {/* امتیاز ویژه فقط وقتی داده شده دیده می‌شود — یک بخشِ همیشه‌حاضرِ خالی،
+          به هر تأییدکننده‌ای می‌گوید «این‌جا چیزی کم است». */}
+      {bonusPoints ? (
+        <div className="rounded-2xl border border-amber-200 bg-amber-50/60 p-5">
+          <h3 className="mb-1 flex items-center gap-2 text-base font-bold text-amber-900">
+            <span aria-hidden>★</span>
+            امتیاز ویژه: {bonusPoints.toLocaleString("fa-IR")} امتیاز
+          </h3>
+          <p className="text-sm leading-relaxed text-amber-900">{bonusReason}</p>
+        </div>
+      ) : null}
+
       {evaluatorComment && (
         <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-card">
           <h3 className="mb-1 text-base font-bold text-gray-900">{commentLabel}</h3>
@@ -687,6 +736,10 @@ function EditableScoring({
   setEvaluatorComment,
   showEvaluatorComment,
   commentLabel,
+  bonusPoints,
+  setBonusPoints,
+  bonusReason,
+  setBonusReason,
   nextAction,
   onSubmitted,
 }: {
@@ -698,6 +751,10 @@ function EditableScoring({
   setEvaluatorComment: (v: string) => void;
   showEvaluatorComment: boolean;
   commentLabel: string;
+  bonusPoints: string;
+  setBonusPoints: (v: string) => void;
+  bonusReason: string;
+  setBonusReason: (v: string) => void;
   nextAction: "submit" | "deputy_approve";
   onSubmitted: () => void;
 }) {
@@ -716,6 +773,38 @@ function EditableScoring({
   const [dirty, setDirty] = useState(false);
   // اولین رندر (hydration داده‌های موجود) نباید autosave را فعال کند
   const hydratedRef = useRef(false);
+  // امتیاز ویژه مسیر ذخیرهٔ خودش را دارد (endpoint جدا)، پس «تغییر کرده یا نه»
+  // را جدا می‌شماریم؛ وگرنه هر ذخیرهٔ خودکارِ امتیازها یک درخواست اضافه هم
+  // می‌فرستاد برای چیزی که کسی دستش نزده.
+  const [bonusDirty, setBonusDirty] = useState(false);
+
+  const showBonus = showEvaluatorComment && config.bonus_max_points > 0;
+  const bonusRaw = toMachineNumber(bonusPoints);
+  // خالی یعنی «امتیاز ویژه‌ای در کار نیست» — نه خطا. این بخش اختیاری است.
+  const bonusValue = bonusRaw === "" ? 0 : Number(bonusRaw);
+  const bonusError =
+    !Number.isFinite(bonusValue) || bonusValue < 0
+      ? "امتیاز ویژه باید یک عدد مثبت باشد"
+      : bonusValue > config.bonus_max_points
+        ? `امتیاز ویژه حداکثر می‌تواند ${config.bonus_max_points.toLocaleString("fa-IR")} باشد`
+        : bonusValue > 0 && bonusReason.trim() === ""
+          ? "برای امتیاز ویژه باید دلیل بنویسید"
+          : null;
+
+  /** امتیاز ویژه را ذخیره می‌کند؛ اگر هنوز کامل نیست، بی‌صدا رد می‌شود.
+   *
+   *  «بی‌صدا» فقط برای ذخیرهٔ خودکار است: کسی که وسط نوشتنِ دلیل است نباید
+   *  هر دو ثانیه پیام خطا بگیرد. ثبت نهایی جداگانه جلویش را می‌گیرد. */
+  async function saveSpecialScore(): Promise<boolean> {
+    if (!showBonus || !bonusDirty) return true;
+    if (bonusError) return false;
+    await apiClient.patch(`/evaluations/${evaluationId}/special-score`, {
+      bonus_points: bonusValue,
+      bonus_reason: bonusValue > 0 ? bonusReason.trim() : null,
+    });
+    setBonusDirty(false);
+    return true;
+  }
 
   async function saveDraft(options?: { silent?: boolean }) {
     setSaving(true);
@@ -725,6 +814,8 @@ function EditableScoring({
         `/evaluations/${evaluationId}/scores`,
         { scores: scoredRows(drafts) }
       );
+      // همراه پیش‌نویس ذخیره می‌شود تا یک رفرش، دلیلی که ارزیاب نوشته را نبرد.
+      await saveSpecialScore();
       // کش را با همان چیزی که سرور برگرداند به‌روز می‌کنیم. بدون این، ذخیرهٔ خودکار
       // فقط سرور را عوض می‌کرد و کشِ ["evaluation", id] روی وضعیتِ *پیش از ذخیره*
       // می‌ماند؛ بازگشت به همان صفحه بدون رفرش، فرم را از آن کشِ کهنه پر می‌کرد و
@@ -758,7 +849,7 @@ function EditableScoring({
     }, 2000);
     return () => clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [drafts]);
+  }, [drafts, bonusPoints, bonusReason]);
 
   // اگر تغییر ذخیره‌نشده هست، هنگام بستن/رفرش صفحه هشدار بده
   useEffect(() => {
@@ -771,8 +862,19 @@ function EditableScoring({
   }, [dirty]);
 
   const preview = computePreview(drafts, indicators, config);
+  // فقط امتیاز ویژهٔ *معتبر* در پیش‌نمایش اثر می‌گذارد؛ عددِ رد‌شدنی نباید
+  // نمره‌ای نشان بدهد که سرور هرگز ثبتش نمی‌کند.
+  const previewBonus = showBonus && !bonusError ? bonusValue : 0;
 
   async function submit() {
+    // امتیاز ویژهٔ نیمه‌کاره نباید بی‌صدا کنار گذاشته شود: ارزیاب عدد را نوشته
+    // و انتظار دارد اعمال شود. این‌جا — برخلاف ذخیرهٔ خودکار — صریح می‌ایستیم.
+    if (showBonus && bonusDirty && bonusError) {
+      setError(bonusError);
+      showError(bonusError);
+      return;
+    }
+
     const ok = await confirm({
       title: "ثبت نهایی این ارزیابی؟",
       description: "پس از ثبت، دیگر امکان ویرایش امتیازها برای شما وجود نخواهد داشت.",
@@ -791,6 +893,9 @@ function EditableScoring({
           evaluator_comment: evaluatorComment,
         });
       }
+      // پیش از گذارِ وضعیت، وگرنه محاسبهٔ سرور امتیاز ویژه را نمی‌بیند و همان
+      // مرحله هم بسته می‌شود — یعنی عدد برای همیشه از قلم می‌افتاد.
+      await saveSpecialScore();
       await apiClient.post(`/evaluations/${evaluationId}/${nextAction === "submit" ? "submit" : "deputy-approve"}`);
       showSuccess("ارزیابی با موفقیت ثبت شد");
       onSubmitted();
@@ -861,6 +966,60 @@ function EditableScoring({
         />
       </div>
 
+      {showBonus && (
+        <div className="rounded-2xl border border-amber-200 bg-amber-50/50 p-5">
+          <h3 className="flex items-center gap-2 text-base font-bold text-amber-900">
+            <span aria-hidden>★</span>
+            امتیاز ویژه <span className="text-xs font-normal text-amber-700">(اختیاری)</span>
+          </h3>
+          <p className="mt-1 text-xs leading-relaxed text-amber-800">
+            برای کاری خارج از شرح وظایف که در هیچ‌کدام از شاخص‌های بالا نمی‌گنجد —
+            مثلاً یک پروژهٔ اضافه یا اقدامی فراتر از انتظار. تا سقف{" "}
+            {config.bonus_max_points.toLocaleString("fa-IR")} امتیاز به نمرهٔ نهایی اضافه
+            می‌شود و در سند نهایی، جدا از امتیاز فرم، ثبت می‌گردد.
+          </p>
+
+          <div className="mt-3 grid gap-3 sm:grid-cols-[9rem_1fr]">
+            <div>
+              <label htmlFor="bonus-points" className="mb-1.5 block text-sm font-medium text-amber-900">
+                امتیاز
+              </label>
+              <input
+                id="bonus-points"
+                type="text"
+                inputMode="decimal"
+                dir="ltr"
+                placeholder="۰"
+                value={bonusPoints}
+                onChange={(e) => {
+                  setBonusPoints(e.target.value);
+                  setBonusDirty(true);
+                }}
+                className="w-full rounded-xl border border-amber-200 bg-white px-3 py-2 text-center text-sm tabular-nums outline-none transition-colors duration-150 focus:border-amber-500"
+              />
+            </div>
+            <div>
+              <label htmlFor="bonus-reason" className="mb-1.5 block text-sm font-medium text-amber-900">
+                دلیل
+              </label>
+              <textarea
+                id="bonus-reason"
+                rows={2}
+                maxLength={500}
+                placeholder="این امتیاز بابت چه کاری است؟"
+                value={bonusReason}
+                onChange={(e) => {
+                  setBonusReason(e.target.value);
+                  setBonusDirty(true);
+                }}
+                className="w-full rounded-xl border border-amber-200 bg-white px-3 py-2 text-sm outline-none transition-colors duration-150 focus:border-amber-500"
+              />
+            </div>
+          </div>
+          {bonusError && <p className="mt-2 text-xs font-medium text-red-600">{bonusError}</p>}
+        </div>
+      )}
+
       {showEvaluatorComment && (
         <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-card">
           <h3 className="mb-2 text-base font-bold text-gray-900">{commentLabel}</h3>
@@ -897,8 +1056,17 @@ function EditableScoring({
               <PctBar value={preview.specialized_pct} />
             </div>
             <div className="flex items-center justify-between gap-3 rounded-xl border border-pulse-100 bg-pulse-50/50 p-3">
-              <span className="text-sm font-medium text-gray-700">امتیاز نهایی وزنی</span>
-              <ScoreRing value={preview.final_pct} size={56} />
+              <div>
+                <span className="text-sm font-medium text-gray-700">امتیاز نهایی وزنی</span>
+                {/* اثر امتیاز ویژه همان‌جا که عدد نهایی است دیده می‌شود، وگرنه
+                    ارزیاب تا پس از ثبت نمی‌فهمد چه چیزی به چه چیزی اضافه شد. */}
+                {previewBonus > 0 && (
+                  <p className="mt-0.5 text-xs text-amber-700">
+                    {preview.final_pct.toLocaleString("fa-IR")} + {previewBonus.toLocaleString("fa-IR")} امتیاز ویژه
+                  </p>
+                )}
+              </div>
+              <ScoreRing value={Math.min(100, preview.final_pct + previewBonus)} size={56} />
             </div>
           </div>
         </div>

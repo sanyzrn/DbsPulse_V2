@@ -4,6 +4,7 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field, computed_field
 
 from app.core.text_limits import (
+    BONUS_REASON_MAX,
     COMMENT_MAX,
     EVALUATOR_COMMENT_MAX,
     EVIDENCE_MAX,
@@ -131,6 +132,11 @@ class EvaluationRead(BaseModel):
     specialized_score_pct: float | None
     final_weighted_pct: float | None
     recommendation: str | None
+    # امتیاز ویژه جدا از امتیاز نهایی برگردانده می‌شود، نه در آن حل‌شده: هر جایی
+    # که این عدد دیده می‌شود باید بشود پرسید «بابت چه؟»
+    base_weighted_pct: float | None = None
+    bonus_points: float | None = None
+    bonus_reason: str | None = None
     evaluator_comment: str | None
     created_at: datetime
     finalized_at: datetime | None
@@ -171,6 +177,19 @@ class EvaluationPage(BaseModel):
     items: list[EvaluationRead]
 
 
+class SpecialScoreUpdate(BaseModel):
+    """امتیاز ویژه — نمرهٔ اختیاری بابت کاری خارج از شرح وظایف.
+
+    صفر (با دلیل خالی) یعنی حذفش. سقفِ بالا این‌جا اعلام نمی‌شود چون از نسخهٔ
+    طرحِ همان پرونده می‌آید؛ سرور آن را می‌سنجد.
+    """
+
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+    bonus_points: float = Field(ge=0, le=100)
+    bonus_reason: str | None = Field(default=None, max_length=BONUS_REASON_MAX)
+
+
 class EvaluatorCommentUpdate(BaseModel):
     model_config = ConfigDict(str_strip_whitespace=True)
 
@@ -189,6 +208,11 @@ class MyEvaluationRead(BaseModel):
     general_score_pct: float | None
     specialized_score_pct: float | None
     final_weighted_pct: float | None
+    # کارمند حق دارد بداند امتیاز ویژه‌ای گرفته و بابت چه — بدون این، همان عدد
+    # در نتیجه‌اش هست ولی توضیحش نیست.
+    base_weighted_pct: float | None = None
+    bonus_points: float | None = None
+    bonus_reason: str | None = None
     recommendation: str | None
     finalized_at: datetime | None
     acknowledged_at: datetime | None

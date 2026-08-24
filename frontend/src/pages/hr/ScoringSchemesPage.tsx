@@ -34,6 +34,7 @@ interface Scheme {
   evidence_required_scores: number[];
   evidence_min_words: number;
   evidence_max_words: number;
+  bonus_max_points: number;
   thresholds: ThresholdBand[];
   indicator_weights: Record<string, number>;
   created_at: string;
@@ -66,6 +67,7 @@ interface SchemeForm {
   evidence_required_scores: number[];
   evidence_min_words: number;
   evidence_max_words: number;
+  bonus_max_points: number;
   thresholds: ThresholdBand[];
 }
 
@@ -101,6 +103,7 @@ function formFrom(scheme: Scheme): SchemeForm {
     evidence_required_scores: [...scheme.evidence_required_scores],
     evidence_min_words: scheme.evidence_min_words,
     evidence_max_words: scheme.evidence_max_words,
+    bonus_max_points: scheme.bonus_max_points,
     thresholds: scheme.thresholds.map((b) => ({ ...b })),
   };
 }
@@ -242,6 +245,10 @@ export function ScoringSchemesPage() {
                 <Fact
                   label="طول شواهد"
                   value={`${faInt(scheme.evidence_min_words)} تا ${faInt(scheme.evidence_max_words)} کلمه`}
+                />
+                <Fact
+                  label="سقف امتیاز ویژه"
+                  value={scheme.bonus_max_points ? faInt(scheme.bonus_max_points) : "غیرفعال"}
                 />
               </dl>
 
@@ -460,6 +467,24 @@ function SchemeEditor({
               />
             </label>
           </div>
+        </div>
+
+        {/* ── سقف امتیاز ویژه ── */}
+        <div>
+          <p className="mb-1 text-xs font-medium text-gray-600">سقف امتیاز ویژه</p>
+          <p className="mb-2 text-[11px] leading-relaxed text-gray-500">
+            نمرهٔ اختیاری‌ای که ارزیاب بابت کارِ خارج از شرح وظایف به امتیاز نهایی اضافه
+            می‌کند. صفر یعنی این بخش در فرم ارزیابی نمایش داده نشود.
+          </p>
+          <input
+            type="number"
+            min={0}
+            max={20}
+            step={0.5}
+            className={`${fieldClass} w-28`}
+            value={form.bonus_max_points}
+            onChange={(e) => patch({ bonus_max_points: Number(e.target.value) })}
+          />
         </div>
 
         {/* ── جدول نتیجه ── */}

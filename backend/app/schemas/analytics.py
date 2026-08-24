@@ -87,6 +87,11 @@ class RecommendationSlice(BaseModel):
     recommendation: str
     count: int
     share_pct: float
+    #: جای این بند در نردبانِ طرحِ فعال — ۰ یعنی پایین‌ترین بازه.
+    #: `None` برای برچسبی که در طرح فعال وجود ندارد (پرونده‌های نسخهٔ قدیمی‌تر).
+    #: رابط از روی همین، رنگ و ترتیب را می‌سازد؛ بدون آن، «عدم تمدید» و «تمدید
+    #: استاندارد» دو میلهٔ هم‌رنگ بودند و نمودار چیزی نمی‌گفت.
+    band_index: int | None = None
 
 
 class CycleTime(BaseModel):

@@ -13,10 +13,10 @@
 میز مدیرعامل می‌گذارد. قرینهٔ همان منطقی که برای زنجیرهٔ بی‌معاونت داریم.
 """
 import pytest
+from sqlalchemy import select
 
 from app.models.enums import EvaluationStatus
 from app.models.notification import Notification
-from sqlalchemy import select
 from tests.helpers import (
     active_indicators,
     auth_header,

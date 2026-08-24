@@ -597,4 +597,8 @@ export interface PeriodProgress {
   /** کل شروع‌نشده‌ها؛ `not_started` ممکن است بریده شده باشد */
   not_started_total: number;
   not_started: NotStartedPersonnel[];
+  /** پرسنل فعالی که زنجیرهٔ ارزیابی ندارند — شکافی که پیش از این از مخرجِ
+   *  پوشش حذف می‌شد و دیده نمی‌شد. */
+  without_chain_total: number;
+  without_chain: NotStartedPersonnel[];
 }

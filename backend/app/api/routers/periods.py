@@ -113,6 +113,7 @@ def create_period(
 @router.post("/{period_id}/close", response_model=PeriodRead)
 def close_period(
     period_id: int,
+    force: bool = False,
     db: Session = Depends(get_db),
     current_user: CurrentUser = Depends(require_roles(UserRole.hr)),
 ) -> EvaluationPeriod:
@@ -121,13 +122,43 @@ def close_period(
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST, detail="این دوره قبلاً بسته شده است"
         )
+
+    # بستنِ دوره‌ای که پروندهٔ باز دارد، تا امروز بی‌صدا انجام می‌شد: وضعیت عوض
+    # می‌شد و آن پرونده‌ها همان‌طور در گردش‌کار می‌ماندند تا ماه‌ها بعد زیر یک
+    # دورهٔ بسته نهایی شوند. «بستن» چیزی را نبسته بود.
+    #
+    # جلوگیریِ مطلق هم درست نیست: گاهی واقعاً باید دوره را بست و آن چند پرونده
+    # را جدا پیش برد. پس تصمیم به تصمیم‌گیرنده برمی‌گردد — ولی صریح، نه ضمنی.
+    open_cases = (
+        db.scalar(
+            select(func.count())
+            .select_from(EvaluationRecord)
+            .where(EvaluationRecord.period_id == period_id, IS_OPEN_RECORD)
+        )
+        or 0
+    )
+    if open_cases and not force:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={
+                "message": (
+                    f"این دوره {open_cases} پروندهٔ باز دارد. اگر دوره بسته شود، آن‌ها "
+                    "در گردش‌کار می‌مانند و بعداً زیر یک دورهٔ بسته نهایی می‌شوند. "
+                    "برای بستنِ آگاهانه، درخواست را با force تکرار کنید."
+                ),
+                "open_cases": open_cases,
+            },
+        )
+
     period.status = PeriodStatus.closed
     period.closed_at = datetime.now(UTC)
     log_event(
         db,
         actor_user_id=current_user.id,
         event_type="period_closed",
-        new_value={"id": period.id, "name": period.name},
+        # عددِ پرونده‌های باز در لحظهٔ بستن ثبت می‌شود: «آگاهانه بسته شد» فقط
+        # وقتی معنا دارد که بشود گفت چه چیزی معلوم بوده.
+        new_value={"id": period.id, "name": period.name, "open_cases": open_cases},
     )
     db.commit()
     db.refresh(period)
@@ -142,13 +173,37 @@ def period_progress(
 ) -> PeriodProgress:
     period = _get_period_or_404(db, period_id)
 
-    # واجدان دوره: پرسنل فعالی که دسترسی ارزیابی برایشان تعریف شده است
-    eligible_base = (
-        select(Personnel)
-        .join(EvaluationAccess, EvaluationAccess.personnel_id == Personnel.id)
-        .where(Personnel.status == PersonnelStatus.active)
+    # واجدان دوره = هر پرسنل فعال. نه «هر پرسنل فعالی که زنجیره دارد».
+    #
+    # تفاوتش تمام ماجراست: با شرطِ زنجیره، کسی که زنجیره‌اش تنظیم نشده از *مخرج*
+    # حذف می‌شد، پس پوشش می‌توانست ۱۰۰٪ نشان بدهد در حالی که ده نفر ارزیابی
+    # نشده‌اند. داشبوردی که به‌خاطر دادهٔ ناقص عدد بهتری نشان می‌دهد، از نبودنش
+    # بدتر است — چون کسی دنبال آن ده نفر نمی‌رود.
+    eligible = (
+        db.scalar(
+            select(func.count())
+            .select_from(Personnel)
+            .where(Personnel.status == PersonnelStatus.active)
+        )
+        or 0
     )
-    eligible = db.scalar(select(func.count()).select_from(eligible_base.subquery())) or 0
+
+    # و همان‌ها که کنار گذاشته می‌شدند، حالا صریحاً شمرده می‌شوند: تا زنجیره‌شان
+    # تنظیم نشود، هیچ‌کس نمی‌تواند ارزیابی‌شان کند.
+    without_chain_query = (
+        select(Personnel.id, Personnel.full_name, Personnel.org_unit)
+        .outerjoin(EvaluationAccess, EvaluationAccess.personnel_id == Personnel.id)
+        .where(
+            Personnel.status == PersonnelStatus.active,
+            EvaluationAccess.id.is_(None),
+        )
+    )
+    without_chain_total = (
+        db.scalar(select(func.count()).select_from(without_chain_query.subquery())) or 0
+    )
+    without_chain_rows = db.execute(
+        without_chain_query.order_by(Personnel.full_name).limit(NOT_STARTED_LIMIT)
+    ).all()
 
     started = (
         db.scalar(
@@ -190,9 +245,10 @@ def period_progress(
         )
         .exists()
     )
+    # این فهرست هم به همان دلیل دیگر با «زنجیره دارد» فیلتر نمی‌شود: کسی که
+    # زنجیره ندارد، مصداقِ کامل «شروع نشده» است، نه مصداقِ «به من مربوط نیست».
     not_started_query = (
         select(Personnel.id, Personnel.full_name, Personnel.org_unit)
-        .join(EvaluationAccess, EvaluationAccess.personnel_id == Personnel.id)
         .where(Personnel.status == PersonnelStatus.active, ~has_period_evaluation)
     )
     not_started_total = (
@@ -209,6 +265,11 @@ def period_progress(
         finalized=finalized,
         in_progress=in_progress,
         not_started_total=not_started_total,
+        without_chain_total=without_chain_total,
+        without_chain=[
+            NotStartedPersonnel(personnel_id=pid, full_name=name, org_unit=unit)
+            for pid, name, unit in without_chain_rows
+        ],
         not_started=[
             NotStartedPersonnel(personnel_id=pid, full_name=name, org_unit=unit)
             for pid, name, unit in not_started_rows

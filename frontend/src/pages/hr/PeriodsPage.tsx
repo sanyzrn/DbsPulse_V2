@@ -79,7 +79,14 @@ export function PeriodsPage() {
     });
     if (!ok) return;
     try {
-      await apiClient.post(`/periods/${period.id}/close`);
+      // سرور بستنِ دوره‌ای که پروندهٔ باز دارد را رد می‌کند مگر با `force` —
+      // یعنی تأییدِ آگاهانه لازم است. همان تأیید بالا این نقش را دارد، پس فقط
+      // وقتی `force` می‌فرستیم که واقعاً پروندهٔ بازی به کاربر نشان داده شده
+      // باشد. اگر شمارشِ فرانت کهنه بوده باشد، سرور جلویش را می‌گیرد و پیامش
+      // را نشان می‌دهیم — که دقیقاً همان چیزی است که باید بشود.
+      await apiClient.post(`/periods/${period.id}/close`, null, {
+        params: stillOpen > 0 ? { force: true } : undefined,
+      });
       await invalidate();
       showSuccess("دوره بسته شد");
     } catch (err) {
@@ -257,6 +264,31 @@ function OpenPeriodCard({ period, onClose }: { period: EvaluationPeriod; onClose
               <PctBar value={pct(finalized)} tone="green" className="mt-2" />
             </div>
           </div>
+
+          {/* پرسنلی که زنجیرهٔ ارزیابی ندارند: تا امروز از *مخرج* حذف می‌شدند، پس
+              پوشش می‌توانست ۱۰۰٪ نشان بدهد در حالی که این‌ها ارزیابی نشده بودند.
+              حالا یک شکافِ دیده‌شدنی‌اند، با راه‌حلش. */}
+          {(progress.without_chain_total ?? 0) > 0 && (
+            <div className="mb-4 rounded-2xl border border-red-200 bg-red-50/60 p-4">
+              <h3 className="flex items-center gap-2 text-sm font-bold text-red-800">
+                <span className="flex h-5 min-w-5 items-center justify-center rounded-md bg-red-100 px-1 text-[10px]">
+                  {(progress.without_chain_total ?? 0).toLocaleString("fa-IR")}
+                </span>
+                زنجیرهٔ ارزیابی ندارند
+              </h3>
+              <p className="mt-1 text-xs leading-relaxed text-red-700">
+                تا زنجیره‌شان در «دسترسی ارزیابی» تعیین نشود، هیچ‌کس نمی‌تواند ارزیابی‌شان
+                کند — و در آمار پوشش هم به‌عنوان شروع‌نشده شمرده می‌شوند.
+              </p>
+              <ul className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-red-900">
+                {progress.without_chain.map((p) => (
+                  <li key={p.personnel_id}>
+                    {p.full_name} <span className="text-red-400">· {p.org_unit}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
 
           {progress.not_started.length > 0 && (
             <div>

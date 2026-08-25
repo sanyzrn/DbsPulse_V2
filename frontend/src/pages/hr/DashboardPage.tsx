@@ -621,50 +621,45 @@ function ExpiringContractsCard() {
           </div>
         </div>
       </div>
-      {contracts.length === 0 ? (
-        <p className="py-6 text-center text-sm text-gray-400">در این بازه قراردادی رو به انقضا نیست.</p>
-      ) : (
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-gray-100">
-                <th className="px-3 py-2 text-right text-xs font-semibold text-gray-600">نام</th>
-                <th className="px-3 py-2 text-right text-xs font-semibold text-gray-600">واحد</th>
-                <th className="px-3 py-2 text-right text-xs font-semibold text-gray-600">پایان قرارداد</th>
-                <th className="px-3 py-2 text-right text-xs font-semibold text-gray-600">باقی‌مانده</th>
-                <th className="px-3 py-2 text-right text-xs font-semibold text-gray-600">وضعیت ارزیابی</th>
-              </tr>
-            </thead>
-            <tbody>
-              {contracts.map((c) => (
-                <tr key={c.personnel_id} className="border-b border-gray-50 transition-colors last:border-0 hover:bg-amber-50/30">
-                  <td className="px-3 py-2.5 text-gray-700">{c.full_name}</td>
-                  <td className="px-3 py-2.5 text-gray-500">{c.org_unit}</td>
-                  <td className="px-3 py-2.5 text-gray-500">{formatDate(c.contract_end_date)}</td>
-                  <td className={`px-3 py-2.5 ${c.days_remaining <= 15 ? "font-bold text-red-600" : "text-gray-700"}`}>
-                    {c.days_remaining < 0
-                      ? `${Math.abs(c.days_remaining).toLocaleString("fa-IR")} روز گذشته`
-                      : `${c.days_remaining.toLocaleString("fa-IR")} روز`}
-                  </td>
-                  <td className="px-3 py-2.5">
-                    {c.has_open_evaluation ? (
-                      <span className="inline-flex items-center gap-1.5 rounded-full bg-blue-50 px-2.5 py-0.5 text-xs font-medium text-blue-700">
-                        <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-blue-500" />
-                        در جریان
-                      </span>
-                    ) : (
-                      <span className="inline-flex items-center gap-1.5 rounded-full bg-red-50 px-2.5 py-0.5 text-xs font-medium text-red-700">
-                        <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-red-500" />
-                        آغاز نشده
-                      </span>
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
+      {/* همان `Table` مشترک و نه یک جدول دستی: این‌طور زیر md خودبه‌خود کارت
+          می‌شود. نسخهٔ دستی روی موبایل «۱۴ شهریور ۱۴۰۵» را به سه سطر می‌شکست. */}
+      <Table
+        bordered={false}
+        headers={["نام", "واحد", "پایان قرارداد", "باقی‌مانده", "وضعیت ارزیابی"]}
+        rowKeys={contracts.map((c) => c.personnel_id)}
+        animateRows={false}
+        emptyMessage="در این بازه قراردادی رو به انقضا نیست."
+        rows={contracts.map((c) => [
+          c.full_name,
+          <span key="unit" className="text-gray-500">
+            {c.org_unit}
+          </span>,
+          <span key="end" className="whitespace-nowrap text-gray-500">
+            {formatDate(c.contract_end_date)}
+          </span>,
+          <span
+            key="left"
+            className={`whitespace-nowrap ${
+              c.days_remaining <= 15 ? "font-bold text-red-600" : "text-gray-700"
+            }`}
+          >
+            {c.days_remaining < 0
+              ? `${Math.abs(c.days_remaining).toLocaleString("fa-IR")} روز گذشته`
+              : `${c.days_remaining.toLocaleString("fa-IR")} روز`}
+          </span>,
+          c.has_open_evaluation ? (
+            <span key="state" className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-full bg-blue-50 px-2.5 py-0.5 text-xs font-medium text-blue-700">
+              <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-blue-500" />
+              در جریان
+            </span>
+          ) : (
+            <span key="state" className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-full bg-red-50 px-2.5 py-0.5 text-xs font-medium text-red-700">
+              <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-red-500" />
+              آغاز نشده
+            </span>
+          ),
+        ])}
+      />
     </div>
   );
 }

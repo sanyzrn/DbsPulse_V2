@@ -27,6 +27,7 @@ import {
   type OrgUnitCatalogueItem,
   type PipelineStat,
   type StageStat,
+  type PeriodTrendPoint,
   type RadarPoint,
   type RoleOverview,
   type TrendPoint,
@@ -240,6 +241,19 @@ export function useDashboardOverview(site?: string) {
     queryFn: async () =>
       (
         await apiClient.get<DashboardOverview>("/dashboard/overview", {
+          params: site ? { site } : undefined,
+        })
+      ).data,
+  });
+}
+
+/** روند میانگین سازمان، دوره به دوره. */
+export function usePeriodTrend(site?: string) {
+  return useQuery({
+    queryKey: ["dashboard", "period-trend", site ?? ""],
+    queryFn: async () =>
+      (
+        await apiClient.get<PeriodTrendPoint[]>("/dashboard/period-trend", {
           params: site ? { site } : undefined,
         })
       ).data,

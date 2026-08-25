@@ -8,12 +8,14 @@
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiClient, extractErrorMessage } from "../../api/client";
+import { useAuth } from "../../auth/AuthContext";
 import { usePermissions, type Capability } from "../../auth/PermissionsContext";
 import { useConfirm } from "../../components/ConfirmDialog";
 import { useToast } from "../../components/Toast";
 import { Button } from "../../ui/Button";
-import { Card, EmptyState, PageHeader, TableSkeleton } from "../../ui/Card";
-import { ROLE_LABELS, type UserRole } from "../../types";
+import { Card, EmptyState, FilterSelect, PageHeader, TableSkeleton } from "../../ui/Card";
+import { useOrgUnitCatalogue, useSites } from "../../api/queries";
+import { ROLE_LABELS, type OrgUnitCatalogueItem, type UserRole } from "../../types";
 
 interface CapabilityHolder {
   user_id: number;
@@ -58,6 +60,11 @@ interface SeparationStatus {
 
 export function AdministrationPage() {
   const { can } = usePermissions();
+  const { user } = useAuth();
+  // همان شرطی که سرور می‌گذارد (`require_role_or_capability(hr, manage_personnel)`).
+  // اگر این‌جا فقط مجوز را می‌دیدیم، کاربر منابع انسانی کارتی را نمی‌دید که API
+  // به او اجازه‌اش را می‌دهد.
+  const canOrgUnits = user?.role === "hr" || can("manage_personnel");
 
   return (
     <div className="space-y-5">
@@ -65,11 +72,15 @@ export function AdministrationPage() {
         title="مدیریت سامانه"
         subtitle="چه کسی می‌تواند خودِ سامانه را عوض کند، و کدام بخش‌ها فعال‌اند"
       />
+      {canOrgUnits && <OrgUnitsCard />}
       {can("manage_capabilities") && <SeparationCard />}
       {can("manage_capabilities") && <CapabilitiesCard />}
       {can("manage_integrations") && <IntegrationsCard />}
       {can("manage_modules") && <ModulesCard />}
-      {!can("manage_capabilities") && !can("manage_modules") && !can("manage_integrations") && (
+      {!can("manage_capabilities") &&
+        !can("manage_modules") &&
+        !can("manage_integrations") &&
+        !canOrgUnits && (
         <Card>
           <EmptyState>
             شما مجوز مدیریت سامانه را ندارید. اگر لازمش دارید، از مدیر سامانه بخواهید
@@ -547,6 +558,231 @@ function IntegrationsCard() {
         پیام آزمایشی مستقیم فرستاده می‌شود و از صف رد نمی‌شود — تا اولین آزمونِ
         پیکربندی روی پیامِ کسی انجام نشود.
       </p>
+    </Card>
+  );
+}
+
+/** کاتالوگ واحدهای سازمانی.
+ *
+ *  تا امروز فهرست واحدها *استخراج* می‌شد: هر رشته‌ای که در پروندهٔ کسی نوشته شده
+ *  بود یک واحد بود. یعنی یک غلط تایپی بی‌سروصدا واحد تازه می‌ساخت، و واحدی که
+ *  هنوز کسی در آن نبود اصلاً وجود نداشت — پس برای ثبتِ اولین نفرِ یک واحد تازه
+ *  باید نامش را از حفظ و بی‌غلط تایپ می‌کردی.
+ *
+ *  حذف عمداً فقط برای واحدِ خالی است. واحدی که پرسنل دارد «غیرفعال» می‌شود: از
+ *  فرم‌های تازه برداشته می‌شود و سابقهٔ گزارش‌ها دست‌نخورده می‌ماند.
+ */
+function OrgUnitsCard() {
+  const { showSuccess, showError } = useToast();
+  const confirm = useConfirm();
+  const queryClient = useQueryClient();
+  const { data: units = [], isPending } = useOrgUnitCatalogue();
+  // فهرست محل‌ها از سرور می‌آید، نه از یک ثابت در این فایل: سرور آن را از
+  // «سه محلِ شناخته‌شده + هر محلی که در داده هست» می‌سازد، و دو نسخه از این
+  // فهرست یعنی روزی که یکی عوض شود و دیگری نه.
+  const { data: sites = [] } = useSites(true);
+  const [busy, setBusy] = useState<number | "new" | null>(null);
+  // `null` یعنی «کاربر هنوز انتخاب نکرده»؛ تا آن وقت اولین محل پیشنهاد می‌شود.
+  const [draft, setDraft] = useState<{ site: string | null; name: string }>({ site: null, name: "" });
+  const [editing, setEditing] = useState<OrgUnitCatalogueItem | null>(null);
+  const draftSite = draft.site ?? sites[0] ?? "";
+
+  async function refresh() {
+    // هم کاتالوگ و هم فهرست‌های استخراج‌شده‌ای که فیلترهای صفحات دیگر از آن
+    // می‌خوانند: تغییرِ نام واحد پرسنل را هم جابه‌جا می‌کند.
+    await queryClient.invalidateQueries({ queryKey: ["org-units"], refetchType: "all" });
+    await queryClient.invalidateQueries({ queryKey: ["personnel"], refetchType: "all" });
+  }
+
+  async function run(key: number | "new", action: () => Promise<void>, done: string) {
+    setBusy(key);
+    try {
+      await action();
+      await refresh();
+      showSuccess(done);
+    } catch (err) {
+      showError(extractErrorMessage(err));
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  function create(e: React.FormEvent) {
+    e.preventDefault();
+    const name = draft.name.trim();
+    if (!name) return;
+    void run(
+      "new",
+      async () => {
+        await apiClient.post("/org-units", { site: draftSite || null, name });
+        setDraft({ site: draftSite, name: "" });
+      },
+      `واحد «${name}» افزوده شد`,
+    );
+  }
+
+  function save(unit: OrgUnitCatalogueItem, patch: Partial<OrgUnitCatalogueItem>, done: string) {
+    void run(unit.id, async () => {
+      await apiClient.patch(`/org-units/${unit.id}`, patch);
+      setEditing(null);
+    }, done);
+  }
+
+  async function remove(unit: OrgUnitCatalogueItem) {
+    const ok = await confirm({
+      title: `حذف «${unit.full_name}»؟`,
+      description: "این واحد از فهرستِ پیشنهادیِ فرم‌ها برداشته می‌شود.",
+      confirmLabel: "حذف",
+      danger: true,
+    });
+    if (!ok) return;
+    void run(unit.id, () => apiClient.delete(`/org-units/${unit.id}`).then(), "واحد حذف شد");
+  }
+
+  return (
+    <Card
+      title="واحدهای سازمانی"
+      actions={
+        <span className="text-xs text-gray-400">
+          {units.length.toLocaleString("fa-IR")} واحد تعریف‌شده
+        </span>
+      }
+    >
+      <p className="mb-4 text-sm text-gray-500">
+        همین فهرست است که در فرم ثبت پرسنل و در فیلترهای گزارش‌ها پیشنهاد می‌شود. تغییر نام
+        یک واحد، پرسنلِ همان واحد را هم با خودش می‌برد.
+      </p>
+
+      <form onSubmit={create} className="mb-4 flex flex-wrap items-end gap-2">
+        <label className="flex flex-col gap-1 text-xs font-medium text-gray-600">
+          محل
+          <FilterSelect
+            value={draftSite}
+            onChange={(site) => setDraft({ ...draft, site })}
+            aria-label="محل واحد تازه"
+          >
+            {sites.map((site) => (
+              <option key={site} value={site}>
+                {site}
+              </option>
+            ))}
+            <option value="">بدون محل</option>
+          </FilterSelect>
+        </label>
+        <label className="flex flex-1 flex-col gap-1 text-xs font-medium text-gray-600">
+          نام واحد
+          <input
+            required
+            value={draft.name}
+            onChange={(e) => setDraft({ ...draft, name: e.target.value })}
+            placeholder="مثلاً کنترل کیفیت"
+            className="w-full rounded-xl border border-gray-200 bg-gray-100 px-3 py-2 text-sm text-gray-900 outline-none transition-colors duration-150 focus:border-gray-900 focus:bg-white"
+          />
+        </label>
+        <Button type="submit" loading={busy === "new"}>
+          افزودن واحد
+        </Button>
+      </form>
+
+      {isPending ? (
+        <TableSkeleton rows={4} />
+      ) : units.length === 0 ? (
+        <EmptyState>هنوز واحدی تعریف نشده است.</EmptyState>
+      ) : (
+        <ul className="space-y-1.5">
+          {units.map((unit) => (
+            <li
+              key={unit.id}
+              className="flex flex-wrap items-center gap-2 rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm"
+            >
+              {editing?.id === unit.id ? (
+                <form
+                  className="flex flex-1 flex-wrap items-center gap-2"
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    save(unit, { site: editing.site || null, name: editing.name }, "واحد به‌روز شد");
+                  }}
+                >
+                  <FilterSelect
+                    value={editing.site ?? ""}
+                    onChange={(site) => setEditing({ ...editing, site: site || null })}
+                    aria-label="محل"
+                  >
+                    {sites.map((site) => (
+                      <option key={site} value={site}>
+                        {site}
+                      </option>
+                    ))}
+                    <option value="">بدون محل</option>
+                  </FilterSelect>
+                  <input
+                    required
+                    autoFocus
+                    value={editing.name}
+                    onChange={(e) => setEditing({ ...editing, name: e.target.value })}
+                    className="min-w-0 flex-1 rounded-xl border border-gray-200 bg-gray-100 px-3 py-1.5 text-sm text-gray-900 outline-none focus:border-gray-900 focus:bg-white"
+                  />
+                  <Button type="submit" loading={busy === unit.id}>
+                    ذخیره
+                  </Button>
+                  <Button variant="secondary" onClick={() => setEditing(null)}>
+                    انصراف
+                  </Button>
+                </form>
+              ) : (
+                <>
+                  <span className="min-w-0 flex-1 truncate font-medium text-gray-800">
+                    {unit.full_name}
+                  </span>
+                  <span className="text-xs text-gray-400">
+                    {unit.personnel_count > 0
+                      ? `${unit.personnel_count.toLocaleString("fa-IR")} نفر`
+                      : "بدون پرسنل"}
+                  </span>
+                  {!unit.is_active && (
+                    <span className="rounded-full bg-amber-50 px-2.5 py-0.5 text-xs font-medium text-amber-800">
+                      غیرفعال
+                    </span>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => setEditing(unit)}
+                    className="rounded-lg px-2 py-1 text-xs font-medium text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-900"
+                  >
+                    ویرایش
+                  </button>
+                  <button
+                    type="button"
+                    disabled={busy === unit.id}
+                    onClick={() =>
+                      save(
+                        unit,
+                        { is_active: !unit.is_active },
+                        unit.is_active ? "واحد غیرفعال شد" : "واحد فعال شد",
+                      )
+                    }
+                    className="rounded-lg px-2 py-1 text-xs font-medium text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-900 disabled:opacity-40"
+                  >
+                    {unit.is_active ? "غیرفعال" : "فعال"}
+                  </button>
+                  {/* حذف فقط وقتی نشان داده می‌شود که واقعاً ممکن است؛ برای واحدِ
+                      پرجمعیت سرور ۴۰۹ می‌دهد و دکمه فقط یک بن‌بست بود. */}
+                  {unit.personnel_count === 0 && (
+                    <button
+                      type="button"
+                      disabled={busy === unit.id}
+                      onClick={() => void remove(unit)}
+                      className="rounded-lg px-2 py-1 text-xs font-medium text-red-600 transition-colors hover:bg-red-50 disabled:opacity-40"
+                    >
+                      حذف
+                    </button>
+                  )}
+                </>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
     </Card>
   );
 }

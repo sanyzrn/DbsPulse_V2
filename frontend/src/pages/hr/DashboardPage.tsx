@@ -3,7 +3,13 @@ import { motion } from "motion/react";
 import { useSearchParams } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { apiClient, extractErrorMessage } from "../../api/client";
-import { useDashboardOverview, useExpiringContracts, useSites } from "../../api/queries";
+import {
+  useDashboardOverview,
+  useExpiringContracts,
+  usePeriodTrend,
+  useSites,
+} from "../../api/queries";
+import { PeriodTrendChart } from "../../components/PeriodTrendChart";
 import { RoleOverviewCards } from "../../components/RoleOverviewCards";
 import { StageStatusCard } from "../../components/StageStatusCard";
 import { useToast } from "../../components/Toast";
@@ -170,6 +176,9 @@ export function DashboardPage() {
       {/* ── سه عددی که «سازمان چطور است» را در یک نگاه می‌گویند ── */}
       <OrgSummaryCard overview={overview} />
 
+      {/* ── روند میانگین سازمان در طول دوره‌ها ── */}
+      <PeriodTrendCard site={siteFilter} />
+
       {/* ── نمودار میله‌ای میانگین به تفکیک واحد ── */}
       <BarByOrgUnitCard data={overview.by_org_unit} />
 
@@ -233,6 +242,29 @@ export function DashboardPage() {
   );
 }
 
+
+/** روند میانگین سازمان در طول دوره‌های ارزیابی.
+ *
+ *  بقیهٔ این صفحه «الان چطوریم» را می‌گوید. این یکی تنها جایی است که می‌گوید
+ *  «داریم بهتر می‌شویم یا بدتر» — و همان چیزی است که از یک گزارش سالانه انتظار
+ *  می‌رود.
+ */
+function PeriodTrendCard({ site }: { site: string }) {
+  const { data = [], isPending } = usePeriodTrend(site || undefined);
+  return (
+    <div className="rounded-2xl border border-gray-200 bg-white p-5">
+      <div className="mb-3">
+        <h3 className="text-base font-bold text-gray-900">روند میانگین سازمان</h3>
+        <p className="mt-0.5 text-xs text-gray-400">میانگین امتیاز نهایی در هر دورهٔ ارزیابی</p>
+      </div>
+      {isPending ? (
+        <div className="skeleton h-64" aria-hidden />
+      ) : (
+        <PeriodTrendChart data={data} />
+      )}
+    </div>
+  );
+}
 
 /** فیلتر محل برای کل نمای سازمان.
  *

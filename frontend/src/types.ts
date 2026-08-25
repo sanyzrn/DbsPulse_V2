@@ -78,6 +78,16 @@ export type SelfAssessmentState =
   | "invited"
   | "submitted";
 
+/** میانگین سازمان در یک دورهٔ ارزیابی — یک نقطه از «روند میانگین زمانی». */
+export interface PeriodTrendPoint {
+  period_id: number | null;
+  name: string;
+  starts_on: string | null;
+  /** `null` یعنی جمعیتِ دوره کمتر از حداقلِ ناشناس‌ماندن بوده است. */
+  avg_final_pct: number | null;
+  count: number;
+}
+
 export interface OrgUnitCatalogueItem {
   id: number;
   site: string | null;

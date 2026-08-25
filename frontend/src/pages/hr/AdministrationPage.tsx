@@ -76,6 +76,7 @@ export function AdministrationPage() {
       {can("manage_capabilities") && <SeparationCard />}
       {can("manage_capabilities") && <CapabilitiesCard />}
       {can("manage_integrations") && <IntegrationsCard />}
+      {can("manage_modules") && <PolicyCard />}
       {can("manage_modules") && <ModulesCard />}
       {!can("manage_capabilities") &&
         !can("manage_modules") &&
@@ -369,6 +370,8 @@ interface IntegrationField {
   kind: "text" | "number" | "bool";
   help: string;
   value: string | number | boolean;
+  minimum?: number | null;
+  maximum?: number | null;
 }
 
 interface IntegrationSettings {
@@ -378,6 +381,87 @@ interface IntegrationSettings {
 }
 
 const CHANNEL_LABELS: Record<string, string> = { email: "ایمیل", sms: "پیامک" };
+
+/** قاعده‌های سازمانی.
+ *
+ *  «مهلت اعتراض هفت روز است یا ده روز» و «از چند نفر به بالا میانگین را نشان
+ *  بده» تصمیم‌های سازمان‌اند، نه تصمیم‌های استقرار — ولی تا امروز فقط در `.env`
+ *  بودند، یعنی عوض‌کردنشان به دسترسی SSH نیاز داشت.
+ *
+ *  کف و سقفِ هر عدد از خودِ سرور می‌آید و روی همان ورودی می‌نشیند: فرم همان
+ *  قاعده‌ای را نشان می‌دهد که سرور اعمال می‌کند، به‌جای اینکه کاربر با
+ *  ذخیره‌کردن کشفش کند.
+ */
+function PolicyCard() {
+  const { showSuccess, showError } = useToast();
+  const queryClient = useQueryClient();
+  const [draft, setDraft] = useState<Record<string, string | number | boolean> | null>(null);
+  const [saving, setSaving] = useState(false);
+
+  const { data, isPending } = useQuery({
+    queryKey: ["administration", "policy"],
+    queryFn: async () =>
+      (await apiClient.get<{ fields: IntegrationField[] }>("/administration/policy")).data,
+  });
+
+  const values = draft ?? Object.fromEntries((data?.fields ?? []).map((f) => [f.key, f.value]));
+
+  async function save() {
+    setSaving(true);
+    try {
+      await apiClient.put("/administration/policy", { values });
+      await queryClient.invalidateQueries({ queryKey: ["administration", "policy"] });
+      setDraft(null);
+      showSuccess("قاعده‌ها ذخیره شد");
+    } catch (err) {
+      showError(extractErrorMessage(err));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  if (isPending || !data) {
+    return (
+      <Card title="قاعده‌های سازمانی">
+        <TableSkeleton rows={3} />
+      </Card>
+    );
+  }
+
+  return (
+    <Card title="قاعده‌های سازمانی">
+      <p className="mb-4 text-sm text-gray-500">
+        مهلت‌ها و آستانه‌هایی که رفتار سامانه را تعیین می‌کنند. تغییرشان بی‌درنگ اثر می‌کند و در
+        گزارش رویدادها ثبت می‌شود.
+      </p>
+
+      <div className="grid gap-3 sm:grid-cols-2">
+        {data.fields.map((field) => (
+          <label key={field.key} className="flex flex-col gap-1 text-xs font-medium text-gray-600">
+            {field.label}
+            <input
+              type="number"
+              min={field.minimum ?? undefined}
+              max={field.maximum ?? undefined}
+              className={inputClass}
+              value={String(values[field.key] ?? "")}
+              onChange={(e) => setDraft({ ...values, [field.key]: Number(e.target.value) })}
+            />
+            {field.help && (
+              <span className="text-[11px] font-normal text-gray-400">{field.help}</span>
+            )}
+          </label>
+        ))}
+      </div>
+
+      <div className="mt-4 border-t border-gray-100 pt-4">
+        <Button onClick={save} disabled={saving || draft === null}>
+          {saving ? "در حال ذخیره…" : "ذخیرهٔ قاعده‌ها"}
+        </Button>
+      </div>
+    </Card>
+  );
+}
 
 /** تنظیمات ارسال بیرونی.
  *

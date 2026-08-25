@@ -9,7 +9,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user, require_capability
-from app.core.integrations import EDITABLE, EDITABLE_BY_KEY, SECRET_KEYS
+from app.core.integrations import EDITABLE, EDITABLE_BY_KEY, POLICY, SECRET_KEYS
 from app.core.modules import MODULES, MODULES_BY_KEY
 from app.db.session import get_db
 from app.models.capability import UserCapability
@@ -28,6 +28,8 @@ from app.schemas.administration import (
     ModuleToggle,
     MyPermissions,
     OverlappingUser,
+    PolicySettings,
+    PolicyUpdate,
     SecretStatus,
     SeparationStatus,
 )
@@ -35,7 +37,7 @@ from app.schemas.auth import CurrentUser
 from app.services import channels
 from app.services.audit import log_event
 from app.services.authorization import capabilities_of, module_states
-from app.services.integrations import effective_values, secret_status
+from app.services.integrations import InvalidSettingValue, effective_values, secret_status
 from app.services.integrations import refresh as refresh_integrations
 from app.services.integrations import save as save_integrations
 
@@ -327,7 +329,7 @@ def update_integrations(
     db: Session = Depends(get_db),
     current_user: CurrentUser = Depends(require_capability(Capability.manage_integrations)),
 ) -> IntegrationSettings:
-    save_integrations(db, payload.values)
+    save_integrations(db, payload.values, allowed={field.key for field in EDITABLE})
     # مقدارهای تازه باید *همین حالا* اثر کنند، وگرنه «ذخیره شد» تا ری‌استارت
     # بعدی دروغ است.
     refresh_integrations(db)
@@ -341,6 +343,70 @@ def update_integrations(
     )
     db.commit()
     return read_integrations(db=db, current_user=current_user)
+
+
+_POLICY_KEYS = {field.key for field in POLICY}
+
+
+@router.get("/policy", response_model=PolicySettings)
+def read_policy(
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(require_capability(Capability.manage_modules)),
+) -> PolicySettings:
+    """قاعده‌های سازمانی — مهلت‌ها، آستانه‌ها و شمارنده‌ها.
+
+    این‌ها تا امروز فقط در `.env` بودند، یعنی «مهلت اعتراض هفت روز است یا ده
+    روز» یک تصمیم سازمانی بود که عوض‌کردنش به دسترسی SSH نیاز داشت.
+
+    مثل تنظیمات ارسال، مقدارِ برگشتی همان چیزی است که *اثر دارد*: مقدار دیتابیس
+    اگر باشد، وگرنه مقدار `.env`.
+    """
+    values = effective_values(db)
+    return PolicySettings(
+        fields=[
+            IntegrationField(
+                key=field.key,
+                label=field.label,
+                kind=field.kind,
+                help=field.help,
+                value=values[field.key],
+                minimum=field.minimum,
+                maximum=field.maximum,
+            )
+            for field in POLICY
+        ]
+    )
+
+
+@router.put("/policy", response_model=PolicySettings)
+def update_policy(
+    payload: PolicyUpdate,
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(require_capability(Capability.manage_modules)),
+) -> PolicySettings:
+    try:
+        save_integrations(db, payload.values, allowed=_POLICY_KEYS)
+    except InvalidSettingValue as err:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(err)) from None
+    except ValueError:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="مقدار وارد‌شده عدد نیست",
+        ) from None
+
+    # همان‌جا اثر کند، وگرنه «ذخیره شد» تا ری‌استارت بعدی دروغ است.
+    refresh_integrations(db)
+    # مقدارها این‌جا *می‌آیند*، برخلاف تنظیمات ارسال: هیچ‌کدام راز نیستند، و
+    # «چه کسی حد نمایش میانگین را از ۵ به ۲ رساند» دقیقاً چیزی است که یک ممیزی
+    # باید بتواند بپرسد.
+    log_event(
+        db,
+        actor_user_id=current_user.id,
+        event_type="policy_settings_changed",
+        new_value={k: v for k, v in payload.values.items() if k in _POLICY_KEYS},
+    )
+    db.commit()
+    return read_policy(db=db, current_user=current_user)
 
 
 @router.post("/integrations/test", response_model=IntegrationTestResult)

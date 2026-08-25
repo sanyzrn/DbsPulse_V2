@@ -18,7 +18,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
-from app.core.integrations import EDITABLE_BY_KEY, SECRET_KEYS
+from app.core.integrations import EDITABLE_BY_KEY, SECRET_KEYS, IntegrationField
 from app.models.integration import IntegrationSetting
 
 #: مقدارهای اولیهٔ `.env`، پیش از هر بازنویسی. بدون این، پاک‌کردن یک مقدار در
@@ -69,15 +69,45 @@ def refresh(db: Session) -> None:
         setattr(settings, key, value)
 
 
-def save(db: Session, values: dict[str, object]) -> None:
+class InvalidSettingValue(ValueError):
+    """مقداری که خارج از کف/سقفِ اعلام‌شدهٔ همان تنظیم است."""
+
+    def __init__(self, field: IntegrationField, message: str) -> None:
+        self.field = field
+        super().__init__(message)
+
+
+def _validated(field: IntegrationField, value: object) -> object:
+    """کف و سقف را *این‌جا* اعمال می‌کنیم و نه فقط در فرم.
+
+    فرم می‌تواند دور زده شود؛ و یک «حداقل جمعیت = ۰» که از راه API بنشیند،
+    ناشناس‌ماندن را بی‌سروصدا خاموش می‌کند بی‌آنکه هیچ‌جا خطایی دیده شود.
+    """
+    if field.kind != "number":
+        return value
+    number = int(value)
+    if field.minimum is not None and number < field.minimum:
+        raise InvalidSettingValue(field, f"«{field.label}» نمی‌تواند کمتر از {field.minimum} باشد")
+    if field.maximum is not None and number > field.maximum:
+        raise InvalidSettingValue(field, f"«{field.label}» نمی‌تواند بیشتر از {field.maximum} باشد")
+    return number
+
+
+def save(db: Session, values: dict[str, object], allowed: set[str] | None = None) -> None:
     """فقط کلیدهای مجاز نوشته می‌شوند.
 
     allowlist بودنش عمدی است: بدون آن، یک کلید دلخواه در بدنهٔ درخواست می‌توانست
     هر صفتی از `settings` را بازنویسی کند — از جمله رمز دیتابیس.
+
+    `allowed` دامنه را باز هم تنگ‌تر می‌کند: هر صفحهٔ پنل فقط کلیدهای گروه خودش
+    را می‌فرستد، وگرنه فرمِ «ایمیل و پیامک» می‌توانست مهلت اعتراض را هم عوض کند.
     """
-    for key, value in values.items():
+    for key, raw_value in values.items():
         if key not in EDITABLE_BY_KEY:
             continue
+        if allowed is not None and key not in allowed:
+            continue
+        value = _validated(EDITABLE_BY_KEY[key], raw_value)
         row = db.get(IntegrationSetting, key)
         if row is None:
             db.add(IntegrationSetting(key=key, value=_serialise(value)))

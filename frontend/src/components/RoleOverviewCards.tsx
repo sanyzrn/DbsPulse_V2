@@ -47,7 +47,10 @@ export function RoleOverviewCards() {
           />
           <p className="text-xs font-medium text-gray-500">{card.label}</p>
           <p className="mt-1.5 text-2xl font-bold tabular-nums text-gray-900">
-            {card.value.toLocaleString("fa-IR")}
+            {card.value.toLocaleString("fa-IR", { maximumFractionDigits: 1 })}
+            {card.suffix && (
+              <span className="mr-0.5 text-base font-semibold text-gray-500">{card.suffix}</span>
+            )}
           </p>
           {card.hint && <p className="mt-0.5 text-[11px] text-gray-400">{card.hint}</p>}
         </motion.div>

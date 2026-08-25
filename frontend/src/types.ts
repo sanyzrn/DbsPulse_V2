@@ -514,6 +514,32 @@ export interface ExpiringContract {
   has_open_evaluation: boolean;
 }
 
+/** آمار یک شخص در یک مرحله. */
+export interface StageOwnerStat {
+  name: string;
+  total: number;
+  active: number;
+  closed: number;
+  avg_dwell_days: number | null;
+  longest_active_days: number | null;
+}
+
+/** وضعیت یک مرحله از گردش‌کار. */
+export interface StageStat {
+  status: EvaluationStatus;
+  /** «الان روی میزِ چه کسی است» — نه اینکه چه کسی کارش را کرده. */
+  holder: string;
+  total: number;
+  active: number;
+  closed: number;
+  /** چند بار ورود به این مرحله رخ داده؛ بیشتر بودنش از total یعنی برگشت. */
+  passes: number;
+  share_pct: number;
+  avg_dwell_days: number | null;
+  longest_active_days: number | null;
+  by_owner: StageOwnerStat[];
+}
+
 export interface PipelineStat {
   status: EvaluationStatus;
   count: number;
@@ -546,6 +572,8 @@ export interface RoleOverviewCard {
   value: number;
   tone: RoleOverviewTone;
   hint: string | null;
+  /** واحدی که بعد از عدد می‌آید («٪») — تا کاشیِ درصد از کاشیِ تعداد جدا باشد. */
+  suffix: string | null;
 }
 
 export interface RoleOverview {

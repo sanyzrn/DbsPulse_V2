@@ -25,6 +25,7 @@ import {
   type PeriodProgress,
   type Personnel,
   type PipelineStat,
+  type StageStat,
   type RadarPoint,
   type RoleOverview,
   type TrendPoint,
@@ -411,6 +412,14 @@ export function useEmployeeVsUnit(
       ).data,
     enabled: personnelId !== null,
     placeholderData: keepPreviousData,
+  });
+}
+
+/** وضعیت پرونده‌ها در هر مرحله — با زمان توقف و تفکیک به‌ازای هر مسئول. */
+export function useStageStats() {
+  return useQuery({
+    queryKey: ["dashboard", "stage-stats"],
+    queryFn: async () => (await apiClient.get<StageStat[]>("/dashboard/stage-stats")).data,
   });
 }
 

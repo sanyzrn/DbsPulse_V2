@@ -3,19 +3,18 @@ import { motion } from "motion/react";
 import { useSearchParams } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { apiClient, extractErrorMessage } from "../../api/client";
-import { useDashboardOverview, useExpiringContracts, usePipeline } from "../../api/queries";
+import { useDashboardOverview, useExpiringContracts } from "../../api/queries";
 import { RoleOverviewCards } from "../../components/RoleOverviewCards";
-import { StatusBadge } from "../../components/StatusBadge";
+import { StageStatusCard } from "../../components/StageStatusCard";
 import { useToast } from "../../components/Toast";
 import { PersonScorecard } from "./PersonScorecard";
 import { ReportsSection } from "./ReportsSection";
 import { PageHeader } from "../../ui/Card";
-import { CountUp, PctBadge, ScoreRing, SuppressedValue } from "../../ui/Meters";
-import { EASE_SOFT, TAB_TRANSITION } from "../../ui/motion";
+import { PctBadge, ScoreRing, SuppressedValue } from "../../ui/Meters";
+import { TAB_TRANSITION } from "../../ui/motion";
 import { DotPlot } from "../../ui/plot";
 import { Table } from "../../ui/Table";
 import { formatDate } from "../../utils/dates";
-import type { EvaluationStatus } from "../../types";
 
 /* ═══════════════════════════════════════════════════════════════════════
    نمودارهای این صفحه تک‌سری‌اند (بزرگی/magnitude) — یک هیو واحد به‌جای گرادیانت
@@ -140,7 +139,7 @@ export function DashboardPage() {
         <ScoreRing value={overview.avg_final_pct} size={72} />
       </motion.div>
 
-      <PipelineCard />
+      <StageStatusCard />
 
       <ExpiringContractsCard />
       </motion.div>
@@ -434,91 +433,3 @@ function ExpiringContractsCard() {
   );
 }
 
-// قیف فقط مسیر پیشرفت است؛ «لغوشده» عمداً در آن نیست (بک‌اند هم برنمی‌گرداند) چون
-// پرونده‌ای که به مرحلهٔ بعد نمی‌رود، نرخ عبور قیف را مخدوش می‌کند.
-type PipelineStatus = Exclude<EvaluationStatus, "cancelled">;
-
-const PIPELINE_ORDER: PipelineStatus[] = [
-  "draft",
-  "submitted",
-  "hr_approved",
-  "deputy_approved",
-  "finalized",
-];
-
-// نوار هر مرحله. رنگ‌ها همان زنجیرهٔ StatusBadge‌اند تا کاشی و نشان یک زبان
-// داشته باشند: خاکستری ← آبی ← نیلی ← کهربایی ← سبز.
-// فقط پله‌های ۴۰۰: تم تیره پله‌های روشن‌تر (۵۰ تا ۳۰۰) را به رنگ‌های تیره
-// بازتعریف می‌کند چون آن‌ها آنجا نقشِ «مرز» و «پرکنندهٔ ملایم» دارند — نوارِ
-// `bg-amber-300` در تم تیره یک لکهٔ قهوه‌ای می‌شد کنار نوارهای روشن.
-const PIPELINE_BAR: Record<PipelineStatus, string> = {
-  draft: "bg-gray-400",
-  submitted: "bg-blue-400",
-  hr_approved: "bg-indigo-400",
-  deputy_approved: "bg-amber-400",
-  finalized: "bg-green-400",
-};
-
-/** قیف گردش‌کار.
- *
- *  پیش از این پنج کاشیِ **هم‌اندازه** بود — یعنی دقیقاً آن چیزی را پنهان می‌کرد
- *  که قرار بود نشان بدهد: کجا پرونده تلنبار شده. حالا هر مرحله یک نوارِ افقی
- *  است که طولش با تعدادش نسبت دارد و مراحل از بالا به پایین ترتیبِ واقعیِ
- *  گردش‌کار را دارند؛ چشم در یک نگاه بلندترین نوار را پیدا می‌کند.
- *
- *  نکته: این اعداد «چند پرونده همین حالا اینجا نشسته‌اند» است، نه جریانِ تجمعی.
- *  به همین دلیل زیرعنوان این را صریح می‌گوید. */
-function PipelineCard() {
-  const { data: pipeline = [] } = usePipeline();
-  const byStatus = new Map(pipeline.map((p) => [p.status, p]));
-  const maxCount = Math.max(1, ...PIPELINE_ORDER.map((st) => byStatus.get(st)?.count ?? 0));
-  const total = PIPELINE_ORDER.reduce((sum, st) => sum + (byStatus.get(st)?.count ?? 0), 0);
-
-  return (
-    <div className="rounded-2xl border border-gray-200 bg-white p-5">
-      <div className="mb-1 flex flex-wrap items-baseline justify-between gap-2">
-        <h2 className="text-base font-bold text-gray-900">قیف گردش‌کار</h2>
-        <p className="text-xs text-gray-400">
-          مجموع <span className="tabular-nums">{total.toLocaleString("fa-IR")}</span> پرونده
-        </p>
-      </div>
-      <p className="mb-4 text-xs text-gray-400">هر پرونده هم‌اکنون در کدام مرحله است</p>
-
-      <ol className="space-y-2">
-        {PIPELINE_ORDER.map((status, idx) => {
-          const stat = byStatus.get(status);
-          const count = stat?.count ?? 0;
-          // نوارِ صفر هم یک ردِ نازک می‌گیرد تا مرحله از قلم نیفتد.
-          const widthPct = count === 0 ? 0 : Math.max(6, (count / maxCount) * 100);
-          return (
-            <li key={status} className="flex items-center gap-3">
-              <div className="w-32 shrink-0 sm:w-40">
-                <StatusBadge status={status} />
-              </div>
-              <div className="h-7 min-w-0 flex-1 rounded-lg bg-gray-50">
-                <motion.div
-                  className={`h-7 rounded-lg ${PIPELINE_BAR[status]}`}
-                  initial={{ width: 0 }}
-                  animate={{ width: `${widthPct}%` }}
-                  transition={{ duration: 0.5, delay: idx * 0.06, ease: EASE_SOFT }}
-                />
-              </div>
-              {/* text-right در RTL یعنی «چسبیده به نوار»: عددها روی یک خط عمودی
-                  می‌نشینند، چه تاریخ داشته باشند چه نه. */}
-              <div className="flex w-24 shrink-0 items-baseline gap-2 text-right sm:w-36">
-                <span className="text-lg font-extrabold tabular-nums text-gray-900">
-                  <CountUp value={count} format="plain" />
-                </span>
-                {stat?.oldest_created_at && status !== "finalized" && count > 0 && (
-                  <span className="hidden text-[10px] text-gray-400 sm:inline">
-                    از {formatDate(stat.oldest_created_at)}
-                  </span>
-                )}
-              </div>
-            </li>
-          );
-        })}
-      </ol>
-    </div>
-  );
-}

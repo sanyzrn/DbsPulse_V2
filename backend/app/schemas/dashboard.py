@@ -65,6 +65,40 @@ class PipelineStat(BaseModel):
     oldest_created_at: datetime | None
 
 
+class StageOwnerStat(BaseModel):
+    """آمار یک *شخص* در یک مرحله.
+
+    «معاونت کند است» یک جملهٔ بی‌مصرف است وقتی سه معاون داری. این تفکیک همان
+    جمله را به چیزی تبدیل می‌کند که می‌شود دربارهٔ آن کاری کرد.
+    """
+
+    name: str
+    total: int
+    active: int
+    closed: int
+    avg_dwell_days: float | None
+    longest_active_days: float | None
+
+
+class StageStat(BaseModel):
+    status: EvaluationStatus
+    #: «الان روی میزِ چه کسی است» — نه اینکه چه کسی کارش را کرده.
+    holder: str
+    #: چند پروندهٔ *متمایز* تا حالا از این مرحله گذشته یا این‌جاست.
+    total: int
+    active: int
+    closed: int
+    #: چند بار *ورود* به این مرحله رخ داده. بیشتر بودنش از `total` یعنی پرونده‌ها
+    #: به این‌جا برمی‌گردند.
+    passes: int
+    share_pct: float
+    #: میانگین فقط روی ماندن‌های تمام‌شده. `None` یعنی هنوز هیچ پرونده‌ای از این
+    #: مرحله رد نشده — که با «صفر روز» یکی نیست.
+    avg_dwell_days: float | None
+    longest_active_days: float | None
+    by_owner: list[StageOwnerStat]
+
+
 class RoleOverviewCard(BaseModel):
     """یک کاشیِ خلاصهٔ داشبورد نقش؛ tone برای رنگ‌بندی سمت فرانت است."""
 
@@ -73,6 +107,9 @@ class RoleOverviewCard(BaseModel):
     value: float
     tone: str  # neutral | amber | pulse | green
     hint: str | None = None
+    #: واحدی که بعد از عدد می‌آید («٪»). بدون این، «۵۵» و «۵۵٪» یک شکل دیده
+    #: می‌شدند و کاشیِ درصد از کاشیِ تعداد قابل تشخیص نبود.
+    suffix: str | None = None
 
 
 class RoleOverview(BaseModel):

@@ -25,11 +25,13 @@ from app.schemas.dashboard import (
     RadarPoint,
     RoleOverview,
     RoleOverviewCard,
+    StageStat,
     TrendPoint,
     UnitStat,
 )
 from app.schemas.notification import ExpiringContract
 from app.services.privacy import suppressed_avg
+from app.services.stage_stats import stage_stats
 from app.services.workflow import IS_OPEN_RECORD
 
 router = APIRouter(prefix="/api/dashboard", tags=["dashboard"])
@@ -187,6 +189,20 @@ def pipeline(
     ]
 
 
+@router.get("/stage-stats", response_model=list[StageStat])
+def stage_statistics(
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(require_roles(UserRole.hr)),
+) -> list[StageStat]:
+    """وضعیت پرونده‌ها در هر مرحله، با زمان توقف و تفکیک به‌ازای هر مسئول.
+
+    جانشین «قیف گردش‌کار» که فقط یک عدد در هر مرحله می‌داد. آن عدد می‌گفت کجا
+    شلوغ است ولی نه چرا: صفِ ده‌تایی که هر پرونده‌اش نیم روز می‌ماند سالم است، و
+    صفِ دوتایی که هر کدام دو هفته مانده‌اند نیست.
+    """
+    return [StageStat(**row) for row in stage_stats(db)]
+
+
 @router.get("/expiring-contracts", response_model=list[ExpiringContract])
 def expiring_contracts(
     days: int = Query(default=60, ge=1, le=365),
@@ -335,6 +351,16 @@ def _count_records(db: Session, *conditions) -> int:
     )
 
 
+#: ارقام فارسی برای متن‌هایی که مستقیم نمایش داده می‌شوند. بقیهٔ اعداد در
+#: فرانت‌اند با `toLocaleString("fa-IR")` قالب می‌گیرند؛ این‌جا چون رشته از
+#: سرور می‌آید، همان‌جا هم قالب می‌گیرد.
+_FA_DIGITS = str.maketrans("0123456789", "۰۱۲۳۴۵۶۷۸۹")
+
+
+def _fa(value: int) -> str:
+    return str(value).translate(_FA_DIGITS)
+
+
 @router.get("/role-overview", response_model=RoleOverview)
 def role_overview(
     db: Session = Depends(get_db),
@@ -444,10 +470,35 @@ def role_overview(
             ),
         ]
     elif role == UserRole.hr:
-        personnel_count = (
-            db.scalar(select(func.count()).select_from(Personnel)) or 0
+        # «مشمول ارزیابی» یعنی پرسنلِ فعال. کسی که از سازمان رفته در مخرجِ پوشش
+        # جایی ندارد — وگرنه درصد تکمیل هیچ‌وقت به صد نمی‌رسد و عددی می‌شود که
+        # هیچ‌کس دنبالش نیست.
+        eligible = (
+            db.scalar(
+                select(func.count())
+                .select_from(Personnel)
+                .where(Personnel.status == PersonnelStatus.active)
+            )
+            or 0
+        )
+        finalized_count = _count_records(db, _FINALIZED)
+        # پرسنل شمرده می‌شود، نه پرونده: کسی که دو پروندهٔ نهایی‌شده دارد (دورهٔ
+        # قبل و امسال) نباید پوشش را دو برابر نشان بدهد.
+        covered = (
+            db.scalar(
+                select(func.count(func.distinct(EvaluationRecord.subject_personnel_id))).where(
+                    _FINALIZED
+                )
+            )
+            or 0
         )
         cards = [
+            RoleOverviewCard(
+                key="eligible",
+                label="کل پرسنل مشمول ارزیابی",
+                value=eligible,
+                tone="neutral",
+            ),
             RoleOverviewCard(
                 key="awaiting_hr",
                 label="در انتظار بررسی منابع انسانی",
@@ -455,18 +506,19 @@ def role_overview(
                 tone="amber",
             ),
             RoleOverviewCard(
-                key="open",
-                label="پرونده‌های باز",
-                value=_count_records(db, IS_OPEN_RECORD),
-                tone="pulse",
-            ),
-            RoleOverviewCard(
                 key="finalized",
                 label="نهایی‌شده",
-                value=_count_records(db, _FINALIZED),
+                value=finalized_count,
                 tone="green",
             ),
-            RoleOverviewCard(key="personnel", label="کل پرسنل", value=personnel_count, tone="neutral"),
+            RoleOverviewCard(
+                key="completion",
+                label="درصد تکمیل",
+                value=round(covered * 100 / eligible, 1) if eligible else 0,
+                tone="pulse",
+                suffix="٪",
+                hint=f"{_fa(covered)} از {_fa(eligible)} نفر",
+            ),
         ]
     elif role == UserRole.employee and current_user.personnel_id is not None:
         pid = current_user.personnel_id

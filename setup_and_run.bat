@@ -5,6 +5,19 @@ title DbsPulse - Setup and Run
 REM ============================================================
 REM  DbsPulse - local development bootstrap (Windows)
 REM
+REM  *** DEVELOPMENT ONLY - DO NOT RUN ON A REAL DEPLOYMENT ***
+REM
+REM  This script deliberately writes ENVIRONMENT=development, a
+REM  fixed JWT_SECRET_KEY, SEED_DEMO_DATA=true (sample accounts
+REM  whose shared password is published in the repository) and
+REM  MIN_COHORT_SIZE=1, which turns OFF the suppression that
+REM  keeps a three-person "unit average" from being read back as
+REM  those three people's scores.
+REM
+REM  For a real deployment see deploy/PRODUCTION.md - it ships
+REM  built container images and never puts any of the above on
+REM  the server.
+REM
 REM  TWO DESIGN RULES FOR THIS SCRIPT:
 REM
 REM  1. Never open the browser on a broken stack. A dead backend

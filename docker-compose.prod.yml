@@ -1,0 +1,94 @@
+# استقرار production — بدون کد منبع.
+#
+# تفاوتش با `docker-compose.yml` یک کلمه است: `image` به‌جای `build`. آن فایل
+# ایمیج‌ها را از روی پوشه‌های `backend/` و `frontend/` می‌سازد، یعنی برای اجرا
+# باید کل سورس روی همان ماشین باشد. این فایل ایمیجِ *ساخته‌شده* را اجرا می‌کند،
+# پس روی ماشین مقصد فقط همین فایل و `.env` لازم است.
+#
+# ساخت و انتقال:
+#   docker compose build                     # روی ماشین توسعه
+#   docker save dbspulse-backend dbspulse-frontend -o dbspulse-images.tar
+#   # فایل tar + همین فایل + .env را به ماشین مقصد ببرید
+#   docker load -i dbspulse-images.tar       # روی ماشین مقصد
+#   docker compose -f docker-compose.prod.yml up -d
+#
+# راهنمای کامل: deploy/PRODUCTION.md
+
+x-backend-env: &backend-env
+  DATABASE_URL: postgresql+psycopg://dbspulse:${POSTGRES_PASSWORD}@db:5432/dbspulse
+  ENVIRONMENT: ${ENVIRONMENT}
+  JWT_SECRET_KEY: ${JWT_SECRET_KEY}
+  CORS_ORIGINS: ${CORS_ORIGINS}
+  PUBLIC_BASE_URL: ${PUBLIC_BASE_URL}
+  FORWARDED_ALLOW_IPS: ${FORWARDED_ALLOW_IPS}
+  RATE_LIMIT_STORAGE_URI: ${RATE_LIMIT_STORAGE_URI:-}
+  ENABLE_SCHEDULER: ${ENABLE_SCHEDULER:-true}
+  METRICS_TOKEN: ${METRICS_TOKEN:-}
+  # این‌جا هیچ پیش‌فرضی ندارد و باید false بماند. کاربران نمونه رمز مشترکِ
+  # منتشرشده دارند؛ روشن‌بودنش در production باعث خطای صریح استارت‌آپ می‌شود.
+  SEED_DEMO_DATA: "false"
+  # نام کاربری و رمزِ نخستین حساب مدیر. اگر خالی بماند، رمز تصادفی ساخته و
+  # یک‌بار در لاگِ استارت‌آپ نوشته می‌شود (`docker compose logs backend`).
+  DBSPULSE_ADMIN_USERNAME: ${DBSPULSE_ADMIN_USERNAME:-admin}
+  DBSPULSE_ADMIN_PASSWORD: ${DBSPULSE_ADMIN_PASSWORD:-}
+  # تنظیمات ایمیل و پیامک: مقدارهای غیرِراز از پنل مدیریت عوض می‌شوند، ولی
+  # رمز و کلید API عمداً فقط از همین‌جا خوانده می‌شوند تا در بک‌آپ دیتابیس نیفتند.
+  SMTP_USERNAME: ${SMTP_USERNAME:-}
+  SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+  SMS_API_KEY: ${SMS_API_KEY:-}
+
+services:
+  db:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: dbspulse
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: dbspulse
+    # هیچ پورتی منتشر نمی‌شود: دیتابیس فقط از شبکهٔ داخلی docker دیده می‌شود.
+    # برای بک‌آپ از `docker compose exec db pg_dump` استفاده کنید.
+    volumes:
+      - dbspulse_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U dbspulse -d dbspulse"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  migrate:
+    image: dbspulse-backend
+    command: alembic upgrade head
+    restart: "no"
+    environment: *backend-env
+    depends_on:
+      db:
+        condition: service_healthy
+
+  backend:
+    image: dbspulse-backend
+    restart: unless-stopped
+    environment: *backend-env
+    depends_on:
+      db:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    # بدون `ports`: بک‌اند فقط از طریق کانتینر frontend (پروکسی /api) در دسترس
+    # است و مستقیماً در معرض شبکهٔ سازمان نیست.
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/health/ready', timeout=3)"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  frontend:
+    image: dbspulse-frontend
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      - "${HTTP_PORT:-8080}:80"
+
+volumes:
+  dbspulse_pgdata:

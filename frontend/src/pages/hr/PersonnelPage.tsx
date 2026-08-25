@@ -11,6 +11,7 @@ import {
 import { EmployeeProfileModal } from "../../components/EmployeeProfileModal";
 import { ExcelExportButton } from "../../components/ExcelExportButton";
 import { PersonnelImportDialog } from "../../components/PersonnelImportDialog";
+import { SelfAssessmentInviteButton } from "../../components/SelfAssessmentInviteButton";
 import { PaginationControls } from "../../components/PaginationControls";
 import { useToast } from "../../components/Toast";
 import { generatePassword } from "../../utils/password";
@@ -657,7 +658,7 @@ export function PersonnelPage() {
           {data && (
             <Table
               bordered={false}
-              headers={["نام", "عنوان شغلی", "واحد", "وضعیت", ""]}
+              headers={["نام", "عنوان شغلی", "واحد", "وضعیت", "خودارزیابی", ""]}
               rowKeys={data.items.map((p) => p.id)}
               rows={data.items.map((p) => [
                 <button
@@ -703,6 +704,7 @@ export function PersonnelPage() {
                       : "غیرفعال"}
                   </span>
                 ),
+                <SelfAssessmentInviteButton key="self" personnel={p} />,
                 <div key="actions" className="flex items-center gap-3">
                   <button
                     onClick={() => setEditingPersonnel(p)}

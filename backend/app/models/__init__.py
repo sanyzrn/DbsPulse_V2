@@ -13,6 +13,7 @@ from app.models.login_attempt import LoginAttempt
 from app.models.module import ModuleSetting
 from app.models.notification import Notification
 from app.models.notification_delivery import NotificationDelivery
+from app.models.org_unit import OrgUnit
 from app.models.personnel import Personnel
 from app.models.scheduler_run import SchedulerRun
 from app.models.scoring_scheme import ScoringScheme
@@ -38,6 +39,7 @@ __all__ = [
     "LoginAttempt",
     "Notification",
     "NotificationDelivery",
+    "OrgUnit",
     "Personnel",
     "SchedulerRun",
     "ScoringScheme",

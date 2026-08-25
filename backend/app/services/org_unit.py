@@ -77,3 +77,16 @@ def join_site(site: str | None, unit: str) -> str:
     unit = unit.strip()
     site = (site or "").strip()
     return f"{site}{CANONICAL_SEPARATOR}{unit}" if site and unit else unit
+
+
+def units_in_site(all_units: list[str], site: str) -> list[str]:
+    """واحدهایی که زیر یک محل‌اند.
+
+    تطبیق در پایتون و با همان `site_of`ی که همه‌جا استفاده می‌شود، نه با یک الگوی
+    LIKE. الگوی LIKE یعنی قرارداد جداکننده دو بار نوشته شود، و همان‌جا بود که
+    اولین بار شکست: مقدارِ واقعی «کارخانه / فروش» فاصله دارد و الگوی «کارخانه/%»
+    هیچ‌چیز نگرفت. تعداد واحدهای متمایز ده‌ها است، پس خواندنشان ارزان‌تر از
+    نگه‌داشتن دو نسخه از یک قانون است.
+    """
+    wanted = site.strip()
+    return [unit for unit in all_units if site_of(unit) == wanted]

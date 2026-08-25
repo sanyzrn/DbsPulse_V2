@@ -27,7 +27,7 @@ from app.schemas.personnel import (
 )
 from app.services.audit import log_event
 from app.services.excel import build_personnel_workbook
-from app.services.org_unit import site_of
+from app.services.org_unit import known_sites, site_of
 from app.services.personnel_import import ImportPreview, build_template, parse_workbook
 from app.services.security_tokens import generate_temp_password
 from app.services.sessions import revoke_all_for_user
@@ -207,6 +207,21 @@ def list_org_units(
     return list(
         db.scalars(select(Personnel.org_unit).distinct().order_by(Personnel.org_unit))
     )
+
+
+@router.get("/sites", response_model=list[str])
+def list_sites(
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(require_role_or_capability(UserRole.hr, Capability.manage_personnel)),
+) -> list[str]:
+    """محل‌ها برای فیلترها و فرم ثبت پرسنل.
+
+    تا امروز فرانت‌اند این فهرست را خودش از روی `org_unit`ها می‌ساخت — یعنی محلی
+    که هنوز کسی در آن ثبت نشده بود، اصلاً وجود نداشت. حالا از یک منبع می‌آید و
+    سه محلِ رسمی همیشه در آن هستند.
+    """
+    org_units = list(db.scalars(select(Personnel.org_unit).distinct()))
+    return known_sites(org_units)
 
 
 @router.get("/export.xlsx")

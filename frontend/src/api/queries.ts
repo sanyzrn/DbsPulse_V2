@@ -87,6 +87,20 @@ export function useEvaluations(params: EvaluationListParams) {
 }
 
 /** واحدهای سازمانی متمایز (فقط HR) — گزینه‌های فیلتر «واحد». */
+/** محل‌ها — سه محلِ رسمیِ سازمان، به‌علاوهٔ هرچه در داده هست.
+ *
+ *  از سرور می‌آید و نه از روی `org_unit`ها ساخته می‌شود: محلی که هنوز کسی در آن
+ *  ثبت نشده باید در فهرست باشد، وگرنه ثبتِ اولین نفرش ممکن نیست.
+ */
+export function useSites(enabled: boolean) {
+  return useQuery({
+    queryKey: ["personnel", "sites"],
+    queryFn: async () => (await apiClient.get<string[]>("/personnel/sites")).data,
+    enabled,
+    staleTime: 300_000,
+  });
+}
+
 export function useOrgUnits(enabled: boolean) {
   return useQuery({
     queryKey: ["personnel", "org-units"],

@@ -35,8 +35,10 @@ def _sheet(rows: list[list], header: list[str] | None = None) -> bytes:
     return buffer.getvalue()
 
 
-def _row(code="P-9001", name="کارمند وارداتی", username=""):
-    return [code, name, "کارشناس", "واحد تست", "خیر", "فعال", "۱۴۰۵/۰۱/۰۱", "۱۴۰۶/۰۱/۰۱", username]
+def _row(code="P-9001", name="کارمند وارداتی", username="", site=""):
+    # ترتیب = ترتیبِ COLUMNS. «محل» ستون تازه‌ای است بین «عنوان شغلی» و «واحد
+    # سازمانی» و اختیاری است، پس این‌جا خالی می‌ماند مگر تست خودش پرش کند.
+    return [code, name, "کارشناس", site, "واحد تست", "خیر", "فعال", "۱۴۰۵/۰۱/۰۱", "۱۴۰۶/۰۱/۰۱", username]
 
 
 def _upload(client, hr, path, content, filename="import.xlsx"):
@@ -137,7 +139,7 @@ def test_contract_end_before_start_is_rejected(client, db_session):
     hr = make_user(db_session, "hr")
     db_session.commit()
     row = _row()
-    row[6], row[7] = "۱۴۰۶/۰۱/۰۱", "۱۴۰۵/۰۱/۰۱"
+    row[7], row[8] = "۱۴۰۶/۰۱/۰۱", "۱۴۰۵/۰۱/۰۱"
 
     body = _upload(client, hr, "/api/personnel/import/preview", _sheet([row])).json()
 
@@ -181,7 +183,7 @@ def test_blank_trailing_rows_are_ignored(client, db_session):
     db_session.commit()
 
     body = _upload(
-        client, hr, "/api/personnel/import/preview", _sheet([_row(), [None] * 9, ["", "", ""]])
+        client, hr, "/api/personnel/import/preview", _sheet([_row(), [None] * 10, ["", "", ""]])
     ).json()
 
     assert body["total_rows"] == 1

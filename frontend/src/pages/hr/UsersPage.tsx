@@ -184,8 +184,9 @@ export function UsersPage() {
             </label>
           )}
           <div className="flex flex-col gap-1 text-xs font-medium text-gray-600 sm:w-72">
-            <span>رمز عبور</span>
+            <label htmlFor="new-user-password">رمز عبور</label>
             <PasswordField
+              id="new-user-password"
               value={form.password}
               onChange={(password) => setForm({ ...form, password })}
               required
@@ -488,8 +489,12 @@ function EditUserModal({
 
         <div className="border-t border-gray-100 pt-4">
           <div className="flex flex-col gap-1.5 text-sm font-medium text-gray-700">
-            <span>تعیین رمز جدید (اختیاری)</span>
+            {/* label/htmlFor و نه پیچیدنِ ورودی: `PasswordField` کنارِ ورودی
+                دکمه هم دارد، و label که دکمه را در بر بگیرد، کلیکِ روی برچسب را
+                به دکمه می‌فرستد. */}
+            <label htmlFor="edit-user-password">تعیین رمز جدید (اختیاری)</label>
             <PasswordField
+              id="edit-user-password"
               value={newPassword}
               onChange={setNewPassword}
               placeholder="خالی بگذارید تا رمز فعلی تغییر نکند"

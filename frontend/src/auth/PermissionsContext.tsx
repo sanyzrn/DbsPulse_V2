@@ -16,6 +16,7 @@ import { useAuth } from "./AuthContext";
 
 export type Capability =
   | "manage_users"
+  | "manage_personnel"
   | "manage_capabilities"
   | "manage_scoring"
   | "manage_integrations"

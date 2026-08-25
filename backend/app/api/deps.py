@@ -137,6 +137,34 @@ def require_capability(*required: Capability):
     return dependency
 
 
+def require_role_or_capability(role: UserRole, capability: Capability):
+    """یا در آن نقش هستی، یا مجوزش را داری.
+
+    برای کارهایی که هم بخشی از کارِ روزمرهٔ یک نقش‌اند و هم بخشی از راه‌اندازیِ
+    سامانه. نمونهٔ روشنش پرسنل است: ثبتِ پرسنل کارِ هر روزِ منابع انسانی است، ولی
+    مدیر سامانه هم باید بتواند انجامش بدهد — وگرنه حسابِ معاونت و مدیرعامل را
+    می‌سازد و هیچ پرسنلی برای وصل‌کردن به آن‌ها ندارد.
+
+    گاردِ نقشِ تنها این را نمی‌داد و گاردِ مجوزِ تنها یعنی باید به همهٔ کاربران
+    منابع انسانی یک مجوز تازه بدهیم تا کارِ امروزشان نشکند.
+    """
+
+    def dependency(
+        current_user: CurrentUser = Depends(get_current_user),
+        db: Session = Depends(get_db),
+    ) -> CurrentUser:
+        if current_user.role is role:
+            return current_user
+        if capability in capabilities_of(db, current_user.id):
+            return current_user
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="برای این کار مجوز لازم را ندارید؛ از مدیر سامانه بخواهید آن را به شما بدهد",
+        )
+
+    return dependency
+
+
 def require_module(key: str):
     """گاردِ ماژول خاموش‌شده.
 

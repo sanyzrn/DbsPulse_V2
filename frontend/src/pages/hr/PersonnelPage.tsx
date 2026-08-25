@@ -5,6 +5,7 @@ import {
   useDebouncedValue,
   useOrgUnits,
   usePersonnelList,
+  useSites,
   useUsersList,
 } from "../../api/queries";
 import { EmployeeProfileModal } from "../../components/EmployeeProfileModal";
@@ -250,15 +251,70 @@ function accessPayload(access: AccessDraft, isManager: boolean) {
  *  نیمه‌کاره‌ها («/ فروش» یا «کارخانه /») عمداً محل حساب نمی‌شوند: یک محلِ
  *  خالی در فهرست فیلتر، گزینه‌ای است که هیچ‌چیز را فیلتر نمی‌کند.
  */
-function siteOf(orgUnit: string): string | null {
+function splitSite(orgUnit: string): [string, string] {
   for (const separator of ["/", "—", " - "]) {
     const at = orgUnit.indexOf(separator);
     if (at === -1) continue;
     const site = orgUnit.slice(0, at).trim();
     const unit = orgUnit.slice(at + separator.length).trim();
-    if (site && unit) return site;
+    if (site && unit) return [site, unit];
   }
-  return null;
+  return ["", orgUnit.trim()];
+}
+
+/** قرینهٔ `join_site`. جداکنندهٔ خروجی همیشه « / » است. */
+function joinSite(site: string, unit: string): string {
+  const s = site.trim();
+  const u = unit.trim();
+  return s && u ? `${s} / ${u}` : u;
+}
+
+/** انتخاب محل + نوشتن واحد، که با هم یک `org_unit` می‌سازند.
+ *
+ *  تا امروز یک ورودیِ آزاد بود و کاربر باید قرارداد جداکننده را می‌دانست. هر کس
+ *  که نمی‌دانست، پرسنلی ثبت می‌کرد که در هیچ گزارشِ محلی دیده نمی‌شد — بی‌آنکه
+ *  خطایی بگیرد. حالا محل از یک فهرست بسته می‌آید و واحد آزاد می‌ماند.
+ */
+function OrgUnitFields({
+  value,
+  onChange,
+  sites,
+  inputClass,
+}: {
+  value: string;
+  onChange: (orgUnit: string) => void;
+  sites: string[];
+  inputClass: string;
+}) {
+  const [site, unit] = splitSite(value);
+  return (
+    <>
+      <label className="flex flex-col gap-1 text-xs font-medium text-gray-600">
+        محل
+        <select
+          className={inputClass}
+          value={site}
+          onChange={(e) => onChange(joinSite(e.target.value, unit))}
+        >
+          <option value="">— بدون تفکیک —</option>
+          {sites.map((option) => (
+            <option key={option} value={option}>
+              {option}
+            </option>
+          ))}
+        </select>
+      </label>
+      <label className="flex flex-col gap-1 text-xs font-medium text-gray-600">
+        واحد سازمانی
+        <input
+          required
+          className={inputClass}
+          value={unit}
+          onChange={(e) => onChange(joinSite(site, e.target.value))}
+        />
+      </label>
+    </>
+  );
 }
 
 export function PersonnelPage() {
@@ -304,7 +360,9 @@ export function PersonnelPage() {
   // سمت سرور در services/org_unit.py تعریف شده. اگر هیچ واحدی جداکننده نداشته
   // باشد فهرست خالی می‌ماند و فیلتر اصلاً نشان داده نمی‌شود، چون سازمان
   // تک‌محلی نباید فیلتری ببیند که همیشه یک گزینه دارد.
-  const sites = [...new Set(orgUnits.map(siteOf).filter((s): s is string => s !== null))].sort();
+  // فهرست از سرور می‌آید (سه محلِ رسمی + هرچه در داده هست). ساختنش از روی
+  // `orgUnits` یعنی محلی که هنوز کسی در آن ثبت نشده، در فیلتر وجود ندارد.
+  const { data: sites = [] } = useSites(true);
 
   function resetFilters() {
     setSearch("");
@@ -428,15 +486,12 @@ export function PersonnelPage() {
                   onChange={(e) => setForm({ ...form, job_title: e.target.value })}
                 />
               </label>
-              <label className="flex flex-col gap-1 text-xs font-medium text-gray-600">
-                واحد سازمانی
-                <input
-                  required
-                  className={inputClass}
-                  value={form.org_unit}
-                  onChange={(e) => setForm({ ...form, org_unit: e.target.value })}
-                />
-              </label>
+              <OrgUnitFields
+                value={form.org_unit}
+                onChange={(org_unit) => setForm({ ...form, org_unit })}
+                sites={sites}
+                inputClass={inputClass}
+              />
               <label className="flex flex-col gap-1 text-xs font-medium text-gray-600">
                 تاریخ شروع قرارداد
                 <JalaliDatePicker
@@ -529,7 +584,7 @@ export function PersonnelPage() {
 
           {/* فیلترهای ترکیب‌پذیر فهرست پرسنل */}
           <div className="mb-4 flex flex-wrap items-center gap-2">
-            {sites.length > 1 && (
+            {sites.length > 0 && (
               <FilterSelect
                 aria-label="فیلتر محل"
                 value={siteFilter}
@@ -707,6 +762,7 @@ function EditPersonnelModal({
   users: AppUser[];
   onClose: () => void;
 }) {
+  const { data: sites = [] } = useSites(true);
   const { showSuccess, showError } = useToast();
   const queryClient = useQueryClient();
   const [form, setForm] = useState({
@@ -836,15 +892,12 @@ function EditPersonnelModal({
             onChange={(e) => setForm({ ...form, job_title: e.target.value })}
           />
         </label>
-        <label className="flex flex-col gap-1 text-xs font-medium text-gray-600">
-          واحد سازمانی
-          <input
-            required
-            className={inputClass}
-            value={form.org_unit}
-            onChange={(e) => setForm({ ...form, org_unit: e.target.value })}
-          />
-        </label>
+        <OrgUnitFields
+          value={form.org_unit}
+          onChange={(org_unit) => setForm({ ...form, org_unit })}
+          sites={sites}
+          inputClass={inputClass}
+        />
         <label className="flex flex-col gap-1 text-xs font-medium text-gray-600">
           تاریخ شروع قرارداد
           <JalaliDatePicker

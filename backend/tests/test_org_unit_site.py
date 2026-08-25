@@ -35,9 +35,39 @@ def test_a_half_written_value_is_left_alone():
     assert split_site("کارخانه /") == (None, "کارخانه /")
 
 
-def test_sites_are_listed_once_and_sorted():
+def test_the_three_known_sites_are_always_offered():
+    """فهرست محل‌ها دیگر *استخراج‌شده* نیست.
+
+    وقتی از روی داده ساخته می‌شد، محلی که هنوز هیچ‌کس در آن ثبت نشده بود در هیچ
+    فیلتری وجود نداشت — یعنی برای ثبتِ اولین نفر در «مدرپ‌ها» باید اول کسی در
+    «مدرپ‌ها» می‌بود.
+    """
     units = ["کارخانه / فروش", "کارخانه / انبار", "دفتر مرکزی / مالی", "منابع انسانی"]
-    assert known_sites(units) == ["دفتر مرکزی", "کارخانه"]
+    assert known_sites(units) == ["دفتر مرکزی", "کارخانه", "مدرپ‌ها"]
+
+
+def test_a_site_that_only_exists_in_the_data_is_not_hidden():
+    """فهرست *شامل* واقعیت است، نه محدود به سه نام رسمی.
+
+    اگر محدود می‌شد، دادهٔ قدیمی با املای دیگر از فیلترها ناپدید می‌شد و کسی
+    نمی‌فهمید چرا چند نفر در هیچ گزارشی نیستند.
+    """
+    assert known_sites(["انبار مرکزی / تدارکات"]) == [
+        "دفتر مرکزی",
+        "کارخانه",
+        "مدرپ‌ها",
+        "انبار مرکزی",
+    ]
+
+
+def test_joining_a_site_and_unit_is_the_reverse_of_splitting():
+    from app.services.org_unit import join_site
+
+    assert join_site("کارخانه", "فروش") == "کارخانه / فروش"
+    assert split_site(join_site("کارخانه", "فروش")) == ("کارخانه", "فروش")
+    # بدون محل، فقط واحد — سازمانی که یک محل بیشتر ندارد نباید جداکننده ببیند.
+    assert join_site(None, "فروش") == "فروش"
+    assert join_site("", "فروش") == "فروش"
 
 
 def test_filtering_personnel_by_site(client, db_session):

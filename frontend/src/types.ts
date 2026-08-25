@@ -266,6 +266,11 @@ export interface UnitStat {
   // null = سرکوب‌شده: جمعیت این واحد کمتر از آستانهٔ کوهورت است (P1-08)
   avg_final_pct: number | null;
   count: number;
+  /** تفکیک همان میانگین به دو بخشِ فرم — واحدی که کلش خوب است ممکن است در یکی
+   *  از دو بخش ضعیف باشد و عددِ کل آن را پنهان کند. */
+  avg_general_pct: number | null;
+  avg_specialized_pct: number | null;
+  site: string | null;
 }
 
 export interface EvaluatorStat {
@@ -280,6 +285,8 @@ export interface EvaluatorStat {
 export interface IndicatorStat {
   indicator_id: number;
   category: string;
+  /** شرح خودِ شاخص — چند شاخص می‌توانند یک «دسته» داشته باشند. */
+  description: string;
   avg_score: number | null;
 }
 
@@ -287,14 +294,30 @@ export interface PersonStat {
   personnel_id: number;
   full_name: string;
   final_weighted_pct: number;
+  org_unit: string;
+  site: string | null;
+}
+
+/** چند درصد افراد کجای طیف‌اند. مرزها از خودِ «طرح نمره‌دهی» می‌آیند، نه از
+ *  عددی که در رابط نوشته شده باشد. */
+export interface OutcomeMix {
+  strong_pct: number | null;
+  needs_improvement_pct: number | null;
+  strong_threshold_pct: number;
+  improvement_threshold_pct: number;
+  people_counted: number;
 }
 
 export interface DashboardOverview {
   total_evaluations: number;
   avg_final_pct: number | null;
+  outcome_mix: OutcomeMix;
   by_org_unit: UnitStat[];
   by_evaluator: EvaluatorStat[];
   lowest_by_indicator: IndicatorStat[];
+  highest_by_indicator: IndicatorStat[];
+  lowest_by_specialized_indicator: IndicatorStat[];
+  highest_by_specialized_indicator: IndicatorStat[];
   lowest_by_unit: UnitStat[];
   lowest_by_person: PersonStat[];
 }
@@ -514,6 +537,32 @@ export interface ExpiringContract {
   has_open_evaluation: boolean;
 }
 
+/** آمار یک شخص در یک مرحله. */
+export interface StageOwnerStat {
+  name: string;
+  total: number;
+  active: number;
+  closed: number;
+  avg_dwell_days: number | null;
+  longest_active_days: number | null;
+}
+
+/** وضعیت یک مرحله از گردش‌کار. */
+export interface StageStat {
+  status: EvaluationStatus;
+  /** «الان روی میزِ چه کسی است» — نه اینکه چه کسی کارش را کرده. */
+  holder: string;
+  total: number;
+  active: number;
+  closed: number;
+  /** چند بار ورود به این مرحله رخ داده؛ بیشتر بودنش از total یعنی برگشت. */
+  passes: number;
+  share_pct: number;
+  avg_dwell_days: number | null;
+  longest_active_days: number | null;
+  by_owner: StageOwnerStat[];
+}
+
 export interface PipelineStat {
   status: EvaluationStatus;
   count: number;
@@ -546,6 +595,8 @@ export interface RoleOverviewCard {
   value: number;
   tone: RoleOverviewTone;
   hint: string | null;
+  /** واحدی که بعد از عدد می‌آید («٪») — تا کاشیِ درصد از کاشیِ تعداد جدا باشد. */
+  suffix: string | null;
 }
 
 export interface RoleOverview {

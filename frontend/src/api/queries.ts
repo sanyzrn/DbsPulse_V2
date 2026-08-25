@@ -25,6 +25,7 @@ import {
   type PeriodProgress,
   type Personnel,
   type PipelineStat,
+  type StageStat,
   type RadarPoint,
   type RoleOverview,
   type TrendPoint,
@@ -87,6 +88,20 @@ export function useEvaluations(params: EvaluationListParams) {
 }
 
 /** واحدهای سازمانی متمایز (فقط HR) — گزینه‌های فیلتر «واحد». */
+/** محل‌ها — سه محلِ رسمیِ سازمان، به‌علاوهٔ هرچه در داده هست.
+ *
+ *  از سرور می‌آید و نه از روی `org_unit`ها ساخته می‌شود: محلی که هنوز کسی در آن
+ *  ثبت نشده باید در فهرست باشد، وگرنه ثبتِ اولین نفرش ممکن نیست.
+ */
+export function useSites(enabled: boolean) {
+  return useQuery({
+    queryKey: ["personnel", "sites"],
+    queryFn: async () => (await apiClient.get<string[]>("/personnel/sites")).data,
+    enabled,
+    staleTime: 300_000,
+  });
+}
+
 export function useOrgUnits(enabled: boolean) {
   return useQuery({
     queryKey: ["personnel", "org-units"],
@@ -397,6 +412,14 @@ export function useEmployeeVsUnit(
       ).data,
     enabled: personnelId !== null,
     placeholderData: keepPreviousData,
+  });
+}
+
+/** وضعیت پرونده‌ها در هر مرحله — با زمان توقف و تفکیک به‌ازای هر مسئول. */
+export function useStageStats() {
+  return useQuery({
+    queryKey: ["dashboard", "stage-stats"],
+    queryFn: async () => (await apiClient.get<StageStat[]>("/dashboard/stage-stats")).data,
   });
 }
 

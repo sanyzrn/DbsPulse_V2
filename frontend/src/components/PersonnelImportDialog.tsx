@@ -183,7 +183,8 @@ export function PersonnelImportDialog({
           <>
             <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-gray-100 bg-gray-50 px-4 py-3">
               <p className="text-xs text-gray-600">
-                ستون‌های فایل باید دقیقاً مثل خروجی Excel پرسنل باشد. ستون «نام کاربری»
+                ستون‌های فایل باید دقیقاً مثل خروجی Excel پرسنل باشد. ستون «محل» یکی از
+                «دفتر مرکزی»، «کارخانه» یا «مدرپ‌ها» را می‌گیرد و خالی‌گذاشتنش هم درست است. ستون «نام کاربری»
                 اختیاری است؛ هر ردیفی که پرش شود، حساب کاربری هم برایش ساخته می‌شود.
               </p>
               <button

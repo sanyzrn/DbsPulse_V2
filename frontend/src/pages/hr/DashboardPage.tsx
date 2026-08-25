@@ -3,19 +3,23 @@ import { motion } from "motion/react";
 import { useSearchParams } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { apiClient, extractErrorMessage } from "../../api/client";
-import { useDashboardOverview, useExpiringContracts, usePipeline } from "../../api/queries";
+import { useDashboardOverview, useExpiringContracts, useSites } from "../../api/queries";
 import { RoleOverviewCards } from "../../components/RoleOverviewCards";
-import { StatusBadge } from "../../components/StatusBadge";
+import { StageStatusCard } from "../../components/StageStatusCard";
 import { useToast } from "../../components/Toast";
 import { PersonScorecard } from "./PersonScorecard";
 import { ReportsSection } from "./ReportsSection";
-import { PageHeader } from "../../ui/Card";
-import { CountUp, PctBadge, ScoreRing, SuppressedValue } from "../../ui/Meters";
-import { EASE_SOFT, TAB_TRANSITION } from "../../ui/motion";
-import { DotPlot } from "../../ui/plot";
+import { FilterSelect, PageHeader } from "../../ui/Card";
+import { PctBadge, ScoreRing, SuppressedValue } from "../../ui/Meters";
+import { TAB_TRANSITION } from "../../ui/motion";
 import { Table } from "../../ui/Table";
 import { formatDate } from "../../utils/dates";
-import type { EvaluationStatus } from "../../types";
+import type {
+  DashboardOverview as DashboardOverviewData,
+  UnitStat as UnitStatData,
+  IndicatorStat as IndicatorStatData,
+  PersonStat as PersonStatData,
+} from "../../types";
 
 /* ═══════════════════════════════════════════════════════════════════════
    نمودارهای این صفحه تک‌سری‌اند (بزرگی/magnitude) — یک هیو واحد به‌جای گرادیانت
@@ -140,7 +144,7 @@ export function DashboardPage() {
         <ScoreRing value={overview.avg_final_pct} size={72} />
       </motion.div>
 
-      <PipelineCard />
+      <StageStatusCard />
 
       <ExpiringContractsCard />
       </motion.div>
@@ -170,10 +174,25 @@ export function DashboardPage() {
 
       {analysisTab === "org" && (
       <div className="space-y-5">
+      {/* ── سه عددی که «سازمان چطور است» را در یک نگاه می‌گویند ── */}
+      <OrgSummaryCard overview={overview} />
+
       {/* ── نمودار میله‌ای میانگین به تفکیک واحد ── */}
       <BarByOrgUnitCard data={overview.by_org_unit} />
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+        <IndicatorRankCard
+          title="تحلیل شایستگی‌ها"
+          subtitle="شاخص‌های عمومی (رفتاری)"
+          weakest={overview.lowest_by_indicator}
+          strongest={overview.highest_by_indicator}
+        />
+        <IndicatorRankCard
+          title="ارزیابی تخصصی"
+          subtitle="شاخص‌های تخصصی هر شغل"
+          weakest={overview.lowest_by_specialized_indicator}
+          strongest={overview.highest_by_specialized_indicator}
+        />
         <Table
           title="نمرات هر ارزیاب (مسئول واحد)"
           headers={["ارزیاب", "میانگین", "زیرمجموعه", "ارزیابی"]}
@@ -194,16 +213,6 @@ export function DashboardPage() {
           emptyMessage="داده‌ای موجود نیست."
         />
         <Table
-          title="کمترین میانگین به تفکیک شاخص"
-          headers={["شاخص", "میانگین امتیاز (از ۵)"]}
-          rows={overview.lowest_by_indicator.map((i) => [
-            i.category,
-            <ScoreOutOfFive key="score" value={i.avg_score} />,
-          ])}
-          animateRows={false}
-          emptyMessage="داده‌ای موجود نیست."
-        />
-        <Table
           title="کمترین میانگین به تفکیک واحد"
           headers={["واحد", "میانگین"]}
           rows={overview.lowest_by_unit.map((u) => [
@@ -213,17 +222,9 @@ export function DashboardPage() {
           animateRows={false}
           emptyMessage="داده‌ای موجود نیست."
         />
-        <Table
-          title="کمترین امتیاز به تفکیک فرد"
-          headers={["فرد", "امتیاز نهایی"]}
-          rows={overview.lowest_by_person.map((p) => [
-            p.full_name,
-            <PctBadge key="pct" value={p.final_weighted_pct} />,
-          ])}
-          animateRows={false}
-          emptyMessage="داده‌ای موجود نیست."
-        />
       </div>
+
+      <PeopleNeedingAttentionCard people={overview.lowest_by_person} />
       </div>
       )}
 
@@ -239,6 +240,195 @@ export function DashboardPage() {
   );
 }
 
+
+/** سه عددی که «سازمان چطور است» را در یک نگاه می‌گویند.
+ *
+ *  میانگین به‌تنهایی توزیع را پنهان می‌کند: سازمانی که نصفش عالی و نصفش ضعیف
+ *  است، همان میانگینِ سازمانی را دارد که همه‌اش متوسط‌اند — و آن دو وضعیت هیچ
+ *  ربطی به هم ندارند. دو درصدِ کناری همان توزیع را برمی‌گردانند.
+ *
+ *  مرزها از خودِ «طرح نمره‌دهی» می‌آیند و کنار عدد نوشته می‌شوند، وگرنه «مطلوب»
+ *  کلمه‌ای است که هرکس معنای خودش را از آن می‌فهمد.
+ */
+function OrgSummaryCard({ overview }: { overview: DashboardOverviewData }) {
+  const mix = overview.outcome_mix;
+  return (
+    <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+      <div className="flex items-center justify-between gap-4 rounded-2xl border border-gray-200 bg-white p-5">
+        <div>
+          <p className="text-sm font-medium text-gray-500">میانگین امتیاز کل سازمان</p>
+          <p className="mt-1 text-xs text-gray-400">
+            بر پایهٔ {overview.total_evaluations.toLocaleString("fa-IR")} ارزیابی نهایی‌شده
+          </p>
+        </div>
+        <ScoreRing value={overview.avg_final_pct} size={64} />
+      </div>
+
+      <SharePanel
+        label="افراد با عملکرد مطلوب"
+        value={mix.strong_pct}
+        hint={`امتیاز ${mix.strong_threshold_pct.toLocaleString("fa-IR")}٪ و بالاتر`}
+        people={mix.people_counted}
+        bar="bg-green-500"
+        text="text-green-700"
+      />
+      <SharePanel
+        label="افراد نیازمند بهبود"
+        value={mix.needs_improvement_pct}
+        hint={`امتیاز ${mix.improvement_threshold_pct.toLocaleString("fa-IR")}٪ و پایین‌تر — واجد برنامهٔ بهبود`}
+        people={mix.people_counted}
+        bar="bg-amber-500"
+        text="text-amber-700"
+      />
+    </div>
+  );
+}
+
+function SharePanel({
+  label,
+  value,
+  hint,
+  people,
+  bar,
+  text,
+}: {
+  label: string;
+  value: number | null;
+  hint: string;
+  people: number;
+  bar: string;
+  text: string;
+}) {
+  return (
+    <div className="rounded-2xl border border-gray-200 bg-white p-5">
+      <p className="text-sm font-medium text-gray-500">{label}</p>
+      <p className={`mt-1 text-3xl font-extrabold tabular-nums ${text}`}>
+        {value === null ? "—" : `${value.toLocaleString("fa-IR", { maximumFractionDigits: 1 })}٪`}
+      </p>
+      <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-gray-100">
+        <div className={`h-full rounded-full ${bar}`} style={{ width: `${value ?? 0}%` }} />
+      </div>
+      <p className="mt-2 text-[11px] text-gray-400">{hint}</p>
+      <p className="text-[11px] text-gray-400">
+        از {people.toLocaleString("fa-IR")} نفرِ دارای ارزیابی نهایی‌شده
+      </p>
+    </div>
+  );
+}
+
+/** ضعیف‌ترین و قوی‌ترین شاخص‌ها، در دو تب.
+ *
+ *  فهرستی که فقط ضعف نشان می‌دهد هر سازمانی را بیمار جلوه می‌دهد و هیچ‌وقت
+ *  نمی‌گوید کجا باید همان کار را تکرار کرد. دو تب و نه دو جدولِ کنار هم: فضای
+ *  یکسان، و خواننده هر بار یکی را می‌خواند نه هر دو را.
+ */
+function IndicatorRankCard({
+  title,
+  subtitle,
+  weakest,
+  strongest,
+}: {
+  title: string;
+  subtitle: string;
+  weakest: IndicatorStatData[];
+  strongest: IndicatorStatData[];
+}) {
+  const [tab, setTab] = useState<"weak" | "strong">("weak");
+  const rows = tab === "weak" ? weakest : strongest;
+
+  return (
+    <div className="rounded-2xl border border-gray-200 bg-white p-5">
+      <div className="mb-3 flex flex-wrap items-start justify-between gap-2">
+        <div>
+          <h3 className="text-base font-bold text-gray-900">{title}</h3>
+          <p className="mt-0.5 text-xs text-gray-400">{subtitle}</p>
+        </div>
+        <div role="tablist" className="inline-flex gap-1 rounded-xl border border-gray-200 bg-gray-50 p-1">
+          {([
+            { key: "weak", label: "ضعیف‌ترین" },
+            { key: "strong", label: "قوی‌ترین" },
+          ] as const).map((t) => (
+            <button
+              key={t.key}
+              role="tab"
+              aria-selected={tab === t.key}
+              onClick={() => setTab(t.key)}
+              className={`rounded-lg px-3 py-1 text-xs font-medium transition-colors ${
+                tab === t.key ? "bg-white text-gray-900 shadow-sm" : "text-gray-500 hover:text-gray-800"
+              }`}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
+      </div>
+      <Table
+        bordered={false}
+        cellAlign="top"
+        headers={["شاخص", "میانگین امتیاز (از ۵)"]}
+        rows={rows.map((i) => [
+          // دسته بالا، شرح زیرش: دو شاخص می‌توانند یک دسته داشته باشند و
+          // فهرستی که فقط دسته را نشان بدهد، دو ردیفِ کاملاً یکسان می‌سازد.
+          <div key="what">
+            <p className="font-medium text-gray-900">{i.category}</p>
+            {i.description && (
+              <p className="mt-0.5 text-xs leading-relaxed text-gray-400">{i.description}</p>
+            )}
+          </div>,
+          <ScoreOutOfFive key="score" value={i.avg_score} />,
+        ])}
+        animateRows={false}
+        emptyMessage="داده‌ای موجود نیست."
+      />
+    </div>
+  );
+}
+
+/** افراد نیازمند توجه، با فیلترِ محل.
+ *
+ *  عنوانِ قبلی «کمترین امتیاز به تفکیک فرد» بود — که توصیفِ کوئری است، نه
+ *  کاری که باید انجام شود. این فهرست برای این خوانده می‌شود که کسی سراغِ این
+ *  آدم‌ها برود.
+ */
+function PeopleNeedingAttentionCard({ people }: { people: PersonStatData[] }) {
+  const { data: sites = [] } = useSites(true);
+  const [site, setSite] = useState("");
+  const visible = site ? people.filter((p) => p.site === site) : people;
+
+  return (
+    <div className="rounded-2xl border border-gray-200 bg-white p-5">
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+        <div>
+          <h3 className="text-base font-bold text-gray-900">افراد نیازمند توجه</h3>
+          <p className="mt-0.5 text-xs text-gray-400">
+            پایین‌ترین امتیازهای نهایی‌شده — کسانی که گفت‌وگو با آن‌ها بیشترین اثر را دارد
+          </p>
+        </div>
+        <FilterSelect value={site} onChange={setSite} aria-label="فیلتر محل">
+          <option value="">همهٔ محل‌ها</option>
+          {sites.map((option) => (
+            <option key={option} value={option}>
+              {option}
+            </option>
+          ))}
+        </FilterSelect>
+      </div>
+      <Table
+        bordered={false}
+        headers={["فرد", "واحد", "امتیاز نهایی"]}
+        rows={visible.slice(0, 10).map((p) => [
+          p.full_name,
+          <span key="unit" className="text-gray-500">
+            {p.org_unit}
+          </span>,
+          <PctBadge key="pct" value={p.final_weighted_pct} />,
+        ])}
+        animateRows={false}
+        emptyMessage={site ? "در این محل کسی با ارزیابی نهایی‌شده نیست." : "داده‌ای موجود نیست."}
+      />
+    </div>
+  );
+}
 
 /** نمایش امتیاز ۰ تا ۵ به‌صورت نوار کوچک تک‌رنگ + عدد. */
 function ScoreOutOfFive({ value }: { value: number | null }) {
@@ -286,34 +476,79 @@ function DashboardSkeleton() {
 
 /** جدول مدرن با هدر گرادیانت و هاور. */
 /** نمودار میله‌ای میانگین به تفکیک واحد. */
-function BarByOrgUnitCard({
-  data,
-}: {
-  data: { org_unit: string; avg_final_pct: number | null; count: number }[];
-}) {
+function BarByOrgUnitCard({ data }: { data: UnitStatData[] }) {
   if (data.length === 0) return null;
   // واحدهای سرکوب‌شده از نمودار کنار گذاشته می‌شوند: میله نمی‌تواند بگوید «پنهان»،
   // و صفر نشان‌دادنشان دروغ است. تعدادشان زیر نمودار اعلام می‌شود.
   const visible = data.filter((u) => u.avg_final_pct !== null);
   const hiddenCount = data.length - visible.length;
   if (visible.length === 0) return null;
-  const chartData = visible.map((u) => ({
-    key: u.org_unit,
-    label: u.org_unit,
-    value: u.avg_final_pct!,
-    note: `${u.count.toLocaleString("fa-IR")} ارزیابی`,
-  }));
 
   return (
     <div className="rounded-2xl border border-gray-200 bg-white p-5">
-      <h2 className="mb-1 text-base font-bold text-gray-900">میانگین امتیاز به تفکیک واحد</h2>
+      <h2 className="mb-1 text-base font-bold text-gray-900">
+        امتیاز و مقایسهٔ واحدهای سازمانی
+      </h2>
+      <p className="mb-4 text-xs text-gray-400">
+        امتیاز کل، و تفکیکش به دو بخشِ فرم. واحدی که کلش خوب است ممکن است در یکی از دو بخش
+        ضعیف باشد — و عددِ کل آن را پنهان می‌کند.
+      </p>
       {hiddenCount > 0 && (
         <p className="mb-3 text-xs text-gray-500">
           {hiddenCount.toLocaleString("fa-IR")} واحد به دلیل تعداد کم افراد نمایش داده نشده است
           (میانگینشان عملاً امتیاز فرد است).
         </p>
       )}
-      <DotPlot rows={chartData} ariaLabel="میانگین امتیاز به تفکیک واحد سازمانی" />
+
+      <ul className="space-y-3">
+        {visible.map((unit) => (
+          <li key={unit.org_unit} className="border-b border-gray-100 pb-3 last:border-0 last:pb-0">
+            <div className="mb-1.5 flex flex-wrap items-baseline justify-between gap-2">
+              <p className="text-sm font-medium text-gray-900">{unit.org_unit}</p>
+              <p className="text-[11px] text-gray-400">
+                {unit.count.toLocaleString("fa-IR")} ارزیابی
+              </p>
+            </div>
+            <div className="space-y-1">
+              <UnitBar label="امتیاز کل" value={unit.avg_final_pct} bar="bg-charcoal-800" bold />
+              <UnitBar label="عمومی (رفتاری)" value={unit.avg_general_pct} bar="bg-blue-400" />
+              <UnitBar label="تخصصی" value={unit.avg_specialized_pct} bar="bg-indigo-400" />
+            </div>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+function UnitBar({
+  label,
+  value,
+  bar,
+  bold,
+}: {
+  label: string;
+  value: number | null;
+  bar: string;
+  bold?: boolean;
+}) {
+  return (
+    <div className="flex items-center gap-2.5">
+      <span className={`w-28 shrink-0 text-[11px] ${bold ? "font-semibold text-gray-700" : "text-gray-500"}`}>
+        {label}
+      </span>
+      <span className="h-2 min-w-0 flex-1 overflow-hidden rounded-full bg-gray-100">
+        {value !== null && (
+          <span className={`block h-full rounded-full ${bar}`} style={{ width: `${value}%` }} />
+        )}
+      </span>
+      <span
+        className={`w-12 shrink-0 text-left text-xs tabular-nums ${
+          bold ? "font-bold text-gray-900" : "text-gray-500"
+        }`}
+      >
+        {value === null ? "—" : `${value.toLocaleString("fa-IR", { maximumFractionDigits: 1 })}٪`}
+      </span>
     </div>
   );
 }
@@ -386,139 +621,46 @@ function ExpiringContractsCard() {
           </div>
         </div>
       </div>
-      {contracts.length === 0 ? (
-        <p className="py-6 text-center text-sm text-gray-400">در این بازه قراردادی رو به انقضا نیست.</p>
-      ) : (
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-gray-100">
-                <th className="px-3 py-2 text-right text-xs font-semibold text-gray-600">نام</th>
-                <th className="px-3 py-2 text-right text-xs font-semibold text-gray-600">واحد</th>
-                <th className="px-3 py-2 text-right text-xs font-semibold text-gray-600">پایان قرارداد</th>
-                <th className="px-3 py-2 text-right text-xs font-semibold text-gray-600">باقی‌مانده</th>
-                <th className="px-3 py-2 text-right text-xs font-semibold text-gray-600">وضعیت ارزیابی</th>
-              </tr>
-            </thead>
-            <tbody>
-              {contracts.map((c) => (
-                <tr key={c.personnel_id} className="border-b border-gray-50 transition-colors last:border-0 hover:bg-amber-50/30">
-                  <td className="px-3 py-2.5 text-gray-700">{c.full_name}</td>
-                  <td className="px-3 py-2.5 text-gray-500">{c.org_unit}</td>
-                  <td className="px-3 py-2.5 text-gray-500">{formatDate(c.contract_end_date)}</td>
-                  <td className={`px-3 py-2.5 ${c.days_remaining <= 15 ? "font-bold text-red-600" : "text-gray-700"}`}>
-                    {c.days_remaining < 0
-                      ? `${Math.abs(c.days_remaining).toLocaleString("fa-IR")} روز گذشته`
-                      : `${c.days_remaining.toLocaleString("fa-IR")} روز`}
-                  </td>
-                  <td className="px-3 py-2.5">
-                    {c.has_open_evaluation ? (
-                      <span className="inline-flex items-center gap-1.5 rounded-full bg-blue-50 px-2.5 py-0.5 text-xs font-medium text-blue-700">
-                        <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-blue-500" />
-                        در جریان
-                      </span>
-                    ) : (
-                      <span className="inline-flex items-center gap-1.5 rounded-full bg-red-50 px-2.5 py-0.5 text-xs font-medium text-red-700">
-                        <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-red-500" />
-                        آغاز نشده
-                      </span>
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
+      {/* همان `Table` مشترک و نه یک جدول دستی: این‌طور زیر md خودبه‌خود کارت
+          می‌شود. نسخهٔ دستی روی موبایل «۱۴ شهریور ۱۴۰۵» را به سه سطر می‌شکست. */}
+      <Table
+        bordered={false}
+        headers={["نام", "واحد", "پایان قرارداد", "باقی‌مانده", "وضعیت ارزیابی"]}
+        rowKeys={contracts.map((c) => c.personnel_id)}
+        animateRows={false}
+        emptyMessage="در این بازه قراردادی رو به انقضا نیست."
+        rows={contracts.map((c) => [
+          c.full_name,
+          <span key="unit" className="text-gray-500">
+            {c.org_unit}
+          </span>,
+          <span key="end" className="whitespace-nowrap text-gray-500">
+            {formatDate(c.contract_end_date)}
+          </span>,
+          <span
+            key="left"
+            className={`whitespace-nowrap ${
+              c.days_remaining <= 15 ? "font-bold text-red-600" : "text-gray-700"
+            }`}
+          >
+            {c.days_remaining < 0
+              ? `${Math.abs(c.days_remaining).toLocaleString("fa-IR")} روز گذشته`
+              : `${c.days_remaining.toLocaleString("fa-IR")} روز`}
+          </span>,
+          c.has_open_evaluation ? (
+            <span key="state" className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-full bg-blue-50 px-2.5 py-0.5 text-xs font-medium text-blue-700">
+              <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-blue-500" />
+              در جریان
+            </span>
+          ) : (
+            <span key="state" className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-full bg-red-50 px-2.5 py-0.5 text-xs font-medium text-red-700">
+              <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-red-500" />
+              آغاز نشده
+            </span>
+          ),
+        ])}
+      />
     </div>
   );
 }
 
-// قیف فقط مسیر پیشرفت است؛ «لغوشده» عمداً در آن نیست (بک‌اند هم برنمی‌گرداند) چون
-// پرونده‌ای که به مرحلهٔ بعد نمی‌رود، نرخ عبور قیف را مخدوش می‌کند.
-type PipelineStatus = Exclude<EvaluationStatus, "cancelled">;
-
-const PIPELINE_ORDER: PipelineStatus[] = [
-  "draft",
-  "submitted",
-  "hr_approved",
-  "deputy_approved",
-  "finalized",
-];
-
-// نوار هر مرحله. رنگ‌ها همان زنجیرهٔ StatusBadge‌اند تا کاشی و نشان یک زبان
-// داشته باشند: خاکستری ← آبی ← نیلی ← کهربایی ← سبز.
-// فقط پله‌های ۴۰۰: تم تیره پله‌های روشن‌تر (۵۰ تا ۳۰۰) را به رنگ‌های تیره
-// بازتعریف می‌کند چون آن‌ها آنجا نقشِ «مرز» و «پرکنندهٔ ملایم» دارند — نوارِ
-// `bg-amber-300` در تم تیره یک لکهٔ قهوه‌ای می‌شد کنار نوارهای روشن.
-const PIPELINE_BAR: Record<PipelineStatus, string> = {
-  draft: "bg-gray-400",
-  submitted: "bg-blue-400",
-  hr_approved: "bg-indigo-400",
-  deputy_approved: "bg-amber-400",
-  finalized: "bg-green-400",
-};
-
-/** قیف گردش‌کار.
- *
- *  پیش از این پنج کاشیِ **هم‌اندازه** بود — یعنی دقیقاً آن چیزی را پنهان می‌کرد
- *  که قرار بود نشان بدهد: کجا پرونده تلنبار شده. حالا هر مرحله یک نوارِ افقی
- *  است که طولش با تعدادش نسبت دارد و مراحل از بالا به پایین ترتیبِ واقعیِ
- *  گردش‌کار را دارند؛ چشم در یک نگاه بلندترین نوار را پیدا می‌کند.
- *
- *  نکته: این اعداد «چند پرونده همین حالا اینجا نشسته‌اند» است، نه جریانِ تجمعی.
- *  به همین دلیل زیرعنوان این را صریح می‌گوید. */
-function PipelineCard() {
-  const { data: pipeline = [] } = usePipeline();
-  const byStatus = new Map(pipeline.map((p) => [p.status, p]));
-  const maxCount = Math.max(1, ...PIPELINE_ORDER.map((st) => byStatus.get(st)?.count ?? 0));
-  const total = PIPELINE_ORDER.reduce((sum, st) => sum + (byStatus.get(st)?.count ?? 0), 0);
-
-  return (
-    <div className="rounded-2xl border border-gray-200 bg-white p-5">
-      <div className="mb-1 flex flex-wrap items-baseline justify-between gap-2">
-        <h2 className="text-base font-bold text-gray-900">قیف گردش‌کار</h2>
-        <p className="text-xs text-gray-400">
-          مجموع <span className="tabular-nums">{total.toLocaleString("fa-IR")}</span> پرونده
-        </p>
-      </div>
-      <p className="mb-4 text-xs text-gray-400">هر پرونده هم‌اکنون در کدام مرحله است</p>
-
-      <ol className="space-y-2">
-        {PIPELINE_ORDER.map((status, idx) => {
-          const stat = byStatus.get(status);
-          const count = stat?.count ?? 0;
-          // نوارِ صفر هم یک ردِ نازک می‌گیرد تا مرحله از قلم نیفتد.
-          const widthPct = count === 0 ? 0 : Math.max(6, (count / maxCount) * 100);
-          return (
-            <li key={status} className="flex items-center gap-3">
-              <div className="w-32 shrink-0 sm:w-40">
-                <StatusBadge status={status} />
-              </div>
-              <div className="h-7 min-w-0 flex-1 rounded-lg bg-gray-50">
-                <motion.div
-                  className={`h-7 rounded-lg ${PIPELINE_BAR[status]}`}
-                  initial={{ width: 0 }}
-                  animate={{ width: `${widthPct}%` }}
-                  transition={{ duration: 0.5, delay: idx * 0.06, ease: EASE_SOFT }}
-                />
-              </div>
-              {/* text-right در RTL یعنی «چسبیده به نوار»: عددها روی یک خط عمودی
-                  می‌نشینند، چه تاریخ داشته باشند چه نه. */}
-              <div className="flex w-24 shrink-0 items-baseline gap-2 text-right sm:w-36">
-                <span className="text-lg font-extrabold tabular-nums text-gray-900">
-                  <CountUp value={count} format="plain" />
-                </span>
-                {stat?.oldest_created_at && status !== "finalized" && count > 0 && (
-                  <span className="hidden text-[10px] text-gray-400 sm:inline">
-                    از {formatDate(stat.oldest_created_at)}
-                  </span>
-                )}
-              </div>
-            </li>
-          );
-        })}
-      </ol>
-    </div>
-  );
-}

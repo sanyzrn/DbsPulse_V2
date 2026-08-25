@@ -1,12 +1,17 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi.responses import Response
-from sqlalchemy import func, select
+from sqlalchemy import delete, func, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.api.deps import require_capability
 from app.core.security import hash_password
 from app.db.session import get_db
+from app.models.audit_log import AuditLog
+from app.models.auth_session import AuthSession
+from app.models.capability import UserCapability
 from app.models.enums import Capability, UserRole
+from app.models.notification import Notification
 from app.models.personnel import Personnel
 from app.models.user import User
 from app.schemas.auth import CurrentUser
@@ -202,3 +207,79 @@ def update_user(
     db.commit()
     db.refresh(user)
     return _to_read([user], _linked_names(db, [user]))[0]
+
+
+@router.delete("/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_user(
+    user_id: int,
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(require_capability(Capability.manage_users)),
+) -> Response:
+    """حذف کامل حساب — فقط برای حسابی که هیچ ردی از خود نگذاشته.
+
+    مرزِ این کار عمدی است. حسابی که یک بار وارد شده، در لاگ ممیزی ردیف دارد، و آن
+    لاگ یک زنجیرهٔ هش است: پاک‌کردن یک ردیفش یعنی از آن نقطه به بعد هیچ‌کدام از
+    ردیف‌ها دیگر قابل اثبات نیستند. همان چیزی که کل لاگ برایش وجود دارد.
+
+    پس دو کار داریم و هر دو لازم‌اند:
+
+    * **حذف** برای حسابی که اشتباه ساخته شده — نقش غلط، نام کاربری غلط، یا
+      اصلاً آدمش عوض شده. چیزی برای نگه‌داشتن ندارد و ماندنش فقط فهرست را شلوغ
+      می‌کند.
+    * **غیرفعال‌کردن** برای حسابی که کار کرده. دسترسی‌اش قطع می‌شود ولی تاریخ
+      می‌ماند: پرونده‌هایی که تأیید کرده همچنان می‌گویند چه کسی تأییدشان کرده.
+
+    اگر حذف ممکن نباشد، پیام خطا دقیقاً همین را می‌گوید و راه دوم را پیشنهاد
+    می‌دهد — نه یک «خطای داخلی سرور» که کاربر نداند با آن چه کند.
+    """
+    user = db.get(User, user_id)
+    if user is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="کاربر یافت نشد")
+    if user.id == current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="نمی‌توانید حساب کاربری خودتان را حذف کنید",
+        )
+
+    has_history = db.scalar(
+        select(func.count()).select_from(AuditLog).where(AuditLog.actor_user_id == user.id)
+    )
+    if has_history:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                "این حساب در گزارش رویدادها رد دارد و حذفش تاریخِ ثبت‌شده را از بین می‌برد. "
+                "به‌جای حذف، آن را «غیرفعال» کنید: دسترسی‌اش بسته می‌شود و سابقه‌اش می‌ماند."
+            ),
+        )
+
+    # متعلقاتِ خودِ حساب با آن می‌روند؛ این‌ها چیزی دربارهٔ *کارِ* او نمی‌گویند.
+    db.execute(delete(AuthSession).where(AuthSession.user_id == user.id))
+    db.execute(delete(Notification).where(Notification.user_id == user.id))
+    db.execute(delete(UserCapability).where(UserCapability.user_id == user.id))
+    db.execute(delete(UserCapability).where(UserCapability.granted_by_user_id == user.id))
+
+    snapshot = {"id": user.id, "username": user.username, "role": user.role.value}
+    db.delete(user)
+    try:
+        db.flush()
+    except IntegrityError:
+        # جدولی که هنوز به این حساب اشاره می‌کند و بالا ندیدیمش. دیتابیس مرجعِ
+        # این پرسش است، نه فهرستی که در کد نگه می‌داریم و از دنیا عقب می‌افتد.
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                "این حساب هنوز در پرونده‌های ارزیابی یا زنجیرهٔ ارزیابیِ کسی استفاده می‌شود. "
+                "ابتدا جای او را به فرد دیگری بسپارید، یا حساب را «غیرفعال» کنید."
+            ),
+        ) from None
+
+    log_event(
+        db,
+        actor_user_id=current_user.id,
+        event_type="user_deleted",
+        old_value=snapshot,
+    )
+    db.commit()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)

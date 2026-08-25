@@ -102,14 +102,28 @@ export function EvaluationDetailPage() {
   }, [evaluation?.id, evaluation?.bonus_points, evaluation?.bonus_reason]);
 
   async function load() {
-    await queryClient.invalidateQueries({ queryKey: ["evaluation", evaluationId] });
-    await queryClient.invalidateQueries({ queryKey: ["evaluations"] });
-    // هر اقدام گردش‌کار (تأیید/برگشت/کامنت) ممکن است اعلان جدیدی بسازد؛ زنگوله را
-    // فوراً به‌روز می‌کنیم تا کاربر منتظر poll بعدی نماند.
-    await queryClient.invalidateQueries({ queryKey: ["notifications"] });
-    // شمارنده‌های خلاصهٔ نقش/قیف/داشبورد نباید پس از یک گذار وضعیت کهنه بمانند
-    // (مثلاً «در انتظار تأیید من» باید فوراً کم شود)؛ کل فضای dashboard را باطل می‌کنیم.
-    await queryClient.invalidateQueries({ queryKey: ["dashboard"] });
+    // `refetchType: "all"` و نه پیش‌فرضِ `"active"`.
+    //
+    // پیش‌فرض فقط کوئری‌هایی را دوباره می‌گیرد که همین حالا mount شده‌اند. بقیه
+    // فقط «کهنه» علامت می‌خورند و منتظر می‌مانند تا کسی سراغشان برود. مشکل
+    // این‌جا بود: پس از ثبت، کاربر به صفحهٔ اصلی نقشش می‌رود و آن صفحه در لحظهٔ
+    // باطل‌کردن هنوز mount نشده. اگر ناوبری پیش از تمام‌شدنِ باطل‌سازی برسد،
+    // فهرست همچنان «تازه» است (staleTime سی ثانیه) و از کش سرو می‌شود — یعنی
+    // دکمهٔ «ادامه ارزیابی باز» روی پرونده‌ای می‌ماند که همین الان ثبت شد، تا
+    // وقتی کاربر صفحه را رفرش کند.
+    //
+    // این‌ها هم موازی اجرا می‌شوند نه پشت سر هم: چهار رفت‌وبرگشتِ ترتیبی همان
+    // چیزی بود که پنجرهٔ مسابقه را باز نگه می‌داشت.
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: ["evaluation", evaluationId] }),
+      queryClient.invalidateQueries({ queryKey: ["evaluations"], refetchType: "all" }),
+      // هر اقدام گردش‌کار (تأیید/برگشت/کامنت) ممکن است اعلان جدیدی بسازد؛ زنگوله را
+      // فوراً به‌روز می‌کنیم تا کاربر منتظر poll بعدی نماند.
+      queryClient.invalidateQueries({ queryKey: ["notifications"] }),
+      // شمارنده‌های خلاصهٔ نقش/قیف/داشبورد نباید پس از یک گذار وضعیت کهنه بمانند
+      // (مثلاً «در انتظار تأیید من» باید فوراً کم شود)؛ کل فضای dashboard را باطل می‌کنیم.
+      queryClient.invalidateQueries({ queryKey: ["dashboard"], refetchType: "all" }),
+    ]);
   }
 
   // «بازگشت» به کجا؟
@@ -757,7 +771,7 @@ function EditableScoring({
   setBonusPoints: (v: string) => void;
   bonusReason: string;
   setBonusReason: (v: string) => void;
-  onSubmitted: () => void;
+  onSubmitted: () => void | Promise<void>;
 }) {
   const { showSuccess, showError } = useToast();
   const confirm = useConfirm();
@@ -902,7 +916,9 @@ function EditableScoring({
       // خودش تأییدکننده هم بود.
       await apiClient.post(`/evaluations/${evaluationId}/submit`);
       showSuccess("ارزیابی با موفقیت ثبت شد");
-      onSubmitted();
+      // `await` لازم است: بدون آن، تایمرِ ناوبری با باطل‌سازیِ کش مسابقه می‌داد و
+      // صفحهٔ بعدی می‌توانست دادهٔ پیش از ثبت را از کش بگیرد.
+      await onSubmitted();
       // پس از ثبت نهایی، ارزیاب به صفحهٔ اصلی نقش خود بازمی‌گردد (مسیر «/» توسط
       // App.tsx بر اساس نقش هدایت می‌شود). کمی تأخیر تا توست موفقیت دیده شود.
       setTimeout(() => navigate("/"), 400);

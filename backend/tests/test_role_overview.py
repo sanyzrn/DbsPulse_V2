@@ -46,7 +46,11 @@ def test_role_overview_is_scoped_per_role(client, db_session):
     # پس از ارسال: منابع انسانی یک پرونده در انتظار بررسی دارد
     hr_cards = _cards(client, hr)
     assert hr_cards["awaiting_hr"] == 1
-    assert hr_cards["open"] >= 1
+    # چهار کاشیِ منابع انسانی: مشمول ارزیابی، در انتظار بررسی، نهایی‌شده، درصد
+    # تکمیل. هنوز هیچ پرونده‌ای نهایی نشده، پس پوشش صفر است.
+    assert hr_cards["eligible"] >= 1
+    assert hr_cards["finalized"] == 0
+    assert hr_cards["completion"] == 0
 
     # مسئول واحد اکنون پرونده‌ای در جریان تأیید دارد (نه پیش‌نویس)
     sup_cards = _cards(client, sup)

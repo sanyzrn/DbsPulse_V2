@@ -5,10 +5,10 @@ from fastapi.responses import Response as FastAPIResponse
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_current_user, require_roles
+from app.api.deps import get_current_user, require_role_or_capability
 from app.core.security import hash_password
 from app.db.session import get_db
-from app.models.enums import CommentStage, PersonnelStatus, UserRole
+from app.models.enums import Capability, CommentStage, PersonnelStatus, UserRole
 from app.models.evaluation import EvaluationComment, EvaluationRecord
 from app.models.evaluation_access import EvaluationAccess
 from app.models.personnel import Personnel
@@ -27,7 +27,7 @@ from app.schemas.personnel import (
 )
 from app.services.audit import log_event
 from app.services.excel import build_personnel_workbook
-from app.services.org_unit import site_of
+from app.services.org_unit import known_sites, site_of
 from app.services.personnel_import import ImportPreview, build_template, parse_workbook
 from app.services.security_tokens import generate_temp_password
 from app.services.sessions import revoke_all_for_user
@@ -201,12 +201,27 @@ def list_personnel(
 @router.get("/org-units", response_model=list[str])
 def list_org_units(
     db: Session = Depends(get_db),
-    current_user: CurrentUser = Depends(require_roles(UserRole.hr)),
+    current_user: CurrentUser = Depends(require_role_or_capability(UserRole.hr, Capability.manage_personnel)),
 ) -> list[str]:
     """واحدهای سازمانی متمایز — منبع گزینه‌های فیلتر «واحد» در فهرست‌های HR."""
     return list(
         db.scalars(select(Personnel.org_unit).distinct().order_by(Personnel.org_unit))
     )
+
+
+@router.get("/sites", response_model=list[str])
+def list_sites(
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(require_role_or_capability(UserRole.hr, Capability.manage_personnel)),
+) -> list[str]:
+    """محل‌ها برای فیلترها و فرم ثبت پرسنل.
+
+    تا امروز فرانت‌اند این فهرست را خودش از روی `org_unit`ها می‌ساخت — یعنی محلی
+    که هنوز کسی در آن ثبت نشده بود، اصلاً وجود نداشت. حالا از یک منبع می‌آید و
+    سه محلِ رسمی همیشه در آن هستند.
+    """
+    org_units = list(db.scalars(select(Personnel.org_unit).distinct()))
+    return known_sites(org_units)
 
 
 @router.get("/export.xlsx")
@@ -219,7 +234,7 @@ def export_personnel_excel(
     sort_by: str = Query(default="full_name"),
     sort_dir: str = Query(default="asc", pattern="^(asc|desc)$"),
     db: Session = Depends(get_db),
-    current_user: CurrentUser = Depends(require_roles(UserRole.hr)),
+    current_user: CurrentUser = Depends(require_role_or_capability(UserRole.hr, Capability.manage_personnel)),
 ) -> FastAPIResponse:
     """خروجی Excel از فهرست پرسنل (فقط HR) با همان فیلترها/مرتب‌سازی فهرست، تا HR
     دقیقاً همان چیزی را که روی صفحه فیلتر کرده دریافت کند."""
@@ -246,7 +261,7 @@ def export_personnel_excel(
 def create_personnel(
     payload: PersonnelCreate,
     db: Session = Depends(get_db),
-    current_user: CurrentUser = Depends(require_roles(UserRole.hr)),
+    current_user: CurrentUser = Depends(require_role_or_capability(UserRole.hr, Capability.manage_personnel)),
 ) -> PersonnelCreated:
     """ساخت پرسنل، و در صورت درخواست، حساب کاربری‌اش در همان تراکنش.
 
@@ -361,7 +376,7 @@ async def _read_upload(file: UploadFile) -> bytes:
 
 @router.get("/import-template.xlsx")
 def download_import_template(
-    current_user: CurrentUser = Depends(require_roles(UserRole.hr)),
+    current_user: CurrentUser = Depends(require_role_or_capability(UserRole.hr, Capability.manage_personnel)),
 ) -> FastAPIResponse:
     """فایل نمونهٔ خالی — تا کاربر مجبور نباشد نام ستون‌ها را حدس بزند."""
     return FastAPIResponse(
@@ -375,7 +390,7 @@ def download_import_template(
 async def preview_personnel_import(
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
-    current_user: CurrentUser = Depends(require_roles(UserRole.hr)),
+    current_user: CurrentUser = Depends(require_role_or_capability(UserRole.hr, Capability.manage_personnel)),
 ) -> PersonnelImportPreview:
     """فقط اعتبارسنجی — هیچ چیزی نوشته نمی‌شود.
 
@@ -389,7 +404,7 @@ async def preview_personnel_import(
 async def commit_personnel_import(
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
-    current_user: CurrentUser = Depends(require_roles(UserRole.hr)),
+    current_user: CurrentUser = Depends(require_role_or_capability(UserRole.hr, Capability.manage_personnel)),
 ) -> PersonnelImportResult:
     """درج ردیف‌های معتبر، همه در یک تراکنش.
 
@@ -603,7 +618,7 @@ def update_personnel(
     personnel_id: int,
     payload: PersonnelUpdate,
     db: Session = Depends(get_db),
-    current_user: CurrentUser = Depends(require_roles(UserRole.hr)),
+    current_user: CurrentUser = Depends(require_role_or_capability(UserRole.hr, Capability.manage_personnel)),
 ) -> Personnel:
     personnel = db.get(Personnel, personnel_id)
     if personnel is None:

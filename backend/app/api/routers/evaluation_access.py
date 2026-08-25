@@ -2,9 +2,9 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.api.deps import require_roles
+from app.api.deps import require_role_or_capability
 from app.db.session import get_db
-from app.models.enums import UserRole
+from app.models.enums import Capability, UserRole
 from app.models.evaluation_access import EvaluationAccess
 from app.models.personnel import Personnel
 from app.models.user import User
@@ -50,7 +50,7 @@ def _ensure_active_user_with_role(db: Session, user_id: int, expected_role: User
 def get_access(
     personnel_id: int,
     db: Session = Depends(get_db),
-    current_user: CurrentUser = Depends(require_roles(UserRole.hr)),
+    current_user: CurrentUser = Depends(require_role_or_capability(UserRole.hr, Capability.manage_personnel)),
 ) -> EvaluationAccess | None:
     # پرسنل ناموجود باید 404 بگیرد (نه 200 با بدنهٔ null) تا با upsert_access یکسان
     # باشد و تایپوی شناسه پنهان نماند.
@@ -64,7 +64,7 @@ def upsert_access(
     personnel_id: int,
     payload: EvaluationAccessUpsert,
     db: Session = Depends(get_db),
-    current_user: CurrentUser = Depends(require_roles(UserRole.hr)),
+    current_user: CurrentUser = Depends(require_role_or_capability(UserRole.hr, Capability.manage_personnel)),
 ) -> EvaluationAccess:
     personnel = db.get(Personnel, personnel_id)
     if personnel is None:

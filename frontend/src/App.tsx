@@ -172,14 +172,25 @@ function App() {
               element={<LegacyImprovementPlanRedirect />}
             />
 
+            {/* صف بررسی و داشبورد کارِ *زنجیره*اند و پشت نقش می‌مانند: مدیر
+                سامانه نباید نمرهٔ کسی را ببیند (P0-03). بقیه کارِ راه‌اندازی و
+                نگه‌داریِ سامانه‌اند و به مجوز هم باز می‌شوند — وگرنه حساب مدیر
+                مجوزش را دارد و رابط راهش نمی‌دهد. */}
             <Route element={<ProtectedRoute allowedRoles={["hr"]} />}>
-              <Route path="/hr/personnel" element={<PersonnelPage />} />
-              <Route path="/hr/users" element={<UsersPage />} />
-              <Route path="/hr/indicators" element={<IndicatorsPage />} />
               <Route path="/hr/queue" element={<QueuePage />} />
-              <Route path="/hr/periods" element={<ModuleRoute module="periods" title="دوره‌های ارزیابی"><PeriodsPage /></ModuleRoute>} />
-              <Route path="/hr/scoring-schemes" element={<ScoringSchemesPage />} />
               <Route path="/hr/dashboard" element={<DashboardPage />} />
+              <Route path="/hr/periods" element={<ModuleRoute module="periods" title="دوره‌های ارزیابی"><PeriodsPage /></ModuleRoute>} />
+            </Route>
+
+            <Route element={<ProtectedRoute allowedRoles={["hr"]} anyCapability={["manage_personnel"]} />}>
+              <Route path="/hr/personnel" element={<PersonnelPage />} />
+            </Route>
+            <Route element={<ProtectedRoute allowedRoles={["hr"]} anyCapability={["manage_users"]} />}>
+              <Route path="/hr/users" element={<UsersPage />} />
+            </Route>
+            <Route element={<ProtectedRoute allowedRoles={["hr"]} anyCapability={["manage_scoring"]} />}>
+              <Route path="/hr/indicators" element={<IndicatorsPage />} />
+              <Route path="/hr/scoring-schemes" element={<ScoringSchemesPage />} />
             </Route>
 
             {/* مدیریت سامانه پشت گاردِ hr نیست: حساب «پشتیبانی فنی» نقش hr

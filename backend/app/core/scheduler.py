@@ -44,7 +44,17 @@ async def _scheduler_loop() -> None:
         await asyncio.sleep(interval)
 
 
-@contextlib.asynccontextmanager
+def _ensure_bootstrap_admin() -> None:
+    if not settings.bootstrap_admin:
+        return
+    from app.db.session import SessionLocal
+    from app.services.bootstrap_admin import ensure_bootstrap_admin
+
+    with SessionLocal() as db:
+        ensure_bootstrap_admin(db)
+        db.commit()
+
+
 def _load_integration_settings() -> None:
     from app.db.session import SessionLocal
     from app.services.integrations import refresh
@@ -53,10 +63,15 @@ def _load_integration_settings() -> None:
         refresh(db)
 
 
+@contextlib.asynccontextmanager
 async def lifespan(app):
     from app.core.startup_checks import assert_no_demo_credentials
 
     await asyncio.to_thread(assert_no_demo_credentials)
+    # سامانه‌ای که بالا بیاید و هیچ‌کس نتواند واردش شود، بالا نیامده. اگر حسابِ
+    # مدیری نباشد — نصبِ تازه، یا قفل‌شدن پس از غیرفعال‌شدنِ تنها مدیر — این‌جا
+    # یکی ساخته می‌شود و رمزِ موقتش یک بار در لاگ می‌آید.
+    await asyncio.to_thread(_ensure_bootstrap_admin)
     # تنظیمات ارسال بیرونی که از پنل ذخیره شده‌اند باید پیش از اولین ارسال روی
     # `settings` بنشینند. بدون این، تا اولین ذخیرهٔ بعدی، مقدارهای `.env` اثر
     # داشتند — یعنی تنظیماتِ پنل بعد از هر ری‌استارت بی‌صدا از کار می‌افتاد.

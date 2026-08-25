@@ -8,7 +8,7 @@ import { BrandMark, DevMark } from "./Brand";
 export function Footer() {
   return (
     <footer className="border-t border-gray-200 bg-white">
-      <div className="mx-auto flex w-full max-w-[1600px] flex-wrap items-center justify-between gap-2 px-4 py-4 text-xs text-gray-500 sm:px-6">
+      <div className="flex w-full flex-wrap items-center justify-between gap-2 px-4 py-4 text-xs text-gray-500 sm:px-6">
         <div className="flex items-center gap-2">
           <BrandMark className="h-5 w-5" />
           <span className="font-semibold text-gray-700">{APP_NAME}</span>

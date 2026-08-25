@@ -13,6 +13,7 @@ from app.models.evaluation import EvaluationRecord
 from app.models.improvement_plan import ImprovementPlan
 from app.models.personnel import Personnel
 from app.models.user import User
+from app.services.org_unit import split_site
 from app.services.pdf import to_jalali
 
 _PERSIAN_DIGITS = str.maketrans("0123456789", "۰۱۲۳۴۵۶۷۸۹")
@@ -140,6 +141,10 @@ _PERSONNEL_HEADERS = [
     "کد پرسنلی",
     "نام و نام خانوادگی",
     "عنوان شغلی",
+    # همان دو ستونی که ایمپورت می‌خواند. جریان واقعی HR «خروجی بگیر، در اکسل
+    # ویرایش کن، برگردان» است — پس هر ستونی که ایمپورت بشناسد و خروجی نداشته
+    # باشد، در همان رفت‌وبرگشت خالی می‌شود.
+    "محل",
     "واحد سازمانی",
     "مدیر",
     "وضعیت",
@@ -169,7 +174,7 @@ def build_personnel_workbook(rows: list[Personnel]) -> bytes:
                 p.personnel_code,
                 p.full_name,
                 p.job_title,
-                p.org_unit,
+                *split_site(p.org_unit),
                 "بله" if p.is_manager else "خیر",
                 "فعال" if p.status.value == "active" else "غیرفعال",
                 _jalali_date(p.contract_start_date),

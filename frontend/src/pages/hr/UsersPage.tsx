@@ -10,6 +10,7 @@ import { useToast } from "../../components/Toast";
 import { Button } from "../../ui/Button";
 import { FilterSelect, PageHeader, TableSkeleton } from "../../ui/Card";
 import { Modal } from "../../ui/Modal";
+import { PasswordField } from "../../ui/PasswordField";
 import { Table } from "../../ui/Table";
 import { ROLE_LABELS, type AppUser, type Personnel, type UserRole } from "../../types";
 import { SearchInput } from "../../ui/SearchInput";
@@ -115,6 +116,25 @@ export function UsersPage() {
     }
   }
 
+  async function removeUser(u: AppUser) {
+    const ok = await confirm({
+      title: `حذف کامل «${u.display_name || u.username}»؟`,
+      description:
+        "حساب و همهٔ اعلان‌ها و نشست‌هایش برای همیشه پاک می‌شوند. اگر این حساب در پرونده‌ای " +
+        "کار کرده باشد، حذف انجام نمی‌شود و پیام می‌گوید چرا — در آن حالت «غیرفعال کردن» راهِ درست است.",
+      confirmLabel: "حذف کن",
+      danger: true,
+    });
+    if (!ok) return;
+    try {
+      await apiClient.delete(`/users/${u.id}`);
+      await queryClient.invalidateQueries({ queryKey: ["users"] });
+      showSuccess("حساب حذف شد");
+    } catch (err) {
+      showError(extractErrorMessage(err));
+    }
+  }
+
   return (
     <div className="space-y-4">
       <PageHeader title="کاربران" subtitle="ساخت و مدیریت حساب‌های کاربری نقش‌های مختلف سامانه" />
@@ -163,18 +183,14 @@ export function UsersPage() {
               />
             </label>
           )}
-          <label className="flex flex-col gap-1 text-xs font-medium text-gray-600">
-            رمز عبور (حداقل ۱۰ نویسه)
-            <input
-              type="password"
-              required
-              minLength={10}
-              autoComplete="new-password"
-              className={`${inputClass} sm:w-44`}
+          <div className="flex flex-col gap-1 text-xs font-medium text-gray-600 sm:w-72">
+            <span>رمز عبور</span>
+            <PasswordField
               value={form.password}
-              onChange={(e) => setForm({ ...form, password: e.target.value })}
+              onChange={(password) => setForm({ ...form, password })}
+              required
             />
-          </label>
+          </div>
           <label className="flex flex-col gap-1 text-xs font-medium text-gray-600">
             نقش
             <select
@@ -315,11 +331,19 @@ export function UsersPage() {
                 >
                   ویرایش
                 </button>
-                {/* حساب خودِ HR قابل غیرفعال‌شدن نیست (محافظ قفل‌نشدن سامانه) */}
+                {/* حساب خودِ کاربر نه غیرفعال می‌شود نه حذف (محافظ قفل‌نشدن سامانه) */}
                 {u.id !== currentUser?.id && (
-                  <button onClick={() => toggleActive(u)} className="text-sm font-medium text-gray-500 hover:text-gray-900">
-                    {u.is_active ? "غیرفعال کردن" : "فعال کردن"}
-                  </button>
+                  <>
+                    <button onClick={() => toggleActive(u)} className="text-sm font-medium text-gray-500 hover:text-gray-900">
+                      {u.is_active ? "غیرفعال کردن" : "فعال کردن"}
+                    </button>
+                    <button
+                      onClick={() => removeUser(u)}
+                      className="text-sm font-medium text-gray-400 transition-colors hover:text-red-600"
+                    >
+                      حذف
+                    </button>
+                  </>
                 )}
               </div>,
             ])}
@@ -463,18 +487,15 @@ function EditUserModal({
         )}
 
         <div className="border-t border-gray-100 pt-4">
-          <label className="flex flex-col gap-1.5 text-sm font-medium text-gray-700">
-            تعیین رمز جدید (اختیاری)
-            <input
-              type="password"
-              minLength={10}
-              autoComplete="new-password"
-              placeholder="خالی بگذارید تا رمز فعلی تغییر نکند"
-              className={inputClass}
+          <div className="flex flex-col gap-1.5 text-sm font-medium text-gray-700">
+            <span>تعیین رمز جدید (اختیاری)</span>
+            <PasswordField
               value={newPassword}
-              onChange={(e) => setNewPassword(e.target.value)}
+              onChange={setNewPassword}
+              placeholder="خالی بگذارید تا رمز فعلی تغییر نکند"
+              optional
             />
-          </label>
+          </div>
           {newPassword && (
             <p className="mt-1.5 text-xs text-amber-600">
               با تنظیم رمز جدید، تمام نشست‌های فعال این کاربر باطل می‌شود و باید در ورود بعدی رمز را

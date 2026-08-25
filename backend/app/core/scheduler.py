@@ -45,6 +45,8 @@ async def _scheduler_loop() -> None:
 
 
 def _ensure_bootstrap_admin() -> None:
+    if not settings.bootstrap_admin:
+        return
     from app.db.session import SessionLocal
     from app.services.bootstrap_admin import ensure_bootstrap_admin
 

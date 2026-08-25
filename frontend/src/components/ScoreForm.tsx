@@ -421,10 +421,14 @@ function ScoreCardList({
   const sectionIndicators = indicators.filter((i) => i.section === section);
   const draftByIndicator = new Map(drafts.map((d) => [d.indicator_id, d]));
   const maxWords = config.evidence_max_words ?? 40;
+  // شماره در *کل فرم* پیوسته است، نه در هر بخش جدا: دو ردیفِ «۳» در یک پرونده
+  // همان ابهامی را می‌سازد که این ستون برای رفعش آمده.
+  const numberOf = new Map(indicators.map((indicator, index) => [indicator.id, index + 1]));
+  const rowNumber = (indicatorId: number) => numberOf.get(indicatorId) ?? 0;
 
   return (
     <ol className="space-y-3">
-      {sectionIndicators.map((ind, index) => {
+      {sectionIndicators.map((ind) => {
         const draft = draftByIndicator.get(ind.id);
         if (!draft) return null;
         const count = wordCount(draft.evidence_text);
@@ -442,9 +446,12 @@ function ScoreCardList({
           >
             <div className="mb-3">
               <p className="flex items-baseline gap-2 text-sm font-bold text-gray-900">
-                <span className="shrink-0 text-[11px] font-normal text-gray-400">
-                  {(index + 1).toLocaleString("fa-IR")}/
-                  {sectionIndicators.length.toLocaleString("fa-IR")}
+                {/* همان شماره‌ای که در جدولِ دسکتاپ دیده می‌شود. پیش از این
+                    «۳/۸» بود — جایگاه در *همین بخش* — و کامنتی که به «ردیف ۳»
+                    ارجاع می‌داد، روی موبایل و دسکتاپ دو شاخص مختلف را نشان
+                    می‌داد. */}
+                <span className="shrink-0 rounded-md bg-gray-100 px-1.5 text-[11px] font-semibold tabular-nums text-gray-500">
+                  {rowNumber(ind.id).toLocaleString("fa-IR")}
                 </span>
                 {ind.category}
               </p>
@@ -534,6 +541,10 @@ function ScoreFormTableWide({
   const sectionIndicators = indicators.filter((i) => i.section === section);
   const draftByIndicator = new Map(drafts.map((d) => [d.indicator_id, d]));
   const maxWords = config.evidence_max_words ?? 40;
+  // شماره در *کل فرم* پیوسته است، نه در هر بخش جدا: دو ردیفِ «۳» در یک پرونده
+  // همان ابهامی را می‌سازد که این ستون برای رفعش آمده.
+  const numberOf = new Map(indicators.map((indicator, index) => [indicator.id, index + 1]));
+  const rowNumber = (indicatorId: number) => numberOf.get(indicatorId) ?? 0;
 
   function handleEvidenceChange(indicatorId: number, raw: string) {
     onEvidenceChange(indicatorId, clampEvidence(raw, maxWords));
@@ -544,6 +555,13 @@ function ScoreFormTableWide({
       <table className="w-full text-sm">
         <thead className="border-b border-gray-100 text-xs text-gray-600">
           <tr>
+            {/* شمارهٔ ردیف: کامنت‌های زنجیره به شاخص‌ها ارجاع می‌دهند و تا امروز
+                تنها راهش نوشتنِ عنوان کامل بود («دربارهٔ شاخص تعهد سازمانیِ دومی
+                که…»). شماره در همان فرم دیده می‌شود، پس «ردیف ۷» بی‌ابهام است.
+
+                شماره در کل فرم پیوسته است، نه در هر بخش جدا: دو ردیفِ «۳» در یک
+                پرونده، همان ابهامی را می‌سازد که این ستون برای رفعش آمده. */}
+            <th className="w-10 px-2 py-3 text-center font-semibold">#</th>
             {/* عرض‌ها صریح‌اند چون بدونشان ستونِ «مصداق» — که فقط خوانده می‌شود —
                 دو سومِ عرض را می‌گرفت و دو ستونی که کاربر واقعاً با آن‌ها کار
                 می‌کند (امتیاز و شواهد) در باریک‌ترین جای جدول فشرده می‌شدند. */}
@@ -563,6 +581,9 @@ function ScoreFormTableWide({
             const scoreLabel = draft.score !== null ? SCORE_LABELS[draft.score] : "امتیازی انتخاب نشده";
             return (
               <tr key={ind.id} className="min-h-16 border-t border-gray-100 align-top transition-colors hover:bg-gray-50">
+                <td className="px-2 py-3 text-center text-xs font-semibold tabular-nums text-gray-400">
+                  {rowNumber(ind.id).toLocaleString("fa-IR")}
+                </td>
                 <td className="px-3 py-3 font-medium text-gray-800">{ind.category}</td>
                 <td className="px-3 py-3 text-gray-600">{ind.description}</td>
                 <td className="px-3 py-3">

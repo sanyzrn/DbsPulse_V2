@@ -266,6 +266,11 @@ export interface UnitStat {
   // null = سرکوب‌شده: جمعیت این واحد کمتر از آستانهٔ کوهورت است (P1-08)
   avg_final_pct: number | null;
   count: number;
+  /** تفکیک همان میانگین به دو بخشِ فرم — واحدی که کلش خوب است ممکن است در یکی
+   *  از دو بخش ضعیف باشد و عددِ کل آن را پنهان کند. */
+  avg_general_pct: number | null;
+  avg_specialized_pct: number | null;
+  site: string | null;
 }
 
 export interface EvaluatorStat {
@@ -280,6 +285,8 @@ export interface EvaluatorStat {
 export interface IndicatorStat {
   indicator_id: number;
   category: string;
+  /** شرح خودِ شاخص — چند شاخص می‌توانند یک «دسته» داشته باشند. */
+  description: string;
   avg_score: number | null;
 }
 
@@ -287,14 +294,30 @@ export interface PersonStat {
   personnel_id: number;
   full_name: string;
   final_weighted_pct: number;
+  org_unit: string;
+  site: string | null;
+}
+
+/** چند درصد افراد کجای طیف‌اند. مرزها از خودِ «طرح نمره‌دهی» می‌آیند، نه از
+ *  عددی که در رابط نوشته شده باشد. */
+export interface OutcomeMix {
+  strong_pct: number | null;
+  needs_improvement_pct: number | null;
+  strong_threshold_pct: number;
+  improvement_threshold_pct: number;
+  people_counted: number;
 }
 
 export interface DashboardOverview {
   total_evaluations: number;
   avg_final_pct: number | null;
+  outcome_mix: OutcomeMix;
   by_org_unit: UnitStat[];
   by_evaluator: EvaluatorStat[];
   lowest_by_indicator: IndicatorStat[];
+  highest_by_indicator: IndicatorStat[];
+  lowest_by_specialized_indicator: IndicatorStat[];
+  highest_by_specialized_indicator: IndicatorStat[];
   lowest_by_unit: UnitStat[];
   lowest_by_person: PersonStat[];
 }

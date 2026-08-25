@@ -8,6 +8,9 @@ os.environ.setdefault("JWT_SECRET_KEY", "test-secret-key-not-for-production")
 # زمان‌بند در تست عمداً خاموش است: هر تست خودش جاروها را صدا می‌زند و یک حلقهٔ
 # پس‌زمینه فقط نویز و ناپایداری اضافه می‌کند.
 os.environ.setdefault("ENABLE_SCHEDULER", "false")
+# حسابِ مدیرِ خودکار در تست‌ها ساخته نمی‌شود: دیتابیس تست مشترک است و آن حساب
+# commit می‌شود، پس بین تست‌ها می‌ماند و فرضِ «هیچ مدیری نیست» را می‌شکند.
+os.environ.setdefault("BOOTSTRAP_ADMIN", "false")
 
 import subprocess
 from pathlib import Path

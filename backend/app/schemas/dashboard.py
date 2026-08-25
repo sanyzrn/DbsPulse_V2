@@ -11,6 +11,12 @@ class UnitStat(BaseModel):
     # نمایش میانگینش عملاً افشای امتیاز فرد بود (P1-08).
     avg_final_pct: float | None
     count: int
+    #: تفکیک همان میانگین به دو بخشِ فرم. واحدی که نمرهٔ کلش خوب است ممکن است
+    #: در یکی از دو بخش ضعیف باشد و در دیگری قوی — و عددِ کل آن را پنهان می‌کند.
+    avg_general_pct: float | None = None
+    avg_specialized_pct: float | None = None
+    #: محل (دفتر مرکزی / کارخانه / مدرپ‌ها)، برای فیلتر کردن.
+    site: str | None = None
 
 
 class EvaluatorStat(BaseModel):
@@ -27,6 +33,10 @@ class EvaluatorStat(BaseModel):
 class IndicatorStat(BaseModel):
     indicator_id: int
     category: str
+    #: شرحِ خودِ شاخص. چند شاخص می‌توانند یک «دسته» داشته باشند («بهبود مستمر»
+    #: دو شاخص دارد)، و فهرستی که فقط دسته را نشان بدهد دو ردیفِ کاملاً یکسان
+    #: می‌سازد که خواننده نمی‌داند کدام کدام است.
+    description: str = ""
     avg_score: float | None
 
 
@@ -34,14 +44,38 @@ class PersonStat(BaseModel):
     personnel_id: int
     full_name: str
     final_weighted_pct: float
+    org_unit: str = ""
+    site: str | None = None
+
+
+class OutcomeMix(BaseModel):
+    """چند درصد افراد کجای طیف‌اند.
+
+    مرزها از خودِ «طرح نمره‌دهی» می‌آیند، نه از عددی که این‌جا نوشته شده باشد:
+    «نیازمند بهبود» همان بازه‌ای است که سامانه برایش برنامهٔ بهبود می‌سازد، و
+    «مطلوب» بالاترین بندِ همان طرح است. عددِ ثابت در کد یعنی سازمانی که قواعدش
+    را عوض می‌کند، گزارشی می‌بیند که با قواعد خودش نمی‌خواند.
+    """
+
+    strong_pct: float | None
+    needs_improvement_pct: float | None
+    #: مرزهایی که این دو درصد از رویشان حساب شده‌اند — تا خواننده بداند «مطلوب»
+    #: یعنی چند.
+    strong_threshold_pct: float
+    improvement_threshold_pct: float
+    people_counted: int
 
 
 class DashboardOverview(BaseModel):
     total_evaluations: int
     avg_final_pct: float | None
+    outcome_mix: OutcomeMix
     by_org_unit: list[UnitStat]
     by_evaluator: list[EvaluatorStat]
     lowest_by_indicator: list[IndicatorStat]
+    highest_by_indicator: list[IndicatorStat]
+    lowest_by_specialized_indicator: list[IndicatorStat]
+    highest_by_specialized_indicator: list[IndicatorStat]
     lowest_by_unit: list[UnitStat]
     lowest_by_person: list[PersonStat]
 

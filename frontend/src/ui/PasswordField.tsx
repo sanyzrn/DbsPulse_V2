@@ -1,52 +1,11 @@
 import { useMemo, useState } from "react";
+import {
+  MIN_PASSWORD_LENGTH,
+  checkPassword,
+  generatePassword,
+  strengthLevel,
+} from "../utils/password";
 import { PasswordInput } from "./PasswordInput";
-
-/** حداقلی که سرور هم اعمال می‌کند (`app/schemas/user.py`). اگر این دو از هم دور
- *  بیفتند، فرم رمزی را قبول می‌کند که API ردش می‌کند. */
-export const PASSWORD_MIN_LENGTH = 10;
-
-const ALPHABET = "abcdefghijkmnopqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789!@#$%^&*-_=+";
-
-/** رمزِ تصادفیِ قوی، از `crypto` مرورگر.
- *
- *  `Math.random` نه: قابل پیش‌بینی است و رمزی که این‌جا ساخته می‌شود رمزِ ورودِ
- *  اولِ یک حساب واقعی است. حروف و رقم‌های شبیه‌به‌هم (l/1/O/0) عمداً نیستند —
- *  این رمز قرار است روی کاغذ یا در پیام به کسی گفته شود.
- */
-export function generatePassword(length = 16): string {
-  const values = new Uint32Array(length);
-  crypto.getRandomValues(values);
-  return Array.from(values, (v) => ALPHABET[v % ALPHABET.length]).join("");
-}
-
-interface Strength {
-  score: 0 | 1 | 2 | 3;
-  label: string;
-  bar: string;
-  text: string;
-}
-
-/** سنجهٔ قدرت — عمداً ساده و قابل توضیح.
- *
- *  طول مهم‌ترین عامل است (NIST 800-63B)، و تنوعِ نویسه‌ها بعد از آن. هدف نمرهٔ
- *  دقیق نیست؛ هدف این است که کسی که «Ali1234567» می‌گذارد، *پیش از ذخیره* ببیند
- *  که این ضعیف است.
- */
-function strengthOf(value: string): Strength {
-  const classes =
-    Number(/[a-z]/.test(value)) +
-    Number(/[A-Z]/.test(value)) +
-    Number(/[0-9]/.test(value)) +
-    Number(/[^a-zA-Z0-9]/.test(value));
-  const points = (value.length >= 16 ? 2 : value.length >= 12 ? 1 : 0) + (classes >= 3 ? 1 : 0);
-
-  if (value.length < PASSWORD_MIN_LENGTH) {
-    return { score: 0, label: "خیلی کوتاه", bar: "bg-red-500", text: "text-red-600" };
-  }
-  if (points >= 3) return { score: 3, label: "قوی", bar: "bg-green-500", text: "text-green-700" };
-  if (points >= 2) return { score: 2, label: "خوب", bar: "bg-lime-500", text: "text-lime-700" };
-  return { score: 1, label: "ضعیف", bar: "bg-amber-500", text: "text-amber-700" };
-}
 
 /** ورودی رمز با چشمِ نمایش، سنجهٔ قدرت، ساختِ رمز قوی و کپی.
  *
@@ -54,6 +13,11 @@ function strengthOf(value: string): Strength {
  *  انتخاب کن، ببین چه نوشته‌ای، و آن را به صاحبش برسان. تا امروز هر سه دستی
  *  بودند، و نتیجه‌اش رمزهایی بود که چون باید تایپ و گفته می‌شدند، ساده انتخاب
  *  می‌شدند.
+ *
+ *  قاعده‌ها این‌جا تعریف نمی‌شوند: طول، تولید و سنجه همه از `utils/password`
+ *  می‌آیند — همان جایی که صفحهٔ «تغییر رمز» هم از آن می‌خواند. پیش‌تر این فایل
+ *  نسخهٔ دوم و کمی متفاوتِ همان قاعده‌ها را داشت، یعنی یک رمز می‌توانست این‌جا
+ *  «قوی» و آن‌جا «متوسط» باشد.
  */
 export function PasswordField({
   value,
@@ -62,6 +26,8 @@ export function PasswordField({
   autoComplete = "new-password",
   placeholder,
   required,
+  /** برای قاعدهٔ «رمز نباید شامل نام کاربری باشد». */
+  username,
   /** فرم «ویرایش» رمز را اختیاری می‌گذارد؛ سنجه تا وقتی خالی است پنهان می‌ماند. */
   optional = false,
 }: {
@@ -71,10 +37,12 @@ export function PasswordField({
   autoComplete?: string;
   placeholder?: string;
   required?: boolean;
+  username?: string | null;
   optional?: boolean;
 }) {
   const [copied, setCopied] = useState(false);
-  const strength = useMemo(() => strengthOf(value), [value]);
+  const check = useMemo(() => checkPassword(value, { username }), [value, username]);
+  const level = strengthLevel(check.score);
   const show = value.length > 0 || !optional;
 
   async function copy() {
@@ -96,7 +64,7 @@ export function PasswordField({
         autoComplete={autoComplete}
         placeholder={placeholder}
         required={required}
-        minLength={PASSWORD_MIN_LENGTH}
+        minLength={MIN_PASSWORD_LENGTH}
       />
 
       <div className="flex flex-wrap items-center gap-2">
@@ -126,22 +94,34 @@ export function PasswordField({
         {show && (
           <div className="flex min-w-0 flex-1 items-center justify-end gap-2">
             <div className="flex gap-1" aria-hidden>
-              {[1, 2, 3].map((step) => (
+              {[1, 2, 3, 4].map((step) => (
                 <span
                   key={step}
-                  className={`h-1.5 w-7 rounded-full ${
-                    strength.score >= step ? strength.bar : "bg-gray-200"
+                  className={`h-1.5 w-6 rounded-full ${
+                    check.score >= step ? level.color : "bg-gray-200"
                   }`}
                 />
               ))}
             </div>
-            <span className={`text-xs font-medium ${strength.text}`}>{strength.label}</span>
+            <span className={`text-xs font-medium ${level.textColor}`}>{level.label}</span>
           </div>
         )}
       </div>
 
+      {/* قاعده‌های الزامیِ نقض‌شده — نه فهرست کاملِ همیشه‌روشن، که فقط نویز است.
+          کسی که رمزِ درستی نوشته لازم نیست سه تیکِ سبز را بخواند. */}
+      {show && !check.valid && (
+        <ul className="space-y-0.5 text-[11px] text-amber-700">
+          {check.required
+            .filter((rule) => !rule.passed)
+            .map((rule) => (
+              <li key={rule.key}>• {rule.label}</li>
+            ))}
+        </ul>
+      )}
+
       <p className="text-[11px] text-gray-400">
-        حداقل {PASSWORD_MIN_LENGTH.toLocaleString("fa-IR")} نویسه. کاربر در اولین ورود باید خودش
+        حداقل {MIN_PASSWORD_LENGTH.toLocaleString("fa-IR")} نویسه. کاربر در اولین ورود باید خودش
         آن را عوض کند.
       </p>
     </div>

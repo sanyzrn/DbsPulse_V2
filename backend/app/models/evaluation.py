@@ -128,6 +128,20 @@ class EvaluationRecord(Base):
         DateTime(timezone=True), nullable=True
     )
     self_assessment_note: Mapped[str | None] = mapped_column(String(SELF_ASSESSMENT_SUMMARY_MAX), nullable=True)
+    #: کِی منابع انسانی از کارمند خواست خودارزیابی‌اش را انجام دهد.
+    #:
+    #: خودارزیابی اختیاری است و همیشه هم بوده — ولی «اختیاری» با «کسی خبرش
+    #: نکرده» یکی نیست. تا امروز کارمند فقط اگر خودش وارد سامانه می‌شد و
+    #: پرونده‌اش را باز می‌کرد می‌فهمید که می‌تواند نظرش را ثبت کند.
+    #:
+    #: روی *پرونده* می‌نشیند و نه روی پرسنل: دعوت مربوط به همین دورهٔ ارزیابی
+    #: است، و دورهٔ بعد باید دوباره فرستاده شود.
+    self_assessment_invited_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    self_assessment_invited_by_user_id: Mapped[int | None] = mapped_column(
+        ForeignKey("users.id"), nullable=True
+    )
 
     # اعتراض رسمی کارمند به نتیجه. «رؤیت» فقط ثبت می‌کند که فرد نتیجه را *دید*، نه
     # این‌که با آن موافق است — بدون مسیر اعتراض، سامانه هیچ جایی برای مخالفت او ندارد

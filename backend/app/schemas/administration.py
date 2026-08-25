@@ -82,6 +82,20 @@ class IntegrationField(BaseModel):
     kind: str
     help: str
     value: str | int | bool
+    #: کف و سقفِ عددی — تا فرم بتواند همان قاعده‌ای را نشان بدهد که سرور اعمال
+    #: می‌کند، به‌جای اینکه کاربر با ذخیره‌کردن کشفش کند.
+    minimum: int | None = None
+    maximum: int | None = None
+
+
+class PolicySettings(BaseModel):
+    """قاعده‌های سازمانی — مهلت‌ها، آستانه‌ها و شمارنده‌ها."""
+
+    fields: list[IntegrationField]
+
+
+class PolicyUpdate(BaseModel):
+    values: dict[str, str | int | bool]
 
 
 class SecretStatus(BaseModel):

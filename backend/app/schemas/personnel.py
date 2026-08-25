@@ -83,6 +83,17 @@ class PersonnelRead(BaseModel):
     #: نام کاربریِ حساب این فرد، اگر دارد. None یعنی هنوز حسابی برایش ساخته
     #: نشده — تا آن موقع نمی‌تواند کارنامهٔ خودش را ببیند.
     account_username: str | None = None
+    #: وضعیت خودارزیابیِ پروندهٔ بازِ این فرد. یکی از:
+    #:
+    #: * `no_case`    — پروندهٔ بازی ندارد؛ هنوز چیزی برای خودارزیابی نیست.
+    #: * `no_account` — پرونده هست ولی این فرد حساب ندارد، پس اعلانی نمی‌گیرد.
+    #: * `closed`     — پرونده از مرحلهٔ خودارزیابی گذشته.
+    #: * `pending`    — می‌شود دعوتش کرد.
+    #: * `invited`    — دعوت رفته و هنوز ثبت نکرده.
+    #: * `submitted`  — انجام داده.
+    self_assessment_state: str = "no_case"
+    #: پروندهٔ باز، برای لینک‌دادن از فهرست پرسنل.
+    open_evaluation_id: int | None = None
     created_at: datetime
     updated_at: datetime
 

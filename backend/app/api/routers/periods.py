@@ -22,6 +22,7 @@ from app.schemas.period import (
     PeriodCreate,
     PeriodProgress,
     PeriodRead,
+    PeriodUpdate,
 )
 from app.services.audit import log_event
 from app.services.bulk_evaluation import BulkOutcome, CohortFilter, execute, plan, summarise
@@ -104,6 +105,55 @@ def create_period(
         type_="period_opened",
         message=f"دوره ارزیابی «{period.name}» آغاز شد؛ ارزیابی افراد زیرمجموعه خود را شروع کنید",
         link="/",
+    )
+    db.commit()
+    db.refresh(period)
+    return period
+
+
+@router.patch("/{period_id}", response_model=PeriodRead)
+def update_period(
+    period_id: int,
+    payload: PeriodUpdate,
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(require_roles(UserRole.hr)),
+) -> EvaluationPeriod:
+    """تغییر نام یا بازهٔ یک دوره.
+
+    تا امروز دوره فقط ساخته و بسته می‌شد. یعنی یک غلط تایپی در نام — نامی که در
+    هر گزارش و روی هر کارنامه می‌نشیند — تا ابد می‌ماند، و تنها راهش ساختن دورهٔ
+    تازه بود که پرونده‌های موجود را جا می‌گذاشت.
+    """
+    period = db.get(EvaluationPeriod, period_id)
+    if period is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="دوره یافت نشد")
+
+    updates = payload.model_dump(exclude_unset=True)
+    old_value = {"name": period.name, "starts_on": str(period.starts_on), "ends_on": str(period.ends_on)}
+    starts_on = updates.get("starts_on", period.starts_on)
+    ends_on = updates.get("ends_on", period.ends_on)
+    if ends_on <= starts_on:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="تاریخ پایان دوره باید بعد از تاریخ شروع باشد",
+        )
+    for field, value in updates.items():
+        setattr(period, field, value)
+
+    try:
+        db.flush()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="دوره‌ای با این نام از قبل هست"
+        ) from None
+
+    log_event(
+        db,
+        actor_user_id=current_user.id,
+        event_type="period_updated",
+        old_value=old_value,
+        new_value={"id": period.id, **{k: str(v) for k, v in updates.items()}},
     )
     db.commit()
     db.refresh(period)

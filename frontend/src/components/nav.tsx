@@ -134,7 +134,7 @@ export const NAV_BY_ROLE: Record<string, NavItem[]> = {
     { to: "/hr/dashboard", label: "داشبورد", icon: ICONS.dashboard },
     { to: "/hr/queue", label: "صف بررسی", icon: ICONS.queue },
     { to: "/hr/personnel", label: "پرسنل", icon: ICONS.personnel },
-    { to: "/hr/users", label: "کاربران", icon: ICONS.accounts },
+    { to: "/hr/users", label: "مدیریت حساب", icon: ICONS.accounts },
     { to: "/hr/indicators", label: "شاخص‌ها", icon: ICONS.indicators },
     // کنار «شاخص‌ها» چون هر دو «فرمِ ارزیابی» را تعریف می‌کنند: یکی چه چیزی
     // سنجیده می‌شود، دیگری چطور به نتیجه تبدیل می‌شود (P1-04).
@@ -182,7 +182,7 @@ export const NAV_BY_ROLE: Record<string, NavItem[]> = {
  */
 export const NAV_BY_CAPABILITY: NavItem[] = [
   { to: "/hr/personnel", label: "پرسنل", icon: ICONS.personnel, anyCapability: ["manage_personnel"] },
-  { to: "/hr/users", label: "کاربران", icon: ICONS.accounts, anyCapability: ["manage_users"] },
+  { to: "/hr/users", label: "مدیریت حساب", icon: ICONS.accounts, anyCapability: ["manage_users"] },
   { to: "/hr/indicators", label: "شاخص‌ها", icon: ICONS.indicators, anyCapability: ["manage_scoring"] },
   {
     to: "/hr/scoring-schemes",

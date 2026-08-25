@@ -26,24 +26,15 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
+import {
+  AXIS_STROKE,
+  GRID_STROKE,
+  SERIES_COLOR,
+  TICK_STYLE,
+  TOOLTIP_STYLE,
+  faNum,
+} from "../ui/chartTokens";
 import type { RadarPoint, TrendPoint } from "../types";
-
-const SERIES_COLOR = "var(--chart-series)";
-const GRID_STROKE = "var(--chart-grid)";
-const AXIS_STROKE = "var(--chart-axis)";
-const TICK_STYLE = { fontSize: 11, fill: "var(--chart-tick)", fontFamily: "Vazirmatn, Tahoma, sans-serif" };
-const TOOLTIP_STYLE = {
-  direction: "rtl" as const,
-  fontFamily: "Vazirmatn, Tahoma, sans-serif",
-  fontSize: 12,
-  borderRadius: 12,
-  border: "1px solid var(--chart-grid)",
-  boxShadow: "0 12px 40px rgba(0,0,0,0.12)",
-  background: "rgba(255,255,255,0.97)",
-};
-
-const faNum = (value: unknown) =>
-  typeof value === "number" ? value.toLocaleString("fa-IR") : String(value);
 
 const MAX_LINE = 16;
 const MAX_LINES = 2;

@@ -19,6 +19,21 @@ class PeriodCreate(BaseModel):
         return self
 
 
+class PeriodUpdate(BaseModel):
+    """ویرایش نام و بازهٔ دوره.
+
+    وضعیت این‌جا نیست: بستنِ دوره مسیر خودش را دارد چون کارهای دیگری هم می‌کند
+    (بررسی پرونده‌های باز، ثبت زمان بستن). یک `PATCH` که بتواند وضعیت را هم عوض
+    کند، همان بررسی‌ها را دور می‌زد.
+    """
+
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+    name: str | None = Field(default=None, min_length=1, max_length=200)
+    starts_on: date | None = None
+    ends_on: date | None = None
+
+
 class PeriodRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

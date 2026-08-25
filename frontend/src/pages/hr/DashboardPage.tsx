@@ -3,7 +3,13 @@ import { motion } from "motion/react";
 import { useSearchParams } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { apiClient, extractErrorMessage } from "../../api/client";
-import { useDashboardOverview, useExpiringContracts, useSites } from "../../api/queries";
+import {
+  useDashboardOverview,
+  useExpiringContracts,
+  usePeriodTrend,
+  useSites,
+} from "../../api/queries";
+import { PeriodTrendChart } from "../../components/PeriodTrendChart";
 import { RoleOverviewCards } from "../../components/RoleOverviewCards";
 import { StageStatusCard } from "../../components/StageStatusCard";
 import { useToast } from "../../components/Toast";
@@ -81,7 +87,20 @@ export function DashboardPage() {
       { replace: true }
     );
 
-  const { data: overview, error: overviewError } = useDashboardOverview();
+  // فیلتر محل در نشانی صفحه زندگی می‌کند، مثل خودِ تب — تا نشانیِ فرستاده‌شده
+  // همان چیزی را نشان بدهد که فرستنده می‌دید.
+  const siteFilter = params.get("site") ?? "";
+  const setSiteFilter = (next: string) =>
+    setParams(
+      (prev) => {
+        const p = new URLSearchParams(prev);
+        if (next) p.set("site", next);
+        else p.delete("site");
+        return p;
+      },
+      { replace: true }
+    );
+  const { data: overview, error: overviewError } = useDashboardOverview(siteFilter || undefined);
 
   if (overviewError != null)
     return <p className="p-6 text-center text-sm text-red-600">{extractErrorMessage(overviewError)}</p>;
@@ -117,33 +136,11 @@ export function DashboardPage() {
 
       {tab === "overview" && (
       <motion.div key="overview-tab" {...TAB_TRANSITION} className="space-y-5">
-      {/* یک جمله به‌جای سه کارت.
-          «کل ارزیابی‌های نهایی‌شده» عیناً همان عددی بود که نوار بالا نشان می‌دهد،
-          و «واحدهای سازمانی» یک عدد کمکی است نه یک شاخص. حالا هر سه در یک
-          کارت‌اند: عدد اصلی بزرگ، بقیه به‌عنوان زمینهٔ همان عدد. */}
-      <motion.div
-        className="flex flex-wrap items-center justify-between gap-5 rounded-2xl border border-gray-200 bg-white p-5"
-        initial={{ opacity: 0, y: 12 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.4 }}
-      >
-        <div>
-          <p className="text-sm font-medium text-gray-500">میانگین امتیاز نهایی سازمان</p>
-          <p className="mt-1 text-sm text-gray-400">
-            بر پایهٔ{" "}
-            <span className="font-semibold tabular-nums text-gray-600">
-              {overview.total_evaluations.toLocaleString("fa-IR")}
-            </span>{" "}
-            ارزیابی نهایی‌شده در{" "}
-            <span className="font-semibold tabular-nums text-gray-600">
-              {overview.by_org_unit.length.toLocaleString("fa-IR")}
-            </span>{" "}
-            واحد سازمانی
-          </p>
-        </div>
-        <ScoreRing value={overview.avg_final_pct} size={72} />
-      </motion.div>
-
+      {/* «سه کارت اولیه» این‌جا بود و برداشته شد.
+          آن سه (کل ارزیابی‌های نهایی‌شده، میانگین، تعداد واحدها) اول به یک کارت
+          خلاصه شدند و حالا کلاً رفته‌اند: هر سه عدد جای دیگری هستند — نوار بالای
+          صفحه و «نمای سازمان» — و نمای کلی جایی است که باید بگوید *چه کاری مانده*،
+          نه اینکه میانگین سازمان چند است. */}
       <StageStatusCard />
 
       <ExpiringContractsCard />
@@ -174,8 +171,13 @@ export function DashboardPage() {
 
       {analysisTab === "org" && (
       <div className="space-y-5">
+      <SiteFilterBar value={siteFilter} onChange={setSiteFilter} />
+
       {/* ── سه عددی که «سازمان چطور است» را در یک نگاه می‌گویند ── */}
       <OrgSummaryCard overview={overview} />
+
+      {/* ── روند میانگین سازمان در طول دوره‌ها ── */}
+      <PeriodTrendCard site={siteFilter} />
 
       {/* ── نمودار میله‌ای میانگین به تفکیک واحد ── */}
       <BarByOrgUnitCard data={overview.by_org_unit} />
@@ -194,7 +196,7 @@ export function DashboardPage() {
           strongest={overview.highest_by_specialized_indicator}
         />
         <Table
-          title="نمرات هر ارزیاب (مسئول واحد)"
+          title="تحلیل الگوی امتیازدهی ارزیابان"
           headers={["ارزیاب", "میانگین", "زیرمجموعه", "ارزیابی"]}
           rows={overview.by_evaluator.map((e) => [
             // نامِ آدم بالا، نام کاربری زیرش. جدولی که فقط «sup_it» را نشان
@@ -240,6 +242,63 @@ export function DashboardPage() {
   );
 }
 
+
+/** روند میانگین سازمان در طول دوره‌های ارزیابی.
+ *
+ *  بقیهٔ این صفحه «الان چطوریم» را می‌گوید. این یکی تنها جایی است که می‌گوید
+ *  «داریم بهتر می‌شویم یا بدتر» — و همان چیزی است که از یک گزارش سالانه انتظار
+ *  می‌رود.
+ */
+function PeriodTrendCard({ site }: { site: string }) {
+  const { data = [], isPending } = usePeriodTrend(site || undefined);
+  return (
+    <div className="rounded-2xl border border-gray-200 bg-white p-5">
+      <div className="mb-3">
+        <h3 className="text-base font-bold text-gray-900">روند میانگین سازمان</h3>
+        <p className="mt-0.5 text-xs text-gray-400">میانگین امتیاز نهایی در هر دورهٔ ارزیابی</p>
+      </div>
+      {isPending ? (
+        <div className="skeleton h-64" aria-hidden />
+      ) : (
+        <PeriodTrendChart data={data} />
+      )}
+    </div>
+  );
+}
+
+/** فیلتر محل برای کل نمای سازمان.
+ *
+ *  قرص‌ها و نه یک `select`: سه گزینه‌اند و همیشه همان سه. یک منوی بازشو برای سه
+ *  گزینه، یک کلیک اضافه می‌گیرد تا چیزی را نشان بدهد که جا داشت همان اول دیده
+ *  شود.
+ */
+function SiteFilterBar({ value, onChange }: { value: string; onChange: (site: string) => void }) {
+  const { data: sites = [] } = useSites(true);
+  if (sites.length === 0) return null;
+  const options = [{ key: "", label: "کل سازمان" }, ...sites.map((s) => ({ key: s, label: s }))];
+  return (
+    <div className="flex flex-wrap items-center gap-2">
+      <span className="text-xs font-medium text-gray-500">محل:</span>
+      <div role="tablist" className="inline-flex flex-wrap gap-1 rounded-xl border border-gray-200 bg-gray-50 p-1">
+        {options.map((option) => (
+          <button
+            key={option.key}
+            role="tab"
+            aria-selected={value === option.key}
+            onClick={() => onChange(option.key)}
+            className={`rounded-lg px-3 py-1 text-xs font-medium transition-colors ${
+              value === option.key
+                ? "bg-white text-gray-900 shadow-sm"
+                : "text-gray-500 hover:text-gray-800"
+            }`}
+          >
+            {option.label}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
 
 /** سه عددی که «سازمان چطور است» را در یک نگاه می‌گویند.
  *

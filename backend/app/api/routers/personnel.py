@@ -27,9 +27,12 @@ from app.schemas.personnel import (
 )
 from app.services.audit import log_event
 from app.services.excel import build_personnel_workbook
-from app.services.org_unit import known_sites, site_of
+from app.services.org_unit import known_sites, units_in_site
 from app.services.personnel_import import ImportPreview, build_template, parse_workbook
 from app.services.security_tokens import generate_temp_password
+from app.services.self_assessment import OPEN_STATUSES as SELF_ASSESSMENT_OPEN_STATUSES
+from app.services.self_assessment import invite as invite_to_self_assessment_service
+from app.services.self_assessment import state_of as self_assessment_state
 from app.services.sessions import revoke_all_for_user
 from app.services.workflow import IS_OPEN_RECORD, apply_transition
 
@@ -71,21 +74,11 @@ def _apply_personnel_filters(
             | Personnel.org_unit.ilike(pattern)
         )
     if site:
-        # تطبیق در پایتون و با همان تابعی که همه‌جا استفاده می‌شود، نه با یک
-        # الگوی LIKE.
-        #
-        # الگوی LIKE یعنی قرارداد جداکننده دو بار نوشته شود — یک بار در
-        # `split_site` و یک بار این‌جا — و همان‌جا بود که اولین بار شکست: مقدارِ
-        # واقعی «کارخانه / فروش» فاصله دارد و الگوی «کارخانه/%» هیچ‌چیز نگرفت.
-        # تعداد واحدهای متمایز ده‌ها است، پس خواندنشان ارزان‌تر از نگه‌داشتن دو
-        # نسخه از یک قانون است.
-        wanted = site.strip()
-        matching = [
-            unit
-            for unit in db.scalars(select(Personnel.org_unit).distinct())
-            if site_of(unit) == wanted
-        ]
-        query = query.where(Personnel.org_unit.in_(matching))
+        query = query.where(
+            Personnel.org_unit.in_(
+                units_in_site(list(db.scalars(select(Personnel.org_unit).distinct())), site)
+            )
+        )
     if status_filter is not None:
         query = query.where(Personnel.status == status_filter)
     if org_unit:
@@ -130,24 +123,40 @@ def _can_view_personnel(db: Session, personnel_id: int, current_user: CurrentUse
 
 
 def _with_accounts(db: Session, rows: list[Personnel]) -> list[PersonnelRead]:
-    """نام کاربریِ هر پرسنل، با یک کوئری برای کل صفحه (نه N+1).
+    """نام کاربری و وضعیت خودارزیابیِ هر پرسنل، با کوئری‌های ثابت (نه N+1).
 
-    بدون این، «آیا این فرد حساب دارد؟» فقط با رفتن به صفحهٔ کاربران و گشتن
-    جواب داشت — و ساختِ حساب برای پرسنلِ موجود عملاً پیدا نمی‌شد.
+    بدون نام کاربری، «آیا این فرد حساب دارد؟» فقط با رفتن به صفحهٔ کاربران و
+    گشتن جواب داشت. بدون وضعیت خودارزیابی، دکمهٔ دعوت نمی‌دانست باید فعال باشد
+    یا نه — و تنها راهش یک درخواست به‌ازای هر ردیف بود.
     """
     if not rows:
         return []
+    ids = [r.id for r in rows]
     usernames = dict(
         db.execute(
             select(User.personnel_id, User.username).where(
-                User.personnel_id.in_([r.id for r in rows])
+                User.personnel_id.in_(ids), User.is_active.is_(True)
             )
         ).all()
     )
+    open_records = {
+        record.subject_personnel_id: record
+        for record in db.scalars(
+            select(EvaluationRecord)
+            .where(
+                EvaluationRecord.subject_personnel_id.in_(ids),
+                EvaluationRecord.status.in_(SELF_ASSESSMENT_OPEN_STATUSES),
+            )
+            .order_by(EvaluationRecord.created_at)
+        )
+    }
     items = []
     for row in rows:
         item = PersonnelRead.model_validate(row)
         item.account_username = usernames.get(row.id)
+        record = open_records.get(row.id)
+        item.open_evaluation_id = record.id if record else None
+        item.self_assessment_state = self_assessment_state(record, row.id in usernames)
         items.append(item)
     return items
 
@@ -207,6 +216,32 @@ def list_org_units(
     return list(
         db.scalars(select(Personnel.org_unit).distinct().order_by(Personnel.org_unit))
     )
+
+
+@router.post("/{personnel_id}/invite-self-assessment", response_model=PersonnelRead)
+def invite_to_self_assessment(
+    personnel_id: int,
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(
+        require_role_or_capability(UserRole.hr, Capability.manage_personnel)
+    ),
+) -> PersonnelRead:
+    """از کارمند بخواه خودارزیابی‌اش را انجام دهد.
+
+    اعلان داخلی می‌سازد؛ همان اعلان — اگر ایمیل یا پیامک تنظیم شده باشد و کاربر
+    آن کانال را روشن کرده باشد — از آن راه هم می‌رود. صفِ ارسال بیرونی همان صفی
+    است که بقیهٔ اعلان‌های گردش‌کار از آن رد می‌شوند.
+
+    یک‌بار برای هر پرونده: دکمه پس از ارسال غیرفعال می‌ماند تا پروندهٔ بعدی.
+    """
+    personnel = db.get(Personnel, personnel_id)
+    if personnel is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="پرسنل یافت نشد")
+
+    invite_to_self_assessment_service(db, personnel, current_user.id)
+    db.commit()
+    db.refresh(personnel)
+    return _with_accounts(db, [personnel])[0]
 
 
 @router.get("/sites", response_model=list[str])

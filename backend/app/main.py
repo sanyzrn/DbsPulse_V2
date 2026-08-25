@@ -26,6 +26,7 @@ from app.api.routers import (
     indicators,
     me,
     notifications,
+    org_units,
     periods,
     personnel,
     reports,
@@ -143,6 +144,7 @@ app.include_router(admin.router)
 app.include_router(administration.router)
 app.include_router(config.router)
 app.include_router(personnel.router)
+app.include_router(org_units.router)
 app.include_router(evaluation_access.router)
 app.include_router(users.router)
 app.include_router(indicators.router)

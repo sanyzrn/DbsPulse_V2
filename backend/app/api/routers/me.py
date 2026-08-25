@@ -31,6 +31,7 @@ from app.schemas.improvement_plan import ImprovementPlanDetail
 from app.services.audit import log_event
 from app.services.indicator_framework import indicator_ids_for_record
 from app.services.notifications import notify
+from app.services.self_assessment import OPEN_STATUSES as SELF_ASSESSMENT_OPEN_STATUSES
 from app.services.workflow import IS_OPEN_RECORD
 
 router = APIRouter(prefix="/api/me", tags=["me"])
@@ -104,12 +105,9 @@ def my_improvement_plans(
     )
 
 
-# خودارزیابی فقط تا پیش از قطعی‌شدن نمرهٔ ارزیاب معنا دارد: بعد از آن دیگر «دیدگاه
-# مستقل» نیست، واکنش به نمره است. مسیر عادی در draft، مسیر «مدیر» در hr_approved
-# (که معاونت خودش نمره‌دهندهٔ اول است).
-_SELF_ASSESSMENT_OPEN_STATUSES = frozenset(
-    {EvaluationStatus.draft, EvaluationStatus.hr_approved}
-)
+# پنجرهٔ خودارزیابی در `services/self_assessment.py` تعریف شده — یک جا، تا
+# دعوت‌کردن و ثبت‌کردن دربارهٔ یک بازهٔ زمانی حرف بزنند.
+_SELF_ASSESSMENT_OPEN_STATUSES = SELF_ASSESSMENT_OPEN_STATUSES
 
 
 @router.get("/evaluations/{evaluation_id}/self-assessment", response_model=SelfAssessmentRead)

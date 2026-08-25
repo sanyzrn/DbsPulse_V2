@@ -79,7 +79,10 @@ export function Layout() {
   }
 
   return (
-    <div className="flex min-h-screen bg-cream-50">
+    /* پوستهٔ شناور: هیچ‌کدام از سه قاب (ناوبری، نوار بالا، پاصفحه) به لبهٔ
+       پنجره نمی‌چسبند. فاصله را همین ظرف می‌دهد تا هر سه یک اندازه عقب
+       بنشینند و گردیِ گوشه‌هایشان دیده شود. */
+    <div className="flex min-h-screen gap-3 bg-cream-50 px-3 pb-3 lg:gap-4 lg:px-4 lg:pb-4">
       {/* پرش به محتوای اصلی: کاربر کیبورد/screen reader مجبور نیست هر بار کل
           ناوبری را Tab بزند تا به محتوای صفحه برسد */}
       <a
@@ -90,9 +93,11 @@ export function Layout() {
       </a>
 
       {/* ستون ثابت — از lg به بالا. `sticky` و نه `fixed` تا نیازی به جبرانِ
-          دستیِ حاشیهٔ محتوا نباشد. */}
+          دستیِ حاشیهٔ محتوا نباشد.
+          ارتفاع = ارتفاع پنجره منهای فاصلهٔ بالا و پایین، تا پاصفحهٔ ستون هم
+          از کفِ پنجره جدا بماند. */}
       <aside
-        className={`sticky top-0 hidden h-screen shrink-0 border-l border-gray-200 transition-[width] duration-200 lg:block ${
+        className={`sticky top-3 hidden h-[calc(100vh-1.5rem)] shrink-0 pt-3 transition-[width] duration-200 lg:top-4 lg:h-[calc(100vh-2rem)] lg:block lg:pt-4 ${
           collapsed ? "w-16" : "w-60"
         }`}
       >
@@ -114,7 +119,7 @@ export function Layout() {
             />
             <motion.aside
               key="drawer"
-              className="fixed inset-y-0 right-0 z-50 w-64 border-l border-gray-200 lg:hidden"
+              className="fixed inset-y-3 right-3 z-50 w-64 lg:hidden"
               initial={{ x: "100%" }}
               animate={{ x: 0 }}
               exit={{ x: "100%" }}
@@ -133,36 +138,42 @@ export function Layout() {
 
       <div className="flex min-w-0 flex-1 flex-col">
         {/* نوار بالا فقط چیزهای «همیشه در دسترس» را دارد: کجا هستم، اعلان‌ها،
-            حساب من. ناوبری از این‌جا رفته، پس نوار می‌تواند نازک بماند. */}
-        <header className="sticky top-0 z-30 flex h-14 shrink-0 items-center gap-3 border-b border-gray-200 bg-white/90 px-4 backdrop-blur-md sm:px-6">
-          <button
-            type="button"
-            onClick={() => setDrawerOpen(true)}
-            aria-label="باز کردن منو"
-            className="flex h-9 w-9 items-center justify-center rounded-xl text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-900 lg:hidden"
-          >
-            <svg viewBox="0 0 20 20" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
-              <path d="M3 6h14M3 10h14M3 14h14" />
-            </svg>
-          </button>
+            حساب من. ناوبری از این‌جا رفته، پس نوار می‌تواند نازک بماند.
 
-          <p className="min-w-0 flex-1 truncate text-sm font-semibold text-gray-900">
-            {active?.label ?? ""}
-          </p>
+            نوار هم شناور است، ولی محتوایی که هنگام اسکرول زیرش رد می‌شود نباید
+            از فاصلهٔ بالای آن پیدا باشد. پس خودِ نوار گرد و جداست و یک لایهٔ
+            هم‌رنگِ صفحه پشتش تا لبهٔ بالا کشیده می‌شود. */}
+        <div className="sticky top-0 z-30 shrink-0 bg-cream-50 pt-3 lg:pt-4">
+          <header className="flex h-14 items-center gap-3 rounded-2xl border border-gray-200 bg-white px-4 shadow-sm sm:px-6">
+            <button
+              type="button"
+              onClick={() => setDrawerOpen(true)}
+              aria-label="باز کردن منو"
+              className="flex h-9 w-9 items-center justify-center rounded-xl text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-900 lg:hidden"
+            >
+              <svg viewBox="0 0 20 20" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
+                <path d="M3 6h14M3 10h14M3 14h14" />
+              </svg>
+            </button>
 
-          <div className="flex shrink-0 items-center gap-1">
-            <span className="hidden sm:inline-flex">
-              <ThemeToggle />
-            </span>
-            <NotificationBell />
-            <ProfileMenu user={user} onLogout={handleLogout} />
-          </div>
-        </header>
+            <p className="min-w-0 flex-1 truncate text-sm font-semibold text-gray-900">
+              {active?.label ?? ""}
+            </p>
+
+            <div className="flex shrink-0 items-center gap-1">
+              <span className="hidden sm:inline-flex">
+                <ThemeToggle />
+              </span>
+              <NotificationBell />
+              <ProfileMenu user={user} onLogout={handleLogout} />
+            </div>
+          </header>
+        </div>
 
         <main
           id="main-content"
           tabIndex={-1}
-          className="w-full flex-1 px-4 py-6 sm:px-6 sm:py-8"
+          className="w-full flex-1 py-4 sm:py-6"
         >
           {/* ErrorBoundary با key مسیر دوباره mount می‌شود تا خطای یک صفحه با رفتن به
               صفحهٔ دیگر خودبه‌خود پاک شود، نه اینکه کاربر برای همیشه در حالت خطا بماند */}

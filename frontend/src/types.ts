@@ -61,8 +61,42 @@ export interface Personnel {
   separation_reason: SeparationReason | null;
   /** نام کاربریِ حساب این فرد، اگر دارد. null یعنی هنوز نمی‌تواند وارد شود. */
   account_username: string | null;
+  /** وضعیت خودارزیابیِ پروندهٔ باز — تعیین می‌کند دکمهٔ دعوت چه بگوید. */
+  self_assessment_state: SelfAssessmentState;
+  open_evaluation_id: number | null;
   created_at: string;
   updated_at: string;
+}
+
+/** «دعوت نشده» و «دعوت شده ولی انجام نداده» و «پرونده‌ای نیست» سه چیز متفاوت‌اند
+ *  و هرکدام به کنشِ متفاوتی می‌رسند — پس یک بولین کافی نبود. */
+export type SelfAssessmentState =
+  | "no_case"
+  | "no_account"
+  | "closed"
+  | "pending"
+  | "invited"
+  | "submitted";
+
+/** میانگین سازمان در یک دورهٔ ارزیابی — یک نقطه از «روند میانگین زمانی». */
+export interface PeriodTrendPoint {
+  period_id: number | null;
+  name: string;
+  starts_on: string | null;
+  /** `null` یعنی جمعیتِ دوره کمتر از حداقلِ ناشناس‌ماندن بوده است. */
+  avg_final_pct: number | null;
+  count: number;
+}
+
+export interface OrgUnitCatalogueItem {
+  id: number;
+  site: string | null;
+  name: string;
+  /** همان رشته‌ای که در `personnel.org_unit` می‌نشیند. */
+  full_name: string;
+  is_active: boolean;
+  display_order: number;
+  personnel_count: number;
 }
 
 export interface EvaluationAccess {

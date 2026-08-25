@@ -18,6 +18,8 @@ function person(id: number, full_name: string, over: Partial<Personnel> = {}): P
     separation_date: null,
     separation_reason: null,
     account_username: null,
+    self_assessment_state: "no_case",
+    open_evaluation_id: null,
     created_at: "",
     updated_at: "",
     ...over,

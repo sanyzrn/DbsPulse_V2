@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import date, datetime
 
 from pydantic import BaseModel
 
@@ -131,6 +131,20 @@ class StageStat(BaseModel):
     avg_dwell_days: float | None
     longest_active_days: float | None
     by_owner: list[StageOwnerStat]
+
+
+class PeriodTrendPoint(BaseModel):
+    """میانگین سازمان در یک دورهٔ ارزیابی.
+
+    یک عددِ امروز نمی‌گوید سازمان دارد بهتر می‌شود یا بدتر. سه عدد پشت سر هم
+    می‌گویند — و همان چیزی است که مدیر از یک گزارش سالانه می‌خواهد.
+    """
+
+    period_id: int | None
+    name: str
+    starts_on: date | None
+    avg_final_pct: float | None
+    count: int
 
 
 class RoleOverviewCard(BaseModel):

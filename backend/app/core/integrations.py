@@ -28,6 +28,10 @@ class IntegrationField:
     #: "text" | "number" | "bool"
     kind: str
     help: str = ""
+    #: کف و سقفِ عددی. یک «حد نمایش کوهورت» صفر یعنی خاموش‌کردنِ بی‌سروصدای
+    #: ناشناس‌ماندن، و یک «مهلت اعتراض» منفی یعنی پنجره‌ای که هیچ‌وقت باز نیست.
+    minimum: int | None = None
+    maximum: int | None = None
 
 
 #: قابل ویرایش از پنل. هیچ‌کدام رمز نیستند.
@@ -57,4 +61,82 @@ SECRET_KEYS: tuple[tuple[str, str], ...] = (
     ("sms_api_key", "کلید API پیامک"),
 )
 
-EDITABLE_BY_KEY = {field.key: field for field in EDITABLE}
+#: قاعده‌های سازمانی — عددهایی که تا امروز فقط در `.env` بودند.
+#:
+#: این‌ها نه راز‌اند و نه فنی: «چند روز مهلت اعتراض» و «از چند نفر به بالا
+#: میانگین را نشان بده» تصمیم‌های سازمان‌اند، نه تصمیم‌های استقرار. تا امروز
+#: عوض‌کردنشان به دسترسی SSH نیاز داشت.
+#:
+#: عمداً هر عددی به این فهرست نیامده: اندازهٔ استخر اتصال و مهلت توکن، تصمیم
+#: استقرارند و جایشان همان `.env` است.
+POLICY: tuple[IntegrationField, ...] = (
+    IntegrationField(
+        "objection_window_days",
+        "مهلت اعتراض کارمند (روز)",
+        "number",
+        "از لحظهٔ نهایی‌شدن پرونده، کارمند چند روز برای ثبت اعتراض دارد",
+        minimum=1,
+        maximum=365,
+    ),
+    IntegrationField(
+        "min_cohort_size",
+        "حداقل جمعیت برای نمایش میانگین",
+        "number",
+        "میانگینِ گروهی که کمتر از این تعداد باشد نشان داده نمی‌شود، تا امتیاز فرد از آن بیرون نیاید",
+        minimum=1,
+        maximum=100,
+    ),
+    IntegrationField(
+        "contract_expiry_alert_days",
+        "هشدار پایان قرارداد (روز)",
+        "number",
+        "چند روز پیش از پایان قرارداد، منابع انسانی خبردار شود",
+        minimum=1,
+        maximum=365,
+    ),
+    IntegrationField(
+        "sla_reminder_days",
+        "یادآوری پروندهٔ راکد (روز)",
+        "number",
+        "پرونده‌ای که این تعداد روز در یک مرحله بماند، به مسئولش یادآوری می‌شود",
+        minimum=1,
+        maximum=90,
+    ),
+    IntegrationField(
+        "improvement_review_alert_days",
+        "یادآوری بازبینی برنامهٔ بهبود (روز)",
+        "number",
+        "چند روز پیش از موعد بازبینی، یادآوری فرستاده شود",
+        minimum=1,
+        maximum=90,
+    ),
+    IntegrationField(
+        "notification_dedup_days",
+        "فاصلهٔ تکرار یک اعلان (روز)",
+        "number",
+        "همان اعلان برای همان پرونده، زودتر از این فاصله دوباره فرستاده نمی‌شود",
+        minimum=1,
+        maximum=90,
+    ),
+    IntegrationField(
+        "login_max_failed_attempts",
+        "تعداد ورود ناموفق تا قفل‌شدن",
+        "number",
+        "بعد از این تعداد تلاش ناموفق، حساب موقتاً قفل می‌شود",
+        minimum=3,
+        maximum=50,
+    ),
+    IntegrationField(
+        "login_lockout_minutes",
+        "مدت قفل‌شدن حساب (دقیقه)",
+        "number",
+        "حسابِ قفل‌شده پس از این مدت خودبه‌خود باز می‌شود",
+        minimum=1,
+        maximum=1440,
+    ),
+)
+
+#: allowlistِ نوشتن. اتحادِ دو گروه است، ولی هر نقطهٔ ورودی فقط کلیدهای گروهِ
+#: خودش را می‌فرستد — وگرنه صفحهٔ «ایمیل و پیامک» می‌توانست مهلت اعتراض را هم
+#: عوض کند.
+EDITABLE_BY_KEY = {field.key: field for field in (*EDITABLE, *POLICY)}

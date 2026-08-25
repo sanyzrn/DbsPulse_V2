@@ -24,8 +24,10 @@ import {
   type Page,
   type PeriodProgress,
   type Personnel,
+  type OrgUnitCatalogueItem,
   type PipelineStat,
   type StageStat,
+  type PeriodTrendPoint,
   type RadarPoint,
   type RoleOverview,
   type TrendPoint,
@@ -93,6 +95,16 @@ export function useEvaluations(params: EvaluationListParams) {
  *  از سرور می‌آید و نه از روی `org_unit`ها ساخته می‌شود: محلی که هنوز کسی در آن
  *  ثبت نشده باید در فهرست باشد، وگرنه ثبتِ اولین نفرش ممکن نیست.
  */
+/** کاتالوگ واحدهای سازمانی — فهرستی که *تعریف* شده، نه استخراج‌شده از داده. */
+export function useOrgUnitCatalogue(enabled = true) {
+  return useQuery({
+    queryKey: ["org-units", "catalogue"],
+    queryFn: async () => (await apiClient.get<OrgUnitCatalogueItem[]>("/org-units")).data,
+    enabled,
+    staleTime: 300_000,
+  });
+}
+
 export function useSites(enabled: boolean) {
   return useQuery({
     queryKey: ["personnel", "sites"],
@@ -220,10 +232,31 @@ export function useAuditLog(params: {
   });
 }
 
-export function useDashboardOverview() {
+/** نمای تحلیلی سازمان. `site` کلِ نما را فیلتر می‌کند، نه فقط سه عدد بالا را:
+ *  فیلتری که نیمی از صفحه را عوض کند و نیمی را نه، خواننده را وادار می‌کند هر
+ *  بار بپرسد کدام عدد فیلتر شده. */
+export function useDashboardOverview(site?: string) {
   return useQuery({
-    queryKey: ["dashboard", "overview"],
-    queryFn: async () => (await apiClient.get<DashboardOverview>("/dashboard/overview")).data,
+    queryKey: ["dashboard", "overview", site ?? ""],
+    queryFn: async () =>
+      (
+        await apiClient.get<DashboardOverview>("/dashboard/overview", {
+          params: site ? { site } : undefined,
+        })
+      ).data,
+  });
+}
+
+/** روند میانگین سازمان، دوره به دوره. */
+export function usePeriodTrend(site?: string) {
+  return useQuery({
+    queryKey: ["dashboard", "period-trend", site ?? ""],
+    queryFn: async () =>
+      (
+        await apiClient.get<PeriodTrendPoint[]>("/dashboard/period-trend", {
+          params: site ? { site } : undefined,
+        })
+      ).data,
   });
 }
 

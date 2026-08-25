@@ -137,7 +137,7 @@ export function UsersPage() {
 
   return (
     <div className="space-y-4">
-      <PageHeader title="کاربران" subtitle="ساخت و مدیریت حساب‌های کاربری نقش‌های مختلف سامانه" />
+      <PageHeader title="مدیریت حساب" subtitle="ساخت، ویرایش و حذف حساب‌های کاربری همهٔ نقش‌های سامانه" />
       {showAddUser && (
         <Modal
           title="ساخت حساب کاربری"

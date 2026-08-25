@@ -2,6 +2,7 @@ from datetime import date, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import func, select
+from sqlalchemy import true as sa_true
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user, require_roles
@@ -11,6 +12,7 @@ from app.models.audit_log import AuditLog
 from app.models.enums import EvaluationStatus, IndicatorSection, PersonnelStatus, UserRole
 from app.models.evaluation import EvaluationRecord, EvaluationScore
 from app.models.evaluation_access import EvaluationAccess
+from app.models.evaluation_period import EvaluationPeriod
 from app.models.indicator import Indicator
 from app.models.personnel import Personnel
 from app.models.user import User
@@ -21,6 +23,7 @@ from app.schemas.dashboard import (
     IndicatorStat,
     InProgressEvaluation,
     OutcomeMix,
+    PeriodTrendPoint,
     PersonStat,
     PipelineStat,
     RadarPoint,
@@ -31,7 +34,7 @@ from app.schemas.dashboard import (
     UnitStat,
 )
 from app.schemas.notification import ExpiringContract
-from app.services.org_unit import site_of
+from app.services.org_unit import site_of, units_in_site
 from app.services.privacy import suppressed_avg
 from app.services.scoring_scheme import current_rules
 from app.services.stage_stats import stage_stats
@@ -53,7 +56,7 @@ _PIPELINE_STATUSES: tuple[EvaluationStatus, ...] = (
 )
 
 
-def _outcome_mix(db: Session) -> OutcomeMix:
+def _outcome_mix(db: Session, in_site) -> OutcomeMix:
     """چند درصد افراد «مطلوب»اند و چند درصد «نیازمند بهبود».
 
     هر دو مرز از خودِ طرحِ نمره‌دهیِ فعال می‌آیند:
@@ -88,7 +91,7 @@ def _outcome_mix(db: Session) -> OutcomeMix:
             )
             .label("rank"),
         )
-        .where(_FINALIZED, EvaluationRecord.final_weighted_pct.is_not(None))
+        .where(_FINALIZED, in_site, EvaluationRecord.final_weighted_pct.is_not(None))
         .subquery()
     )
     rows = db.execute(select(latest.c.pct).where(latest.c.rank == 1)).all()
@@ -113,15 +116,46 @@ def _outcome_mix(db: Session) -> OutcomeMix:
     )
 
 
+def _units_of(db: Session, site: str | None) -> list[str] | None:
+    """واحدهای زیر یک محل، یا `None` یعنی «بدون فیلتر».
+
+    `None` و نه فهرست خالی: فهرست خالی به `IN ()` تبدیل می‌شود و همه‌چیز را حذف
+    می‌کند — یعنی «همهٔ محل‌ها» و «محلی که کسی در آن نیست» یک نتیجه می‌دادند.
+    """
+    if not site:
+        return None
+    return units_in_site(list(db.scalars(select(Personnel.org_unit).distinct())), site)
+
+
 @router.get("/overview", response_model=DashboardOverview)
 def overview(
+    site: str | None = Query(default=None),
     db: Session = Depends(get_db),
     current_user: CurrentUser = Depends(require_roles(UserRole.hr)),
 ) -> DashboardOverview:
     """همه آمارها با تجمیع SQL محاسبه می‌شوند؛ نسخه قبلی کل جدول‌ها را در حافظه
     بارگذاری می‌کرد و به ازای هر رکورد یک کوئری جدا برای امتیازها می‌زد (N+1)."""
-    total = db.scalar(select(func.count()).select_from(EvaluationRecord).where(_FINALIZED)) or 0
-    avg_raw = db.scalar(select(func.avg(EvaluationRecord.final_weighted_pct)).where(_FINALIZED))
+    # فیلتر محل روی *کل* این نما اعمال می‌شود، نه فقط روی سه عدد بالا. فیلتری که
+    # نیمی از صفحه را عوض کند و نیمی را نه، خواننده را وادار می‌کند هر بار بپرسد
+    # کدام عدد فیلتر شده — که بدتر از نداشتنِ فیلتر است.
+    units = _units_of(db, site)
+    in_site = (
+        EvaluationRecord.subject_personnel_id.in_(
+            select(Personnel.id).where(Personnel.org_unit.in_(units))
+        )
+        if units is not None
+        else sa_true()
+    )
+
+    total = (
+        db.scalar(
+            select(func.count()).select_from(EvaluationRecord).where(_FINALIZED, in_site)
+        )
+        or 0
+    )
+    avg_raw = db.scalar(
+        select(func.avg(EvaluationRecord.final_weighted_pct)).where(_FINALIZED, in_site)
+    )
     avg_final = round(float(avg_raw), 1) if avg_raw is not None else None
 
     unit_rows = db.execute(
@@ -135,7 +169,7 @@ def overview(
             func.count(),
         )
         .join(Personnel, Personnel.id == EvaluationRecord.subject_personnel_id)
-        .where(_FINALIZED, EvaluationRecord.final_weighted_pct.is_not(None))
+        .where(_FINALIZED, in_site, EvaluationRecord.final_weighted_pct.is_not(None))
         .group_by(Personnel.org_unit)
     ).all()
     by_org_unit = [
@@ -175,7 +209,7 @@ def overview(
             func.count(),
         )
         .join(EvaluationRecord, EvaluationRecord.unit_supervisor_user_id == User.id)
-        .where(_FINALIZED, EvaluationRecord.final_weighted_pct.is_not(None))
+        .where(_FINALIZED, in_site, EvaluationRecord.final_weighted_pct.is_not(None))
         .group_by(User.id, User.username, User.full_name)
     ).all()
     by_evaluator = [
@@ -209,7 +243,7 @@ def overview(
             )
             .join(EvaluationScore, EvaluationScore.indicator_id == Indicator.id)
             .join(EvaluationRecord, EvaluationRecord.id == EvaluationScore.evaluation_record_id)
-            .where(_FINALIZED)
+            .where(_FINALIZED, in_site)
             .group_by(Indicator.id, Indicator.category, Indicator.description)
             .order_by(func.avg(EvaluationScore.score) if weakest else func.avg(EvaluationScore.score).desc())
             .limit(5)
@@ -250,7 +284,7 @@ def overview(
             EvaluationRecord.final_weighted_pct,
         )
         .join(Personnel, Personnel.id == EvaluationRecord.subject_personnel_id)
-        .where(_FINALIZED, EvaluationRecord.final_weighted_pct.is_not(None))
+        .where(_FINALIZED, in_site, EvaluationRecord.final_weighted_pct.is_not(None))
         .order_by(EvaluationRecord.final_weighted_pct)
         .limit(20)
     ).all()
@@ -268,7 +302,7 @@ def overview(
     return DashboardOverview(
         total_evaluations=total,
         avg_final_pct=avg_final,
-        outcome_mix=_outcome_mix(db),
+        outcome_mix=_outcome_mix(db, in_site),
         by_org_unit=by_org_unit,
         by_evaluator=by_evaluator,
         lowest_by_indicator=lowest_by_indicator,
@@ -303,6 +337,57 @@ def pipeline(
             oldest_created_at=rows.get(status_member, (0, None))[1],
         )
         for status_member in _PIPELINE_STATUSES
+    ]
+
+
+@router.get("/period-trend", response_model=list[PeriodTrendPoint])
+def period_trend(
+    site: str | None = Query(default=None),
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(require_roles(UserRole.hr)),
+) -> list[PeriodTrendPoint]:
+    """روند میانگین سازمان، دوره به دوره.
+
+    یک عددِ امروز نمی‌گوید سازمان دارد بهتر می‌شود یا بدتر؛ سه عدد پشت سر هم
+    می‌گویند.
+
+    پرونده‌های بدون دوره در یک ردیفِ جدا جمع می‌شوند و آخر می‌آیند — نه اینکه
+    حذف شوند. حذفشان یعنی نموداری که ادعا می‌کند کل سازمان است ولی بخشی از
+    ارزیابی‌ها را نمی‌شمارد، و کسی که آن را می‌خواند دلیلِ اختلاف را نمی‌فهمد.
+    """
+    units = _units_of(db, site)
+    in_site = (
+        EvaluationRecord.subject_personnel_id.in_(
+            select(Personnel.id).where(Personnel.org_unit.in_(units))
+        )
+        if units is not None
+        else sa_true()
+    )
+
+    rows = db.execute(
+        select(
+            EvaluationPeriod.id,
+            EvaluationPeriod.name,
+            EvaluationPeriod.starts_on,
+            func.avg(EvaluationRecord.final_weighted_pct),
+            func.count(),
+        )
+        .select_from(EvaluationRecord)
+        .outerjoin(EvaluationPeriod, EvaluationPeriod.id == EvaluationRecord.period_id)
+        .where(_FINALIZED, in_site, EvaluationRecord.final_weighted_pct.is_not(None))
+        .group_by(EvaluationPeriod.id, EvaluationPeriod.name, EvaluationPeriod.starts_on)
+        .order_by(EvaluationPeriod.starts_on.nullslast())
+    ).all()
+
+    return [
+        PeriodTrendPoint(
+            period_id=period_id,
+            name=name or "بدون دوره",
+            starts_on=starts_on,
+            avg_final_pct=suppressed_avg(round(float(avg), 1), count),
+            count=count,
+        )
+        for period_id, name, starts_on, avg, count in rows
     ]
 
 

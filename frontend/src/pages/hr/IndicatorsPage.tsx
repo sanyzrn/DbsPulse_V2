@@ -220,7 +220,16 @@ export function IndicatorsPage() {
         </Modal>
       )}
 
-      <div className="rounded-2xl border border-gray-200 bg-white p-5">
+      {/* افکتِ ورودِ محتوای تب، دقیقاً مثل بقیهٔ تب‌های سامانه: *کل* کارت
+          می‌آید، نه فقط ردیف‌های داخلش.
+          پیش‌تر انیمیشن یک لایه پایین‌تر بود و نتیجه‌اش این می‌شد که قابِ کارت و
+          سرستون‌هایش بی‌حرکت سر جا می‌ماندند و فقط ردیف‌ها محو و ظاهر می‌شدند —
+          همان چیزی که «با بقیهٔ تب‌ها فرق دارد» به نظر می‌رسید. */}
+      <motion.div
+        key={section}
+        {...TAB_TRANSITION}
+        className="rounded-2xl border border-gray-200 bg-white p-5"
+      >
         {loadError != null && (
           <p className="mb-2 text-sm text-red-600">{extractErrorMessage(loadError)}</p>
         )}
@@ -236,7 +245,6 @@ export function IndicatorsPage() {
           <span className="w-36 text-left">عملیات</span>
         </div>
 
-        <motion.div key={section} {...TAB_TRANSITION}>
         {isPending ? (
           <TableSkeleton rows={6} />
         ) : items.length === 0 ? (
@@ -256,8 +264,7 @@ export function IndicatorsPage() {
             ))}
           </Reorder.Group>
         )}
-        </motion.div>
-      </div>
+      </motion.div>
 
       {editing && (
         <EditIndicatorModal

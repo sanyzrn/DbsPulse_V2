@@ -14,6 +14,7 @@ import { APP_NAME, APP_NAME_FA } from "../appInfo";
 import { AnimatedGridBackground } from "../components/AnimatedGridBackground";
 import { BrandMark } from "../components/Brand";
 import { Footer } from "../components/Footer";
+import { PasswordInput } from "../ui/PasswordInput";
 import { Button } from "../ui/Button";
 import { PublicInfoLinks } from "../components/PublicInfoDialogs";
 import { ThemeToggle } from "../ui/ThemeToggle";
@@ -175,53 +176,6 @@ function EyeBall({
         />
       )}
     </div>
-  );
-}
-
-function EyeGlyph({ className = "size-5" }: { className?: string }) {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" aria-hidden="true" className={className}>
-      <path
-        d="M2 12C3.7 8.5 7.2 6 12 6s8.3 2.5 10 6c-1.7 3.5-5.2 6-10 6S3.7 15.5 2 12Z"
-        stroke="currentColor"
-        strokeWidth="1.8"
-        strokeLinejoin="round"
-      />
-      <circle cx="12" cy="12" r="3.2" stroke="currentColor" strokeWidth="1.8" />
-    </svg>
-  );
-}
-
-function EyeOffGlyph({ className = "size-5" }: { className?: string }) {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" aria-hidden="true" className={className}>
-      <path
-        d="M3 3L21 21"
-        stroke="currentColor"
-        strokeWidth="1.8"
-        strokeLinecap="round"
-      />
-      <path
-        d="M10.6 10.6A3.2 3.2 0 0 0 13.4 13.4"
-        stroke="currentColor"
-        strokeWidth="1.8"
-        strokeLinecap="round"
-      />
-      <path
-        d="M9.2 5.7A12.2 12.2 0 0 1 12 5.5c4.8 0 8.3 2.5 10 6.5-.8 1.5-1.8 2.8-3 3.9"
-        stroke="currentColor"
-        strokeWidth="1.8"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-      <path
-        d="M6 6.9C4.4 8.2 3.2 10 2.1 12c1.7 3.5 5.2 6 9.9 6 1.8 0 3.4-.3 4.9-.8"
-        stroke="currentColor"
-        strokeWidth="1.8"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
   );
 }
 
@@ -601,28 +555,22 @@ export function LoginPage() {
                 </Field>
 
                 <Field label="رمز عبور" htmlFor="login-password">
-                  <div className="relative">
-                    <input
-                      id="login-password"
-                      name="password"
-                      type={showPassword ? "text" : "password"}
-                      required
-                      autoComplete="current-password"
-                      className="w-full rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 pr-11 text-sm text-gray-900 outline-none transition-colors duration-150 focus:border-gray-900 focus:bg-white"
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      onFocus={() => setIsTyping(true)}
-                      onBlur={() => setIsTyping(false)}
-                    />
-                    <button
-                      type="button"
-                      aria-label={showPassword ? "Hide password" : "Show password"}
-                      className="absolute inset-y-0 right-3 flex items-center text-gray-500 transition-colors hover:text-pulse-700"
-                      onClick={() => setShowPassword((current) => !current)}
-                    >
-                      {showPassword ? <EyeOffGlyph className="size-5" /> : <EyeGlyph className="size-5" />}
-                    </button>
-                  </div>
+                  {/* همان ورودیِ رمزِ بقیهٔ سامانه — چشم در همان سمت و با همان
+                      برچسب. نمایش این‌جا کنترل‌شده است چون شخصیت‌های صفحه هم
+                      باید بدانند رمز پیداست یا نه (چشم‌هایشان را می‌پوشانند). */}
+                  <PasswordInput
+                    id="login-password"
+                    name="password"
+                    required
+                    autoComplete="current-password"
+                    baseClassName="w-full rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 pl-11 text-sm text-gray-900 outline-none transition-colors duration-150 focus:border-gray-900 focus:bg-white"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    onFocus={() => setIsTyping(true)}
+                    onBlur={() => setIsTyping(false)}
+                    visible={showPassword}
+                    onVisibleChange={setShowPassword}
+                  />
                 </Field>
 
                 {error && (

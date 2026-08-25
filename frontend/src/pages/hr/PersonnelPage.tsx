@@ -14,7 +14,7 @@ import { PersonnelImportDialog } from "../../components/PersonnelImportDialog";
 import { SelfAssessmentInviteButton } from "../../components/SelfAssessmentInviteButton";
 import { PaginationControls } from "../../components/PaginationControls";
 import { useToast } from "../../components/Toast";
-import { generatePassword } from "../../utils/password";
+import { PasswordField } from "../../ui/PasswordField";
 import { Button } from "../../ui/Button";
 import { FilterSelect, PageHeader, TableSkeleton } from "../../ui/Card";
 import { Modal } from "../../ui/Modal";
@@ -62,8 +62,6 @@ const emptyAccount: AccountDraft = { enabled: true, username: "", password: "" }
 function suggestUsername(personnelCode: string): string {
   return personnelCode.trim().toLowerCase().replace(/[^a-z0-9_.-]/g, "-").replace(/^-+|-+$/g, "");
 }
-
-/** رمز موقتِ قوی. HR باید آن را به فرد بدهد، پس باید بتواند ببیندش. */
 
 /** کلاس استاندارد فیلد ورودی مدرن. */
 const inputClass =
@@ -119,30 +117,21 @@ function AccountFields({
             </span>
           </label>
 
-          <label className="block text-sm">
-            <span className="mb-1.5 block font-medium text-gray-700">رمز عبور موقت</span>
-            <div className="flex gap-2">
-              <input
-                className={inputClass}
-                value={account.password}
-                onChange={(e) => setAccount({ ...account, username: username, password: e.target.value })}
-                placeholder="حداقل ۱۰ نویسه"
-                dir="ltr"
-              />
-              <button
-                type="button"
-                onClick={() =>
-                  setAccount({ ...account, username, password: generatePassword() })
-                }
-                className="whitespace-nowrap rounded-xl border border-gray-300 bg-white px-3 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-100"
-              >
-                تولید
-              </button>
-            </div>
-            <span className="mt-1 block text-xs text-gray-400">
-              همین رمز را به فرد بدهید؛ در اولین ورود مجبور به تغییرش می‌شود.
-            </span>
-          </label>
+          {/* label/htmlFor و نه پیچیدنِ ورودی: `PasswordField` کنارِ ورودی دکمه
+              هم دارد و کلیکِ روی «ساخت رمز قوی» داخل یک <label> به ورودی
+              منتقل می‌شد. */}
+          <div className="text-sm">
+            <label htmlFor="personnel-account-password" className="mb-1.5 block font-medium text-gray-700">
+              رمز عبور موقت
+            </label>
+            <PasswordField
+              id="personnel-account-password"
+              value={account.password}
+              onChange={(password) => setAccount({ ...account, username, password })}
+              username={username}
+              placeholder="حداقل ۱۰ نویسه"
+            />
+          </div>
         </div>
       )}
     </>
@@ -987,7 +976,7 @@ function EditPersonnelModal({
         {personnel.account_username ? (
           <p className="text-sm text-gray-600">
             این فرد حساب دارد:{" "}
-            <code className="rounded bg-gray-100 px-2 py-0.5 font-mono text-gray-800" dir="ltr">
+            <code className="rounded-md bg-gray-100 px-2 py-0.5 font-mono text-gray-800" dir="ltr">
               {personnel.account_username}
             </code>
             <span className="mt-1 block text-xs text-gray-400">

@@ -5,15 +5,39 @@
  */
 import { useId, useState, type InputHTMLAttributes } from "react";
 
+/** ظاهرِ پیش‌فرض. جای چشم (`pl-11`) بخشی از همین قرارداد است: هر جا که این
+ *  پایه عوض می‌شود، فضای چشم هم باید در نسخهٔ تازه باشد. */
 const INPUT_CLASS =
   "w-full rounded-xl border border-gray-200 bg-gray-100 px-4 py-2.5 pl-11 text-sm text-gray-900 outline-none transition-colors duration-150 focus:border-gray-900 focus:bg-white";
 
+interface PasswordInputProps extends Omit<InputHTMLAttributes<HTMLInputElement>, "type"> {
+  /** جایگزینِ کاملِ کلاس‌های پایه — نه افزوده به آن‌ها.
+   *
+   *  `className` در Tailwind نمی‌تواند کلاس پایه را «لغو» کند: `py-3` و `py-2.5`
+   *  هم‌وزن‌اند و برنده به ترتیبِ فایل CSS تعیین می‌شود، نه ترتیبِ نوشتن. پس
+   *  فرمی که ظاهرِ دیگری می‌خواهد (مثل صفحهٔ ورود) پایه را *عوض* می‌کند. */
+  baseClassName?: string;
+  /** نمایشِ کنترل‌شده — برای فرمی که خودش هم به این حالت واکنش نشان می‌دهد. */
+  visible?: boolean;
+  onVisibleChange?: (visible: boolean) => void;
+}
+
 export function PasswordInput({
   className = "",
+  baseClassName = INPUT_CLASS,
+  visible: visibleProp,
+  onVisibleChange,
   ...props
-}: Omit<InputHTMLAttributes<HTMLInputElement>, "type">) {
-  const [visible, setVisible] = useState(false);
+}: PasswordInputProps) {
+  const [visibleState, setVisibleState] = useState(false);
+  const visible = visibleProp ?? visibleState;
   const hintId = useId();
+
+  function toggle() {
+    const next = !visible;
+    if (visibleProp === undefined) setVisibleState(next);
+    onVisibleChange?.(next);
+  }
 
   return (
     <div className="relative">
@@ -24,12 +48,12 @@ export function PasswordInput({
         autoCapitalize="off"
         autoCorrect="off"
         spellCheck={false}
-        className={`${INPUT_CLASS} ${className}`}
+        className={`${baseClassName} ${className}`}
         aria-describedby={props["aria-describedby"] ?? hintId}
       />
       <button
         type="button"
-        onClick={() => setVisible((v) => !v)}
+        onClick={toggle}
         // tabIndex منفی نیست: کاربر صفحه‌کلید هم باید بتواند رمزش را ببیند
         aria-pressed={visible}
         aria-label={visible ? "پنهان‌کردن رمز عبور" : "نمایش رمز عبور"}

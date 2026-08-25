@@ -148,7 +148,11 @@ export function VerifyPage() {
           </AnimatePresence>
         </motion.div>
       </div>
-      <Footer />
+      {/* پاصفحه حالا یک قابِ گردِ شناور است، پس مثل بقیهٔ پوسته باید از
+          لبه‌های پنجره فاصله بگیرد. */}
+      <div className="px-3 pb-3 lg:px-4 lg:pb-4">
+        <Footer />
+      </div>
     </div>
   );
 }

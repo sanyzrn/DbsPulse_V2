@@ -67,7 +67,7 @@ interface SeparationStatus {
 }
 
 export function AdministrationPage() {
-  const { can } = usePermissions();
+  const { can, loading } = usePermissions();
   const { user } = useAuth();
   // همان شرطی که سرور می‌گذارد (`require_role_or_capability(hr, manage_personnel)`).
   // اگر این‌جا فقط مجوز را می‌دیدیم، کاربر منابع انسانی کارتی را نمی‌دید که API
@@ -80,14 +80,21 @@ export function AdministrationPage() {
         title="مدیریت سامانه"
         subtitle="چه کسی می‌تواند خودِ سامانه را عوض کند، و کدام بخش‌ها فعال‌اند"
       />
-      {canOrgUnits && <OrgUnitsCard />}
+      {!loading && canOrgUnits && <OrgUnitsCard />}
       {can("manage_capabilities") && <SeparationCard />}
       {can("manage_capabilities") && <CapabilitiesCard />}
       {can("manage_integrations") && <IntegrationsCard />}
       {can("manage_ai") && <AiCard />}
       {can("manage_modules") && <PolicyCard />}
       {can("manage_modules") && <ModulesCard />}
-      {!can("manage_capabilities") &&
+      {/* `loading` عمداً در شرط هست.
+          `can()` تا وقتی مجوزها از سرور نیامده `false` برمی‌گرداند، پس بدون این
+          شرط صفحه در همان یک لحظه با اطمینان می‌گفت «مجوز ندارید» — به مدیری که
+          همهٔ مجوزها را دارد. همان سه حالتی که در کد یکی به‌نظر می‌رسند و برای
+          کاربر کاملاً فرق دارند: «هنوز نمی‌دانم»، «نداری»، «داری». */}
+      {loading && <Card><TableSkeleton rows={3} /></Card>}
+      {!loading &&
+        !can("manage_capabilities") &&
         !can("manage_modules") &&
         !can("manage_integrations") &&
         !can("manage_ai") &&
@@ -976,6 +983,50 @@ function AiCard() {
         />
         دستیار در این سامانه فعال باشد
       </label>
+
+      {/* انتخاب سرویس: یک کلیک، آدرس و یک مدلِ پیش‌فرضِ سالم.
+          نیمی از مشکلات راه‌اندازی یک `/v1` جامانده در آدرس بود. */}
+      <div className="mb-4">
+        <p className="mb-2 text-xs font-medium text-gray-600">سرویس</p>
+        <div className="flex flex-wrap gap-2">
+          {(data.providers ?? []).map((option) => {
+            const active = value.provider === option.id;
+            return (
+              <button
+                key={option.id}
+                type="button"
+                onClick={() =>
+                  setDraft((prev) => ({
+                    ...prev,
+                    provider: option.id,
+                    // «سفارشی» چیزی را پاک نمی‌کند: کسی که رویش می‌زند معمولاً
+                    // همان آدرسی را می‌خواهد که نوشته بود.
+                    ...(option.base_url ? { base_url: option.base_url } : {}),
+                    ...(option.default_model ? { model: option.default_model } : {}),
+                  }))
+                }
+                className={`rounded-xl border px-3 py-2 text-right text-xs transition-colors ${
+                  active
+                    ? "border-pulse-200 bg-pulse-50 text-pulse-700"
+                    : "border-gray-200 bg-white text-gray-600 hover:bg-gray-50"
+                }`}
+              >
+                <span className="block font-semibold">{option.label}</span>
+                {option.default_model && (
+                  <span dir="ltr" className="mt-0.5 block text-left text-[11px] text-gray-400">
+                    {option.default_model}
+                  </span>
+                )}
+              </button>
+            );
+          })}
+        </div>
+        {(data.providers ?? []).find((o) => o.id === value.provider)?.note && (
+          <p className="mt-2 text-[11px] text-gray-400">
+            {(data.providers ?? []).find((o) => o.id === value.provider)?.note}
+          </p>
+        )}
+      </div>
 
       <div className="grid gap-3 sm:grid-cols-2">
         <label className="flex flex-col gap-1 text-xs font-medium text-gray-600">

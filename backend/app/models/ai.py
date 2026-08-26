@@ -55,6 +55,9 @@ class AiSettings(Base):
     #: فردی‌اش روشن باشد.
     enabled: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 
+    #: کدام سرویسِ آماده انتخاب شده. «custom» یعنی آدرس دستی.
+    provider: Mapped[str] = mapped_column(String(40), default="custom", nullable=False)
+
     #: نقطهٔ پایانیِ سازگار با OpenAI. خالی یعنی «تنظیم نشده».
     base_url: Mapped[str] = mapped_column(String(300), default="", nullable=False)
     model: Mapped[str] = mapped_column(String(120), default="", nullable=False)

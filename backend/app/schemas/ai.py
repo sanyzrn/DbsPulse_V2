@@ -3,8 +3,22 @@ from datetime import datetime
 from pydantic import BaseModel, Field
 
 
+class AiProviderOption(BaseModel):
+    """یک سرویسِ آماده. فرم از روی همین‌ها ساخته می‌شود و نه از فهرستی در فرانت‌اند —
+    دو نسخه از این جدول یعنی روزی که آدرسی عوض شود و یکی از آن دو نداند."""
+
+    id: str
+    label: str
+    base_url: str
+    default_model: str
+    note: str
+
+
 class AiSettingsRead(BaseModel):
     enabled: bool
+    provider: str
+    #: فهرست سرویس‌های آماده، برای ساختن دکمه‌های انتخاب.
+    providers: list[AiProviderOption]
     base_url: str
     model: str
     #: هرگز خودِ کلید — فقط چهار نویسهٔ آخر، تا آدم بشناسدش.
@@ -22,6 +36,7 @@ class AiSettingsRead(BaseModel):
 
 class AiSettingsUpdate(BaseModel):
     enabled: bool | None = None
+    provider: str | None = None
     base_url: str | None = None
     model: str | None = None
     #: `None` یعنی دست نزن، رشتهٔ خالی یعنی پاکش کن.

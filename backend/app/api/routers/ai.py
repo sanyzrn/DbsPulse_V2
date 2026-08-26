@@ -18,6 +18,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user, require_capability
+from app.core.ai_providers import PROVIDERS, PROVIDERS_BY_ID
 from app.core.crypto import decrypt, encrypt, masked
 from app.db.session import get_db
 from app.models.ai import (
@@ -35,6 +36,7 @@ from app.schemas.ai import (
     AiChatResponse,
     AiConversationRead,
     AiMessageRead,
+    AiProviderOption,
     AiRunActionRequest,
     AiRunActionResponse,
     AiSettingsRead,
@@ -354,6 +356,14 @@ def run_action(
 def _to_settings_read(row: AiSettings) -> AiSettingsRead:
     return AiSettingsRead(
         enabled=row.enabled,
+        provider=row.provider,
+        providers=[
+            AiProviderOption(
+                id=p.id, label=p.label, base_url=p.base_url,
+                default_model=p.default_model, note=p.note,
+            )
+            for p in PROVIDERS
+        ],
         base_url=row.base_url,
         model=row.model,
         api_key_hint=masked(row.api_key_encrypted),
@@ -386,6 +396,12 @@ def update_settings(
     row = _settings_row(db)
     data = payload.model_dump(exclude_unset=True)
     api_key = data.pop("api_key", None)
+
+    # سرویسِ ناشناخته رد می‌شود و به «سفارشی» نمی‌افتد: افتادنِ خاموش یعنی
+    # فرم چیزی را ذخیره کند که کاربر انتخاب نکرده.
+    if data.get("provider") is not None and data["provider"] not in PROVIDERS_BY_ID:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "سرویس انتخاب‌شده شناخته نشد")
+
     for key, value in data.items():
         setattr(row, key, value)
     if api_key is not None:

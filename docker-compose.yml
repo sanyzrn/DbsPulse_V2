@@ -48,6 +48,10 @@ services:
   # یک‌بار اجرا می‌شود، تا پایان موفق منتظر می‌مانیم، بعد بک‌اند بالا می‌آید.
   migrate:
     build: ./backend
+    # نام صریح، تا `docker save dbspulse-backend` و `docker-compose.prod.yml`
+    # همان ایمیجی را ببینند که این‌جا ساخته می‌شود؛ بدون این، نام از روی نام
+    # پوشهٔ پروژه ساخته می‌شود و روی هر ماشین می‌تواند فرق کند.
+    image: dbspulse-backend
     command: alembic upgrade head
     restart: "no"
     environment: *backend-env
@@ -57,6 +61,7 @@ services:
 
   backend:
     build: ./backend
+    image: dbspulse-backend
     restart: unless-stopped
     environment: *backend-env
     depends_on:
@@ -77,6 +82,7 @@ services:
 
   frontend:
     build: ./frontend
+    image: dbspulse-frontend
     restart: unless-stopped
     depends_on:
       - backend

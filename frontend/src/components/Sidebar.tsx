@@ -73,10 +73,12 @@ export function Sidebar({
                   {({ isActive }) => (
                     <>
                       {/* نوارِ باریکِ کنارِ آیتم فعال: در حالت جمع‌شده تنها نشانهٔ
-                          «کجا هستم» است، چون برچسبی در کار نیست. */}
+                          «کجا هستم» است، چون برچسبی در کار نیست.
+                          کمی تورفته، تا روی قابِ گردِ پنل ننشیند و شبیه خطی که
+                          از لبه بیرون زده دیده نشود. */}
                       <span
                         aria-hidden
-                        className={`absolute inset-y-1.5 right-0 w-[3px] rounded-full bg-pulse-600 transition-opacity ${
+                        className={`absolute inset-y-2 right-1 w-[3px] rounded-full bg-pulse-600 transition-opacity ${
                           isActive ? "opacity-100" : "opacity-0"
                         }`}
                       />

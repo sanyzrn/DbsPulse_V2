@@ -67,7 +67,7 @@ interface SeparationStatus {
 }
 
 export function AdministrationPage() {
-  const { can } = usePermissions();
+  const { can, loading } = usePermissions();
   const { user } = useAuth();
   // همان شرطی که سرور می‌گذارد (`require_role_or_capability(hr, manage_personnel)`).
   // اگر این‌جا فقط مجوز را می‌دیدیم، کاربر منابع انسانی کارتی را نمی‌دید که API
@@ -80,14 +80,21 @@ export function AdministrationPage() {
         title="مدیریت سامانه"
         subtitle="چه کسی می‌تواند خودِ سامانه را عوض کند، و کدام بخش‌ها فعال‌اند"
       />
-      {canOrgUnits && <OrgUnitsCard />}
+      {!loading && canOrgUnits && <OrgUnitsCard />}
       {can("manage_capabilities") && <SeparationCard />}
       {can("manage_capabilities") && <CapabilitiesCard />}
       {can("manage_integrations") && <IntegrationsCard />}
       {can("manage_ai") && <AiCard />}
       {can("manage_modules") && <PolicyCard />}
       {can("manage_modules") && <ModulesCard />}
-      {!can("manage_capabilities") &&
+      {/* `loading` عمداً در شرط هست.
+          `can()` تا وقتی مجوزها از سرور نیامده `false` برمی‌گرداند، پس بدون این
+          شرط صفحه در همان یک لحظه با اطمینان می‌گفت «مجوز ندارید» — به مدیری که
+          همهٔ مجوزها را دارد. همان سه حالتی که در کد یکی به‌نظر می‌رسند و برای
+          کاربر کاملاً فرق دارند: «هنوز نمی‌دانم»، «نداری»، «داری». */}
+      {loading && <Card><TableSkeleton rows={3} /></Card>}
+      {!loading &&
+        !can("manage_capabilities") &&
         !can("manage_modules") &&
         !can("manage_integrations") &&
         !can("manage_ai") &&

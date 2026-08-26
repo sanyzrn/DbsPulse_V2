@@ -705,3 +705,55 @@ export interface PeriodProgress {
   without_chain_total: number;
   without_chain: NotStartedPersonnel[];
 }
+
+// ── دستیار هوشمند ─────────────────────────────────────────────────────────
+
+export interface AiStatus {
+  available: boolean;
+  /** اگر در دسترس نیست، *چرا* — به زبان قابل‌اقدام. */
+  reason: string;
+  allow_write_actions: boolean;
+}
+
+export interface AiAction {
+  name: string;
+  /** جمله‌ای که زیرِ دکمهٔ تأیید نوشته می‌شود — به نام، نه به شناسه. */
+  summary: string;
+  payload: Record<string, unknown>;
+}
+
+export interface AiMessage {
+  id: number;
+  role: "user" | "assistant";
+  content: string;
+  actions: AiAction[];
+}
+
+export interface AiSettings {
+  enabled: boolean;
+  base_url: string;
+  model: string;
+  api_key_hint: string;
+  api_key_configured: boolean;
+  temperature: number;
+  max_tokens: number;
+  timeout_seconds: number;
+  instructions: string;
+  restrict_to_platform: boolean;
+  context_record_limit: number;
+  allow_write_actions: boolean;
+  max_user_chars: number;
+}
+
+export interface AiUserAccess {
+  user_id: number;
+  username: string;
+  display_name: string;
+  role: string;
+  enabled: boolean;
+  api_key_hint: string;
+  api_key_configured: boolean;
+  model: string;
+  allow_write_actions: boolean;
+  daily_message_limit: number;
+}

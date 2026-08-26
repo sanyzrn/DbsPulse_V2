@@ -36,6 +36,8 @@ x-backend-env: &backend-env
   SMTP_USERNAME: ${SMTP_USERNAME:-}
   SMTP_PASSWORD: ${SMTP_PASSWORD:-}
   SMS_API_KEY: ${SMS_API_KEY:-}
+  # کلیدهای API دستیار هوشمند با این رمز می‌شوند پیش از نشستن در دیتابیس.
+  AI_ENCRYPTION_KEY: ${AI_ENCRYPTION_KEY:-}
 
 services:
   db:

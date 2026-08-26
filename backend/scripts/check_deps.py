@@ -52,6 +52,10 @@ REQUIRED = {
     "prometheus-client": "prometheus_client",
     "openpyxl": "openpyxl",
     "qrcode": "qrcode",
+    # رمزنگاریِ کلیدهای API دستیار پیش از ذخیره در دیتابیس. الزامی و نه
+    # اختیاری: بدون آن هر خواندنِ تنظیمات دستیار در import شکست می‌خورد، نه
+    # پشتِ یک try/except.
+    "cryptography": "cryptography",
 }
 
 # اختیاری‌ها: نبودشان برنامه را زمین نمی‌زند، پس نباید راه‌اندازی را متوقف

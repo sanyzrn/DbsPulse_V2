@@ -984,6 +984,50 @@ function AiCard() {
         دستیار در این سامانه فعال باشد
       </label>
 
+      {/* انتخاب سرویس: یک کلیک، آدرس و یک مدلِ پیش‌فرضِ سالم.
+          نیمی از مشکلات راه‌اندازی یک `/v1` جامانده در آدرس بود. */}
+      <div className="mb-4">
+        <p className="mb-2 text-xs font-medium text-gray-600">سرویس</p>
+        <div className="flex flex-wrap gap-2">
+          {(data.providers ?? []).map((option) => {
+            const active = value.provider === option.id;
+            return (
+              <button
+                key={option.id}
+                type="button"
+                onClick={() =>
+                  setDraft((prev) => ({
+                    ...prev,
+                    provider: option.id,
+                    // «سفارشی» چیزی را پاک نمی‌کند: کسی که رویش می‌زند معمولاً
+                    // همان آدرسی را می‌خواهد که نوشته بود.
+                    ...(option.base_url ? { base_url: option.base_url } : {}),
+                    ...(option.default_model ? { model: option.default_model } : {}),
+                  }))
+                }
+                className={`rounded-xl border px-3 py-2 text-right text-xs transition-colors ${
+                  active
+                    ? "border-pulse-200 bg-pulse-50 text-pulse-700"
+                    : "border-gray-200 bg-white text-gray-600 hover:bg-gray-50"
+                }`}
+              >
+                <span className="block font-semibold">{option.label}</span>
+                {option.default_model && (
+                  <span dir="ltr" className="mt-0.5 block text-left text-[11px] text-gray-400">
+                    {option.default_model}
+                  </span>
+                )}
+              </button>
+            );
+          })}
+        </div>
+        {(data.providers ?? []).find((o) => o.id === value.provider)?.note && (
+          <p className="mt-2 text-[11px] text-gray-400">
+            {(data.providers ?? []).find((o) => o.id === value.provider)?.note}
+          </p>
+        )}
+      </div>
+
       <div className="grid gap-3 sm:grid-cols-2">
         <label className="flex flex-col gap-1 text-xs font-medium text-gray-600">
           آدرس سرویس (سازگار با OpenAI)

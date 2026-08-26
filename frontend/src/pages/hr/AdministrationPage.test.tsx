@@ -78,21 +78,39 @@ function renderPage() {
   );
 }
 
-describe("کارت قاعده‌های سازمانی", () => {
-  function mockGets() {
-    vi.mocked(apiClient.get).mockImplementation(async (url: string) => {
-      if (url === "/administration/policy") return { data: { fields: POLICY_FIELDS } } as never;
-      if (url === "/administration/integrations")
-        return { data: { fields: [], secrets: [], active_channels: [] } } as never;
-      if (url === "/administration/modules") return { data: [] } as never;
-      if (url === "/administration/separation")
-        return { data: { separated: true, overlapping_users: [] } } as never;
-      if (url === "/org-units") return { data: [] } as never;
-      if (url === "/personnel/sites") return { data: ["دفتر مرکزی"] } as never;
-      return { data: [] } as never;
-    });
-  }
+function mockGets() {
+  vi.mocked(apiClient.get).mockImplementation(async (url: string) => {
+    if (url === "/administration/policy") return { data: { fields: POLICY_FIELDS } } as never;
+    if (url === "/ai/settings")
+      return {
+        data: {
+          enabled: false,
+          provider: "custom",
+          providers: [
+            { id: "openai", label: "OpenAI", base_url: "https://api.openai.com/v1",
+              default_model: "gpt-4o-mini", note: "" },
+            { id: "custom", label: "سفارشی", base_url: "", default_model: "", note: "" },
+          ],
+          base_url: "", model: "", api_key_hint: "", api_key_configured: false,
+          temperature: 30, max_tokens: 1200, timeout_seconds: 60, instructions: "x",
+          restrict_to_platform: true, context_record_limit: 25,
+          allow_write_actions: true, max_user_chars: 4000,
+        },
+      } as never;
+    if (url === "/ai/access") return { data: [] } as never;
+    if (url === "/administration/integrations")
+      return { data: { fields: [], secrets: [], active_channels: [] } } as never;
+    if (url === "/administration/modules") return { data: [] } as never;
+    if (url === "/administration/separation")
+      return { data: { separated: true, overlapping_users: [] } } as never;
+    if (url === "/org-units") return { data: [] } as never;
+    if (url === "/personnel/sites") return { data: ["دفتر مرکزی"] } as never;
+    return { data: [] } as never;
+  });
+}
 
+
+describe("کارت قاعده‌های سازمانی", () => {
   it("کف و سقفِ سرور را روی خودِ ورودی می‌گذارد", async () => {
     // فرم باید همان قاعده‌ای را نشان بدهد که سرور اعمال می‌کند، نه اینکه کاربر
     // با ذخیره‌کردن کشفش کند.
@@ -128,5 +146,28 @@ describe("کارت قاعده‌های سازمانی", () => {
     mockGets();
     renderPage();
     expect(await screen.findByRole("button", { name: "ذخیرهٔ قاعده‌ها" })).toBeDisabled();
+  });
+});
+
+
+describe("کارت دستیار هوشمند", () => {
+  it("انتخاب یک سرویس، آدرس و مدلش را با هم می‌گذارد", async () => {
+    // نیمی از مشکلات راه‌اندازی یک `/v1` جامانده در آدرس بود؛ این‌جا هر دو با
+    // یک کلیک می‌آیند و ذخیره باید همان‌ها را بفرستد.
+    mockGets();
+    vi.mocked(apiClient.put).mockResolvedValue({ data: {} } as never);
+    renderPage();
+
+    await userEvent.click(await screen.findByRole("button", { name: /OpenAI/ }));
+    await userEvent.click(screen.getByRole("button", { name: /ذخیرهٔ تنظیمات دستیار/ }));
+
+    await waitFor(() => expect(apiClient.put).toHaveBeenCalledWith(
+      "/ai/settings",
+      expect.objectContaining({
+        provider: "openai",
+        base_url: "https://api.openai.com/v1",
+        model: "gpt-4o-mini",
+      }),
+    ));
   });
 });

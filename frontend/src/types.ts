@@ -729,8 +729,19 @@ export interface AiMessage {
   actions: AiAction[];
 }
 
+export interface AiProviderOption {
+  id: string;
+  label: string;
+  base_url: string;
+  default_model: string;
+  note: string;
+}
+
 export interface AiSettings {
   enabled: boolean;
+  provider: string;
+  /** فهرست سرویس‌های آماده — از سرور می‌آید، نه از یک ثابت در فرانت‌اند. */
+  providers: AiProviderOption[];
   base_url: string;
   model: string;
   api_key_hint: string;

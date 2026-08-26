@@ -15,7 +15,14 @@ import { useToast } from "../../components/Toast";
 import { Button } from "../../ui/Button";
 import { Card, EmptyState, FilterSelect, PageHeader, TableSkeleton } from "../../ui/Card";
 import { useOrgUnitCatalogue, useSites } from "../../api/queries";
-import { ROLE_LABELS, type OrgUnitCatalogueItem, type UserRole } from "../../types";
+import { PasswordInput } from "../../ui/PasswordInput";
+import {
+  ROLE_LABELS,
+  type AiSettings,
+  type AiUserAccess,
+  type OrgUnitCatalogueItem,
+  type UserRole,
+} from "../../types";
 
 interface CapabilityHolder {
   user_id: number;
@@ -43,6 +50,7 @@ const CAPABILITY_INFO: Record<Capability, { label: string; scope: string }> = {
   manage_scoring: { label: "شاخص‌ها و طرح نمره‌دهی", scope: "تغییر سؤال‌های فرم و قواعد امتیازدهی" },
   manage_integrations: { label: "ایمیل و پیامک", scope: "تنظیم سرویس‌های ارسال بیرونی" },
   manage_modules: { label: "بخش‌های سامانه", scope: "روشن و خاموش کردن بخش‌ها" },
+  manage_ai: { label: "دستیار هوشمند", scope: "کلید سرویس، نحوهٔ پاسخگویی، و اینکه چه کسی دستیار دارد" },
   view_audit_log: { label: "گزارش کامل رویدادها", scope: "کل لاگ ممیزی، شامل امتیاز و نتیجهٔ پرونده‌ها" },
   view_diagnostics: { label: "سلامت سامانه", scope: "صف تحویل، اجرای زمان‌بند، وضعیت — فقط خواندنی" },
 };
@@ -76,11 +84,13 @@ export function AdministrationPage() {
       {can("manage_capabilities") && <SeparationCard />}
       {can("manage_capabilities") && <CapabilitiesCard />}
       {can("manage_integrations") && <IntegrationsCard />}
+      {can("manage_ai") && <AiCard />}
       {can("manage_modules") && <PolicyCard />}
       {can("manage_modules") && <ModulesCard />}
       {!can("manage_capabilities") &&
         !can("manage_modules") &&
         !can("manage_integrations") &&
+        !can("manage_ai") &&
         !canOrgUnits && (
         <Card>
           <EmptyState>
@@ -868,5 +878,358 @@ function OrgUnitsCard() {
         </ul>
       )}
     </Card>
+  );
+}
+
+/** دستیار هوشمند — تنظیمات سرویس، نحوهٔ پاسخگویی، و اینکه چه کسی دستیار دارد.
+ *
+ *  سه چیز عمداً از هم جدا نگه داشته شده‌اند، چون سه تصمیمِ متفاوت‌اند:
+ *  «به کدام سرویس وصل شویم» (فنی)، «چطور جواب بدهد» (سازمانی)، و «چه کسی
+ *  استفاده کند» (دسترسی). فقط مدیرِ دارای مجوز `manage_ai` این کارت را
+ *  می‌بیند؛ کاربرِ دستیار — مثلاً معاونت — فقط پنجرهٔ گفت‌وگو را دارد.
+ */
+function AiCard() {
+  const { showSuccess, showError } = useToast();
+  const queryClient = useQueryClient();
+  const [draft, setDraft] = useState<Partial<AiSettings> & { api_key?: string }>({});
+  const [saving, setSaving] = useState(false);
+  const [testing, setTesting] = useState(false);
+  const [testResult, setTestResult] = useState<{ ok: boolean; detail: string } | null>(null);
+
+  const { data, isPending } = useQuery({
+    queryKey: ["ai", "settings"],
+    queryFn: async () => (await apiClient.get<AiSettings>("/ai/settings")).data,
+  });
+  const { data: access = [] } = useQuery({
+    queryKey: ["ai", "access"],
+    queryFn: async () => (await apiClient.get<AiUserAccess[]>("/ai/access")).data,
+  });
+
+  const value = { ...(data ?? {}), ...draft } as AiSettings & { api_key?: string };
+  const dirty = Object.keys(draft).length > 0;
+
+  function set<K extends keyof typeof value>(key: K, next: (typeof value)[K]) {
+    setDraft((prev) => ({ ...prev, [key]: next }));
+  }
+
+  async function save() {
+    setSaving(true);
+    try {
+      await apiClient.put("/ai/settings", draft);
+      await queryClient.invalidateQueries({ queryKey: ["ai"] });
+      setDraft({});
+      showSuccess("تنظیمات دستیار ذخیره شد");
+    } catch (err) {
+      showError(extractErrorMessage(err));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function test() {
+    setTesting(true);
+    setTestResult(null);
+    try {
+      const { data: result } = await apiClient.post<{ ok: boolean; detail: string }>(
+        "/ai/settings/test",
+        { base_url: value.base_url, model: value.model, api_key: draft.api_key },
+      );
+      setTestResult(result);
+    } catch (err) {
+      setTestResult({ ok: false, detail: extractErrorMessage(err) });
+    } finally {
+      setTesting(false);
+    }
+  }
+
+  async function setAccess(row: AiUserAccess, patch: Record<string, unknown>) {
+    try {
+      await apiClient.put(`/ai/access/${row.user_id}`, patch);
+      await queryClient.invalidateQueries({ queryKey: ["ai", "access"] });
+    } catch (err) {
+      showError(extractErrorMessage(err));
+    }
+  }
+
+  if (isPending || !data) {
+    return (
+      <Card title="دستیار هوشمند">
+        <TableSkeleton rows={3} />
+      </Card>
+    );
+  }
+
+  return (
+    <Card title="دستیار هوشمند">
+      <p className="mb-4 text-sm text-gray-500">
+        دستیار داده‌های سامانه را <b>می‌خواند</b> و برای تغییرشان <b>پیشنهاد</b> می‌دهد؛ هیچ
+        تغییری بدون تأیید کاربر اجرا نمی‌شود. هر کنش هم همان محدودیتی را دارد که خودِ آن کاربر
+        در رابط دارد.
+      </p>
+
+      <label className="mb-4 flex items-center gap-2 text-sm font-medium text-gray-700">
+        <input
+          type="checkbox"
+          checked={value.enabled}
+          onChange={(e) => set("enabled", e.target.checked)}
+          className="h-4 w-4 cursor-pointer rounded border-gray-300 text-pulse-500"
+        />
+        دستیار در این سامانه فعال باشد
+      </label>
+
+      <div className="grid gap-3 sm:grid-cols-2">
+        <label className="flex flex-col gap-1 text-xs font-medium text-gray-600">
+          آدرس سرویس (سازگار با OpenAI)
+          <input
+            dir="ltr"
+            value={value.base_url}
+            onChange={(e) => set("base_url", e.target.value)}
+            placeholder="https://api.openai.com/v1"
+            className={inputClass}
+          />
+        </label>
+        <label className="flex flex-col gap-1 text-xs font-medium text-gray-600">
+          نام مدل
+          <input
+            dir="ltr"
+            value={value.model}
+            onChange={(e) => set("model", e.target.value)}
+            placeholder="gpt-4o-mini"
+            className={inputClass}
+          />
+        </label>
+        <label className="flex flex-col gap-1 text-xs font-medium text-gray-600 sm:col-span-2">
+          کلید API پیش‌فرض
+          <PasswordInput
+            value={draft.api_key ?? ""}
+            onChange={(e) => set("api_key", e.target.value)}
+            placeholder={
+              data.api_key_configured ? `تنظیم شده (${data.api_key_hint})` : "هنوز تنظیم نشده"
+            }
+            baseClassName={`${inputClass} pl-11`}
+          />
+          <span className="text-[11px] font-normal text-gray-400">
+            رمزنگاری‌شده ذخیره می‌شود و هرگز از سرور برنمی‌گردد. خالی‌گذاشتنش یعنی «دست نزن».
+          </span>
+        </label>
+      </div>
+
+      <div className="mt-3 flex flex-wrap items-center gap-2">
+        <Button variant="secondary" onClick={test} loading={testing}>
+          آزمودن اتصال
+        </Button>
+        {testResult && (
+          <span
+            className={`text-xs ${testResult.ok ? "text-green-700" : "text-red-600"}`}
+            dir="auto"
+          >
+            {testResult.detail}
+          </span>
+        )}
+      </div>
+
+      <h3 className="mt-6 mb-2 text-sm font-bold text-gray-900">نحوهٔ پاسخگویی</h3>
+      <label className="flex flex-col gap-1 text-xs font-medium text-gray-600">
+        دستورالعمل کلی
+        <textarea
+          rows={4}
+          value={value.instructions}
+          onChange={(e) => set("instructions", e.target.value)}
+          className={`${inputClass} resize-y leading-relaxed`}
+        />
+      </label>
+
+      <div className="mt-3 grid gap-3 sm:grid-cols-2">
+        <label className="flex items-start gap-2 text-xs text-gray-700">
+          <input
+            type="checkbox"
+            checked={value.restrict_to_platform}
+            onChange={(e) => set("restrict_to_platform", e.target.checked)}
+            className="mt-0.5 h-4 w-4 cursor-pointer rounded border-gray-300 text-pulse-500"
+          />
+          <span>
+            فقط دربارهٔ همین سامانه پاسخ بدهد
+            <span className="mt-0.5 block text-[11px] text-gray-400">
+              خاموش‌کردنش یعنی به پرسش‌های بی‌ربط هم جواب می‌دهد — و مدل‌های ارزان در آن حوزه
+              بدتر از هر جای دیگر جواب می‌دهند.
+            </span>
+          </span>
+        </label>
+        <label className="flex items-start gap-2 text-xs text-gray-700">
+          <input
+            type="checkbox"
+            checked={value.allow_write_actions}
+            onChange={(e) => set("allow_write_actions", e.target.checked)}
+            className="mt-0.5 h-4 w-4 cursor-pointer rounded border-gray-300 text-pulse-500"
+          />
+          <span>
+            اجازهٔ پیشنهادِ تغییر داشته باشد
+            <span className="mt-0.5 block text-[11px] text-gray-400">
+              حتی وقتی روشن است، اجرای هر تغییر به تأیید کاربر نیاز دارد.
+            </span>
+          </span>
+        </label>
+      </div>
+
+      <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        <NumberField label="ردیف‌های داده در هر پرسش" hint="صفر یعنی هیچ داده‌ای فرستاده نشود" min={0} max={200} value={value.context_record_limit} onChange={(n) => set("context_record_limit", n)} />
+        <NumberField label="خلاقیت (۰ تا ۱۰۰)" hint="کمتر = پاسخ‌های محتاط‌تر و یکنواخت‌تر" min={0} max={100} value={value.temperature} onChange={(n) => set("temperature", n)} />
+        <NumberField label="حداکثر طول پاسخ (توکن)" min={100} max={32000} value={value.max_tokens} onChange={(n) => set("max_tokens", n)} />
+        <NumberField label="مهلت پاسخ (ثانیه)" min={5} max={300} value={value.timeout_seconds} onChange={(n) => set("timeout_seconds", n)} />
+        <NumberField label="حداکثر طول پیام کاربر (نویسه)" min={200} max={20000} value={value.max_user_chars} onChange={(n) => set("max_user_chars", n)} />
+      </div>
+
+      <div className="mt-4 border-t border-gray-100 pt-4">
+        <Button onClick={save} disabled={saving || !dirty}>
+          {saving ? "در حال ذخیره…" : "ذخیرهٔ تنظیمات دستیار"}
+        </Button>
+      </div>
+
+      <h3 className="mt-6 mb-2 text-sm font-bold text-gray-900">چه کسی دستیار دارد</h3>
+      <p className="mb-3 text-xs text-gray-500">
+        هر حساب می‌تواند کلید و مدلِ خودش را داشته باشد، تا هزینه و سهمیه از هم جدا بماند.
+        خالی‌گذاشتنِ کلید یعنی از کلید پیش‌فرضِ بالا استفاده می‌کند.
+      </p>
+      <ul className="space-y-1.5">
+        {access.map((row) => (
+          <li key={row.user_id} className="rounded-xl border border-gray-200 bg-white px-3 py-2">
+            <div className="flex flex-wrap items-center gap-2 text-sm">
+              <label className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={row.enabled}
+                  onChange={(e) => void setAccess(row, { enabled: e.target.checked })}
+                  className="h-4 w-4 cursor-pointer rounded border-gray-300 text-pulse-500"
+                />
+                <span className="font-medium text-gray-800">{row.display_name}</span>
+              </label>
+              <span dir="ltr" className="text-[11px] text-gray-400">{row.username}</span>
+              <span className="rounded-full bg-gray-100 px-2 py-0.5 text-[11px] text-gray-600">
+                {ROLE_LABELS[row.role as UserRole] ?? row.role}
+              </span>
+              <span className="flex-1" />
+              {row.enabled && (
+                <>
+                  <label className="flex items-center gap-1.5 text-[11px] text-gray-500">
+                    <input
+                      type="checkbox"
+                      checked={row.allow_write_actions}
+                      onChange={(e) =>
+                        void setAccess(row, { allow_write_actions: e.target.checked })
+                      }
+                      className="h-3.5 w-3.5 cursor-pointer rounded border-gray-300 text-pulse-500"
+                    />
+                    اجازهٔ تغییر
+                  </label>
+                  <span className="text-[11px] text-gray-400">
+                    {row.api_key_configured ? `کلید اختصاصی ${row.api_key_hint}` : "کلید پیش‌فرض"}
+                  </span>
+                  <UserKeyEditor row={row} onSave={setAccess} />
+                </>
+              )}
+            </div>
+          </li>
+        ))}
+      </ul>
+    </Card>
+  );
+}
+
+function NumberField({
+  label,
+  hint,
+  value,
+  onChange,
+  min,
+  max,
+}: {
+  label: string;
+  hint?: string;
+  value: number;
+  onChange: (value: number) => void;
+  min: number;
+  max: number;
+}) {
+  return (
+    <label className="flex flex-col gap-1 text-xs font-medium text-gray-600">
+      {label}
+      <input
+        type="number"
+        min={min}
+        max={max}
+        value={String(value ?? "")}
+        onChange={(e) => onChange(Number(e.target.value))}
+        className={inputClass}
+      />
+      {hint && <span className="text-[11px] font-normal text-gray-400">{hint}</span>}
+    </label>
+  );
+}
+
+/** ویرایشگرِ کلید و مدلِ یک کاربر. بسته می‌ماند تا ردیف‌ها شلوغ نشوند. */
+function UserKeyEditor({
+  row,
+  onSave,
+}: {
+  row: AiUserAccess;
+  onSave: (row: AiUserAccess, patch: Record<string, unknown>) => Promise<void>;
+}) {
+  const [open, setOpen] = useState(false);
+  const [apiKey, setApiKey] = useState("");
+  const [model, setModel] = useState(row.model);
+  const [limit, setLimit] = useState(row.daily_message_limit);
+
+  if (!open) {
+    return (
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        className="rounded-lg px-2 py-1 text-[11px] font-medium text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-900"
+      >
+        کلید و مدل
+      </button>
+    );
+  }
+
+  return (
+    <form
+      className="mt-2 flex w-full flex-wrap items-end gap-2"
+      onSubmit={(e) => {
+        e.preventDefault();
+        const patch: Record<string, unknown> = { model, daily_message_limit: limit };
+        // فقط وقتی کلید فرستاده می‌شود که چیزی تایپ شده باشد — وگرنه ذخیرهٔ
+        // یک تغییرِ نامربوط، کلیدِ موجود را پاک می‌کرد.
+        if (apiKey.trim()) patch.api_key = apiKey.trim();
+        void onSave(row, patch).then(() => setOpen(false));
+      }}
+    >
+      <label className="flex min-w-[180px] flex-1 flex-col gap-1 text-[11px] text-gray-500">
+        کلید اختصاصی
+        <PasswordInput
+          value={apiKey}
+          onChange={(e) => setApiKey(e.target.value)}
+          placeholder={row.api_key_configured ? row.api_key_hint : "از کلید پیش‌فرض"}
+          baseClassName={`${inputClass} pl-11`}
+        />
+      </label>
+      <label className="flex flex-col gap-1 text-[11px] text-gray-500">
+        مدل اختصاصی
+        <input dir="ltr" value={model} onChange={(e) => setModel(e.target.value)} className={inputClass} />
+      </label>
+      <label className="flex flex-col gap-1 text-[11px] text-gray-500">
+        سقف روزانه (۰ = بی‌حد)
+        <input
+          type="number"
+          min={0}
+          value={String(limit)}
+          onChange={(e) => setLimit(Number(e.target.value))}
+          className={`${inputClass} w-28`}
+        />
+      </label>
+      <Button type="submit">ذخیره</Button>
+      <Button variant="secondary" onClick={() => setOpen(false)}>
+        انصراف
+      </Button>
+    </form>
   );
 }

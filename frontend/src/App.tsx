@@ -143,15 +143,19 @@ function PeopleManagementRedirect() {
   );
 }
 
+// هر دو تا پیش از آمدنِ مجوزها منتظر می‌مانند: `can()` در آن فاصله `false`
+// می‌دهد، و بدون این گارد تبِ دوم یک لحظه غایب بود و بعد ظاهر می‌شد.
 function PeoplePersonnelRoute() {
   const { user } = useAuth();
-  const { can } = usePermissions();
+  const { can, loading } = usePermissions();
+  if (loading) return <PageFallback />;
   return <PersonnelPage showAccountsTab={user?.role === "hr" || can("manage_users")} />;
 }
 
 function PeopleAccountsRoute() {
   const { user } = useAuth();
-  const { can } = usePermissions();
+  const { can, loading } = usePermissions();
+  if (loading) return <PageFallback />;
   return <UsersPage showPersonnelTab={user?.role === "hr" || can("manage_personnel")} />;
 }
 

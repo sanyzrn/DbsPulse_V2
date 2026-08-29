@@ -1001,8 +1001,8 @@ function AiCard() {
     setSaving(true);
     try {
       await apiClient.put("/ai/settings", draft);
+      // `["ai"]` پیشوند است و `["ai", "status"]` را هم می‌گیرد.
       await queryClient.invalidateQueries({ queryKey: ["ai"] });
-      await queryClient.invalidateQueries({ queryKey: ["ai", "status"] });
       setDraft({});
       showSuccess("تنظیمات دستیار ذخیره شد");
     } catch (err) {
@@ -1031,7 +1031,9 @@ function AiCard() {
   async function setAccess(row: AiUserAccess, patch: Record<string, unknown>) {
     try {
       await apiClient.put(`/ai/access/${row.user_id}`, patch);
-      await queryClient.invalidateQueries({ queryKey: ["ai", "access"] });
+      // کلِ شاخهٔ `ai` و نه فقط `access`: اگر مدیر دستیار را برای *خودش* روشن
+      // کند، وضعیتِ دکمهٔ گفت‌وگو (`["ai", "status"]`) هم همین حالا عوض شده.
+      await queryClient.invalidateQueries({ queryKey: ["ai"] });
     } catch (err) {
       showError(extractErrorMessage(err));
     }

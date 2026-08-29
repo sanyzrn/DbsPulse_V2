@@ -514,3 +514,73 @@ def test_a_new_event_type_is_hidden_from_support_by_default(client, support):
     assert "evaluation_returned" not in SYSTEM_EVENT_TYPES
     assert "pdf_downloaded" not in SYSTEM_EVENT_TYPES
     assert "personnel_created" not in SYSTEM_EVENT_TYPES
+
+
+def test_promoting_an_admin_to_hr_keeps_the_capabilities_it_already_had(
+    client, db_session, admin
+):
+    """«پیش‌فرض» کفِ اختیارات است، نه سقفِ آن.
+
+    نسخهٔ پیشینِ `apply_default_hr_capabilities` اول همهٔ ردیف‌های حساب را پاک
+    می‌کرد. یعنی عوض‌کردنِ نقشِ یک حسابِ مدیر سامانه به «منابع انسانی» — کاری که
+    در راه‌اندازی کاملاً محتمل است — شش مجوزش را بی‌صدا می‌شست.
+    """
+    target = make_user(db_session, "support", capabilities=list(Capability))
+    db_session.commit()
+
+    response = client.patch(
+        f"/api/users/{target.id}", json={"role": "hr"}, headers=auth_header(admin)
+    )
+
+    assert response.status_code == 200, response.text
+    held = set(
+        db_session.scalars(
+            select(UserCapability.capability).where(UserCapability.user_id == target.id)
+        )
+    )
+    assert held == set(Capability)
+
+
+def test_the_capabilities_that_come_with_a_role_are_written_to_the_audit_log(
+    client, db_session, admin
+):
+    """صفحهٔ مجوزها دادن و گرفتن را ثبت می‌کند؛ این مسیر نمی‌کرد.
+
+    تنها ردِ ماجرا یک `user_updated` بود که فقط نقش را می‌گفت، و اینکه *چه
+    اختیاری* با آن نقش آمد هیچ‌جا نوشته نمی‌شد.
+    """
+    target = make_user(db_session, "support", capabilities=[])
+    db_session.commit()
+
+    client.patch(f"/api/users/{target.id}", json={"role": "hr"}, headers=auth_header(admin))
+
+    entries = client.get(
+        "/api/audit-log", params={"event_type": "user_updated"}, headers=auth_header(admin)
+    ).json()
+    latest = entries["items"][0]
+    assert set(latest["new_value"]["capabilities_granted"]) == {
+        Capability.manage_users.value,
+        Capability.manage_personnel.value,
+        Capability.manage_scoring.value,
+    }
+
+
+def test_the_last_grantor_cannot_be_locked_out_by_a_role_change(client, db_session):
+    """گاردِ «آخرین اختیاردهنده» روی endpointِ مجوزهاست و این مسیر را نمی‌دید.
+
+    اگر تنها حسابِ دارای `manage_capabilities` نقشش به hr تغییر می‌کرد، هیچ‌کس
+    دیگر نمی‌توانست به هیچ‌کس اختیاری بدهد.
+    """
+    from app.services.bootstrap_admin import has_active_admin
+
+    sole = make_user(db_session, "support", capabilities=list(Capability))
+    db_session.commit()
+    assert has_active_admin(db_session) is True
+
+    response = client.patch(
+        f"/api/users/{sole.id}", json={"role": "hr"}, headers=auth_header(sole)
+    )
+
+    assert response.status_code == 200, response.text
+    db_session.expire_all()
+    assert has_active_admin(db_session) is True

@@ -34,15 +34,32 @@ def has_capability(db: Session, user_id: int, capability: Capability) -> bool:
     )
 
 
-def apply_default_hr_capabilities(db: Session, user_id: int) -> None:
-    """Set the baseline permissions for a human-resources account."""
-    db.query(UserCapability).filter(UserCapability.user_id == user_id).delete(
-        synchronize_session=False
-    )
+def apply_default_hr_capabilities(db: Session, user_id: int) -> list[Capability]:
+    """پایهٔ منابع انسانی را *اضافه* می‌کند — و هیچ‌چیزی را برنمی‌دارد.
+
+    نسخهٔ پیشین اول همهٔ ردیف‌های این حساب را پاک می‌کرد و بعد سه مجوز پایه را
+    می‌نوشت. سه پیامد داشت که هر سه دیده شدند:
+
+    * تغییر نقشِ یک حسابِ مدیر سامانه به «منابع انسانی» شش مجوزش را می‌شست،
+      از جمله `manage_capabilities`.
+    * اگر آن حساب تنها اختیاردهندهٔ فعال بود، دیگر هیچ‌کس نمی‌توانست به هیچ‌کس
+      اختیاری بدهد — و گاردِ «آخرین اختیاردهنده نمی‌تواند خودش را خلع کند» که
+      روی endpointِ مجوزها هست، این مسیر را اصلاً نمی‌دید.
+    * هیچ‌کدام در گزارش رویدادها ثبت نمی‌شد؛ تنها ردِ ماجرا یک `user_updated`
+      بود که فقط نقش را می‌گفت.
+
+    «پیش‌فرض» یعنی کفِ اختیارات، نه سقفِ آن. برداشتنِ مجوز کارِ صریحِ صفحهٔ
+    مجوزهاست، که ثبتش هم می‌کند.
+
+    فهرستِ آنچه *واقعاً* اضافه شد برگردانده می‌شود تا فراخوان بتواند همان را در
+    لاگ ممیزی بنویسد — و ردیفی که چیزی عوض نکرده، رویدادی هم نسازد.
+    """
+    existing = capabilities_of(db, user_id)
+    added = sorted(DEFAULT_HR_CAPABILITIES - existing, key=lambda c: c.value)
     db.add_all(
-        UserCapability(user_id=user_id, capability=capability)
-        for capability in DEFAULT_HR_CAPABILITIES
+        UserCapability(user_id=user_id, capability=capability) for capability in added
     )
+    return added
 
 
 def module_states(db: Session) -> dict[str, bool]:

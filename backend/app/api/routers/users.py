@@ -129,13 +129,20 @@ def create_user(
     )
     db.add(user)
     db.flush()
-    if user.role == UserRole.hr:
-        apply_default_hr_capabilities(db, user.id)
+    granted = apply_default_hr_capabilities(db, user.id) if user.role == UserRole.hr else []
     log_event(
         db,
         actor_user_id=current_user.id,
         event_type="user_created",
-        new_value={"id": user.id, "username": user.username, "role": user.role.value},
+        new_value={
+            "id": user.id,
+            "username": user.username,
+            "role": user.role.value,
+            # مجوزهایی که همراه نقش داده شدند در همین رویداد می‌آیند، وگرنه
+            # تنها ردِ ماجرا «نقش عوض شد» بود و اینکه *چه اختیاری* با آن آمد،
+            # هیچ‌جا نوشته نمی‌شد.
+            **({"capabilities_granted": [c.value for c in granted]} if granted else {}),
+        },
     )
     db.commit()
     db.refresh(user)
@@ -184,8 +191,9 @@ def update_user(
         ensure_user_link_is_not_self_evaluation(db, user, updates["personnel_id"])
     for field, value in updates.items():
         setattr(user, field, value)
+    granted_capabilities: list = []
     if old_value["role"] != UserRole.hr.value and user.role == UserRole.hr:
-        apply_default_hr_capabilities(db, user.id)
+        granted_capabilities = apply_default_hr_capabilities(db, user.id)
     if user.role == UserRole.employee and user.personnel_id is None:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -193,6 +201,8 @@ def update_user(
         )
     # رمز عبور هرگز در لاگ ثبت نمی‌شود؛ فقط این‌که تغییر کرده است
     audited_changes: dict = {k: (v.value if isinstance(v, UserRole) else v) for k, v in updates.items()}
+    if granted_capabilities:
+        audited_changes["capabilities_granted"] = [c.value for c in granted_capabilities]
     if payload.password:
         user.password_hash = hash_password(payload.password)
         # نشست‌های فعال قبلی این کاربر بلافاصله باطل می‌شوند

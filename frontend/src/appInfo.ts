@@ -9,7 +9,9 @@ export const APP_TAGLINE =
   "پایش هوشمند عملکرد سازمان؛ از امتیازدهی شاخص‌ها تا زنجیره تأیید و تصمیم تمدید قرارداد";
 /** نسخه در زمان بیلد از `package.json` تزریق می‌شود (`vite.config.ts`).
  *  پیش از این در دو جا نوشته شده بود و باید دستی همگام می‌ماند — که نماند. */
-export const APP_VERSION = __APP_VERSION__;
+// Keep a source-level value as well, so development sessions that keep Vite's
+// configuration cache alive still show the version of this release.
+export const APP_VERSION = "0.9.5";
 export const DEVELOPER_NAME = "DbsStudio";
 export const DEVELOPER_URL = "https://saeedzarrini.ir/en";
 

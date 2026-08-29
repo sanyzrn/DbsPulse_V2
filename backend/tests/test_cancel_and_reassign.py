@@ -5,7 +5,7 @@
 دارد) و ایندکس یکتای جزئی هم اجازهٔ ساخت پروندهٔ جایگزین نمی‌داد — آن پرسنل عملاً برای
 همیشه غیرقابل‌ارزیابی می‌شد و تنها درمانش SQL دستی روی پروداکشن بود.
 """
-from app.models.enums import EvaluationStatus
+from app.models.enums import Capability, EvaluationStatus
 from app.models.evaluation import EvaluationRecord
 from tests.helpers import (
     active_indicators,
@@ -19,7 +19,7 @@ from tests.helpers import (
 
 def _open_case(client, db_session):
     """یک پروندهٔ باز در وضعیت submitted، با همهٔ بازیگرانش."""
-    hr = make_user(db_session, "hr")
+    hr = make_user(db_session, "hr", capabilities=[Capability.view_audit_log])
     sup = make_user(db_session, "unit_supervisor")
     dep = make_user(db_session, "deputy")
     ceo = make_user(db_session, "ceo")

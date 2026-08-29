@@ -4,13 +4,12 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.security import create_access_token, hash_password
-from app.services.authorization import DEFAULT_HR_CAPABILITIES
 from app.models.capability import UserCapability
-from app.models.enums import Capability
 from app.models.evaluation_access import EvaluationAccess
 from app.models.indicator import Indicator
 from app.models.personnel import Personnel
 from app.models.user import User
+from app.services.authorization import DEFAULT_HR_CAPABILITIES
 
 _counter = {"n": 0}
 

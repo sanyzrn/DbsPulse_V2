@@ -22,7 +22,10 @@ export function AiChat() {
   const { data: status } = useQuery({
     queryKey: ["ai", "status"],
     queryFn: async () => (await apiClient.get<AiStatus>("/ai/status")).data,
-    staleTime: 120_000,
+    // فعال‌سازی دستیار از پنل مدیریت یا تب دیگری باید بدون تأخیر دیده شود.
+    staleTime: 0,
+    refetchOnMount: "always",
+    refetchOnWindowFocus: true,
   });
   const [open, setOpen] = useState(false);
 

@@ -1002,6 +1002,7 @@ function AiCard() {
     try {
       await apiClient.put("/ai/settings", draft);
       await queryClient.invalidateQueries({ queryKey: ["ai"] });
+      await queryClient.invalidateQueries({ queryKey: ["ai", "status"] });
       setDraft({});
       showSuccess("تنظیمات دستیار ذخیره شد");
     } catch (err) {

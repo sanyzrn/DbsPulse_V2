@@ -392,6 +392,10 @@ def test_the_employee_can_submit_a_self_assessment_while_the_case_is_open(client
     assert r.json()["submitted_at"] is not None
     assert len(r.json()["scores"]) == 20
     assert "گزارش‌گیری" in r.json()["note"]
+    open_row = client.get(
+        "/api/me/evaluations/open", headers=auth_header(case["employee"])
+    ).json()[0]
+    assert open_row["self_assessment_submitted_at"] is not None
 
 
 def test_the_self_assessment_never_enters_the_result(client, db_session):
@@ -423,7 +427,9 @@ def test_the_self_assessment_never_enters_the_result(client, db_session):
     assert final["final_weighted_pct"] == 60.0, "خودارزیابی نباید در میانگین اثر بگذارد"
 
 
-def test_the_evaluator_sees_the_self_assessment_beside_their_own_scores(client, db_session):
+def test_self_assessment_visibility_defaults_to_hr_only_and_can_enable_the_evaluator(
+    client, db_session
+):
     case = _case(client, db_session, finalize=False)
     client.post(
         f"/api/evaluations/{case['id']}/return",
@@ -436,13 +442,28 @@ def test_the_evaluator_sees_the_self_assessment_beside_their_own_scores(client, 
         headers=auth_header(case["employee"]),
     )
 
-    detail = client.get(f"/api/evaluations/{case['id']}", headers=auth_header(case["sup"])).json()
+    supervisor_detail = client.get(
+        f"/api/evaluations/{case['id']}", headers=auth_header(case["sup"])
+    ).json()
+    hr_detail = client.get(
+        f"/api/evaluations/{case['id']}", headers=auth_header(case["hr"])
+    ).json()
 
-    assert detail["self_assessment"] is not None
-    assert len(detail["self_assessment"]["scores"]) == 20
-    assert detail["self_assessment"]["scores"][0]["score"] == 5
-    # و امتیاز خود ارزیاب جداگانه سر جایش است
-    assert detail["scores"][0]["score"] == 3
+    assert supervisor_detail["self_assessment"] is None
+    assert hr_detail["self_assessment"] is not None
+    assert len(hr_detail["self_assessment"]["scores"]) == 20
+
+    original = settings.self_assessment_visible_to_unit_supervisor
+    try:
+        settings.self_assessment_visible_to_unit_supervisor = True
+        enabled_detail = client.get(
+            f"/api/evaluations/{case['id']}", headers=auth_header(case["sup"])
+        ).json()
+        assert enabled_detail["self_assessment"]["scores"][0]["score"] == 5
+        # و امتیاز خود ارزیاب جداگانه سر جایش است
+        assert enabled_detail["scores"][0]["score"] == 3
+    finally:
+        settings.self_assessment_visible_to_unit_supervisor = original
 
 
 def test_a_case_without_a_self_assessment_is_perfectly_normal(client, db_session):

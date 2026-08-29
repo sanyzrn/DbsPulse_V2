@@ -83,6 +83,12 @@ def _validated(field: IntegrationField, value: object) -> object:
     فرم می‌تواند دور زده شود؛ و یک «حداقل جمعیت = ۰» که از راه API بنشیند،
     ناشناس‌ماندن را بی‌سروصدا خاموش می‌کند بی‌آنکه هیچ‌جا خطایی دیده شود.
     """
+    if field.kind == "bool":
+        if isinstance(value, bool):
+            return value
+        if value in ("true", "false"):
+            return value == "true"
+        raise InvalidSettingValue(field, f"مقدار «{field.label}» باید روشن یا خاموش باشد")
     if field.kind != "number":
         return value
     number = int(value)

@@ -225,6 +225,7 @@ export interface MyOpenEvaluation {
   status: EvaluationStatus;
   created_at: string;
   stage_entered_at: string;
+  self_assessment_submitted_at: string | null;
   stage_label: string;
   /** شاخص‌های همین پرونده (P1-05) — فرم خودارزیابی از روی این ساخته می‌شود. */
   indicator_ids: number[];
@@ -535,6 +536,8 @@ export interface AppConfig {
   specialized_section_weight: number;
   /** سقف امتیاز ویژه در طرح فعال؛ صفر یعنی فرم این بخش را نشان ندهد. */
   bonus_max_points: number;
+  /** حداقل تعداد نویسهٔ توضیح، وقتی امتیاز ویژه بیشتر از صفر است. */
+  bonus_reason_min_length: number;
 }
 
 export const DEFAULT_APP_CONFIG: AppConfig = {
@@ -544,6 +547,7 @@ export const DEFAULT_APP_CONFIG: AppConfig = {
   general_section_weight: 0.6,
   specialized_section_weight: 0.4,
   bonus_max_points: 5,
+  bonus_reason_min_length: 10,
 };
 
 export interface AppNotification {

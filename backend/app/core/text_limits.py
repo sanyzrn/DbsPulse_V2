@@ -35,6 +35,7 @@ REASON_MAX = 1000
 OBJECTION_MAX = 2000
 
 # دلیلِ امتیاز ویژه — شرحِ همان یک کارِ خارج از شرح وظایف، نه یک گزارش
+BONUS_REASON_MIN = 10
 BONUS_REASON_MAX = 500
 
 # برنامهٔ بهبود

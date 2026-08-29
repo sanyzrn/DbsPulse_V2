@@ -93,7 +93,14 @@ def test_a_bonus_without_a_reason_is_refused(client, db_session, org):
     record_id = _open_draft(client, db_session, org)
     response = _set_bonus(client, org["sup"], record_id, 2, "   ")
     assert response.status_code == 400
-    assert "دلیل" in response.json()["detail"]
+    assert "توضیح" in response.json()["detail"]
+
+
+def test_a_bonus_reason_shorter_than_ten_characters_is_refused(client, db_session, org):
+    record_id = _open_draft(client, db_session, org)
+    response = _set_bonus(client, org["sup"], record_id, 2, "کار خوب")
+    assert response.status_code == 400
+    assert "۱۰" in response.json()["detail"]
 
 
 def test_a_bonus_above_the_scheme_cap_is_refused_not_silently_trimmed(client, db_session, org):
@@ -185,8 +192,8 @@ def test_the_manager_path_evaluator_can_award_it(client, db_session):
 def test_it_lands_in_the_audit_log_with_the_previous_value(client, db_session, org):
     """یک تعدیل دستی روی نتیجهٔ یک تصمیم رسمی — دقیقاً چیزی که لاگ برایش هست."""
     record_id = _open_draft(client, db_session, org)
-    _set_bonus(client, org["sup"], record_id, 3, "دلیل اول")
-    _set_bonus(client, org["sup"], record_id, 1, "دلیل دوم")
+    _set_bonus(client, org["sup"], record_id, 3, "توضیح معتبر اول")
+    _set_bonus(client, org["sup"], record_id, 1, "توضیح معتبر دوم")
 
     admin = make_user(db_session, "support", capabilities=list(Capability))
     db_session.commit()

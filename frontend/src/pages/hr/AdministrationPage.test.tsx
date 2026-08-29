@@ -109,6 +109,32 @@ function mockGets() {
   });
 }
 
+async function openTab(name: string) {
+  await userEvent.click(await screen.findByRole("tab", { name }));
+}
+
+describe("تب‌های مدیریت سامانه", () => {
+  it("بخش‌ها را در تب‌های جداگانه نشان می‌دهد و فقط تب انتخاب‌شده را نمایش می‌دهد", async () => {
+    mockGets();
+    renderPage();
+
+    const tabs = await screen.findAllByRole("tab");
+    expect(tabs).toHaveLength(7);
+    expect(screen.getByRole("tab", { name: "واحدهای سازمانی" })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
+    expect(screen.queryByText("دستیار در این سامانه فعال باشد")).not.toBeInTheDocument();
+
+    await openTab("دستیار هوشمند");
+    expect(screen.getByRole("tab", { name: "دستیار هوشمند" })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
+    expect(await screen.findByText("دستیار در این سامانه فعال باشد")).toBeInTheDocument();
+  });
+});
+
 
 describe("کارت قاعده‌های سازمانی", () => {
   it("کف و سقفِ سرور را روی خودِ ورودی می‌گذارد", async () => {
@@ -116,6 +142,7 @@ describe("کارت قاعده‌های سازمانی", () => {
     // با ذخیره‌کردن کشفش کند.
     mockGets();
     renderPage();
+    await openTab("قاعده‌های سازمانی");
 
     const input = await screen.findByLabelText(/مهلت اعتراض کارمند/);
     expect(input).toHaveAttribute("min", "1");
@@ -127,6 +154,7 @@ describe("کارت قاعده‌های سازمانی", () => {
     mockGets();
     vi.mocked(apiClient.put).mockResolvedValue({ data: { fields: POLICY_FIELDS } } as never);
     renderPage();
+    await openTab("قاعده‌های سازمانی");
 
     const input = await screen.findByLabelText(/حداقل جمعیت/);
     await userEvent.clear(input);
@@ -145,6 +173,7 @@ describe("کارت قاعده‌های سازمانی", () => {
   it("دکمهٔ ذخیره تا وقتی چیزی عوض نشده خاموش است", async () => {
     mockGets();
     renderPage();
+    await openTab("قاعده‌های سازمانی");
     expect(await screen.findByRole("button", { name: "ذخیرهٔ قاعده‌ها" })).toBeDisabled();
   });
 });
@@ -157,6 +186,7 @@ describe("کارت دستیار هوشمند", () => {
     mockGets();
     vi.mocked(apiClient.put).mockResolvedValue({ data: {} } as never);
     renderPage();
+    await openTab("دستیار هوشمند");
 
     await userEvent.click(await screen.findByRole("button", { name: /OpenAI/ }));
     await userEvent.click(screen.getByRole("button", { name: /ذخیرهٔ تنظیمات دستیار/ }));

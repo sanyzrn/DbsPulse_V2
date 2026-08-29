@@ -17,6 +17,7 @@ from app.models.user import User
 from app.schemas.auth import CurrentUser
 from app.schemas.user import UserCreate, UserPage, UserRead, UserUpdate
 from app.services.audit import log_event
+from app.services.authorization import apply_default_hr_capabilities
 from app.services.excel import build_users_workbook
 from app.services.self_evaluation import ensure_user_link_is_not_self_evaluation
 from app.services.sessions import revoke_all_for_user
@@ -128,6 +129,8 @@ def create_user(
     )
     db.add(user)
     db.flush()
+    if user.role == UserRole.hr:
+        apply_default_hr_capabilities(db, user.id)
     log_event(
         db,
         actor_user_id=current_user.id,
@@ -181,6 +184,8 @@ def update_user(
         ensure_user_link_is_not_self_evaluation(db, user, updates["personnel_id"])
     for field, value in updates.items():
         setattr(user, field, value)
+    if old_value["role"] != UserRole.hr.value and user.role == UserRole.hr:
+        apply_default_hr_capabilities(db, user.id)
     if user.role == UserRole.employee and user.personnel_id is None:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,

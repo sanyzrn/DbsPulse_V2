@@ -31,6 +31,10 @@ def test_reads_the_value_that_actually_applies(client, db_session):
     # فرم باید همان قاعده‌ای را نشان بدهد که سرور اعمال می‌کند
     assert fields["min_cohort_size"]["minimum"] == 1
     assert fields["objection_window_days"]["maximum"] == 365
+    assert fields["self_assessment_visible_to_hr"]["value"] is True
+    assert fields["self_assessment_visible_to_unit_supervisor"]["value"] is False
+    assert fields["self_assessment_visible_to_deputy"]["value"] is False
+    assert fields["self_assessment_visible_to_ceo"]["value"] is False
 
 
 def test_saving_takes_effect_immediately(client, db_session):
@@ -70,6 +74,21 @@ def test_out_of_range_is_refused_by_the_server(client, db_session):
     assert response.status_code == 400
     assert "کمتر" in response.json()["detail"]
     assert settings.min_cohort_size == original
+
+
+def test_self_assessment_visibility_can_be_changed_from_the_admin_panel(client, db_session):
+    admin = _admin(db_session)
+    original = settings.self_assessment_visible_to_deputy
+    try:
+        response = client.put(
+            "/api/administration/policy",
+            json={"values": {"self_assessment_visible_to_deputy": True}},
+            headers=auth_header(admin),
+        )
+        assert response.status_code == 200, response.text
+        assert settings.self_assessment_visible_to_deputy is True
+    finally:
+        settings.self_assessment_visible_to_deputy = original
 
 
 def test_the_policy_form_cannot_write_integration_keys(client, db_session):

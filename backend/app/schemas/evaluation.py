@@ -248,6 +248,8 @@ class MyOpenEvaluation(BaseModel):
     status: EvaluationStatus
     created_at: datetime
     stage_entered_at: datetime
+    # برای اینکه پس از رفرش، فرم یک‌بارمصرفِ خودارزیابی دوباره نمایش داده نشود.
+    self_assessment_submitted_at: datetime | None = None
     #: شاخص‌های همین پرونده (P1-05) — فرم خودارزیابی باید از روی این ساخته شود،
     #: نه از «شاخص‌های فعالِ امروز». وگرنه کارمند به مجموعه‌ای پاسخ می‌دهد که
     #: ارزیاب به آن نمره نمی‌دهد، و مقایسهٔ دو دیدگاه بی‌معنا می‌شود.

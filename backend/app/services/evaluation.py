@@ -1,6 +1,7 @@
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
+from app.core.text_limits import BONUS_REASON_MIN
 from app.models.indicator import Indicator
 from app.services.scoring_scheme import LEGACY_RULES, Rules
 
@@ -88,8 +89,11 @@ def validate_bonus(
         )
     # دلیل، بخشِ اجباریِ این قابلیت است نه تزئین آن: نمره‌ای که کسی نتواند
     # توضیحش را بخواند، در سند تصمیمِ تمدید قرارداد قابل دفاع نیست.
-    if bonus_points > 0 and not (bonus_reason or "").strip():
-        raise ValueError("برای امتیاز ویژه باید دلیل نوشته شود")
+    reason = (bonus_reason or "").strip()
+    if bonus_points > 0 and len(reason) < BONUS_REASON_MIN:
+        raise ValueError(
+            f"توضیح امتیاز ویژه باید حداقل {_fa(BONUS_REASON_MIN)} نویسه باشد"
+        )
 
 
 def compute_result(

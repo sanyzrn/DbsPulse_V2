@@ -7,6 +7,14 @@ from app.models.capability import UserCapability
 from app.models.enums import Capability
 from app.models.module import ModuleSetting
 
+DEFAULT_HR_CAPABILITIES = frozenset(
+    {
+        Capability.manage_users,
+        Capability.manage_personnel,
+        Capability.manage_scoring,
+    }
+)
+
 
 def capabilities_of(db: Session, user_id: int) -> set[Capability]:
     return set(
@@ -23,6 +31,17 @@ def has_capability(db: Session, user_id: int, capability: Capability) -> bool:
             )
         )
         is not None
+    )
+
+
+def apply_default_hr_capabilities(db: Session, user_id: int) -> None:
+    """Set the baseline permissions for a human-resources account."""
+    db.query(UserCapability).filter(UserCapability.user_id == user_id).delete(
+        synchronize_session=False
+    )
+    db.add_all(
+        UserCapability(user_id=user_id, capability=capability)
+        for capability in DEFAULT_HR_CAPABILITIES
     )
 
 

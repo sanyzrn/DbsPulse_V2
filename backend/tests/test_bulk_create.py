@@ -10,7 +10,7 @@
 """
 import pytest
 
-from app.models.enums import EvaluationStatus, PersonnelStatus
+from app.models.enums import Capability, EvaluationStatus, PersonnelStatus
 from app.models.evaluation import EvaluationRecord
 from tests.helpers import auth_header, make_access, make_personnel, make_user
 
@@ -18,7 +18,7 @@ from tests.helpers import auth_header, make_access, make_personnel, make_user
 @pytest.fixture()
 def cohort(db_session):
     """یک واحد با چهار وضعیت متفاوت — هر کدام یک شاخهٔ متفاوت از منطق."""
-    hr = make_user(db_session, "hr")
+    hr = make_user(db_session, "hr", capabilities=[Capability.view_audit_log])
     sup = make_user(db_session, "unit_supervisor")
     dep = make_user(db_session, "deputy")
     ceo = make_user(db_session, "ceo")

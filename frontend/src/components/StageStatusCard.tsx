@@ -45,18 +45,15 @@ export function StageStatusCard() {
   const maxActive = Math.max(1, ...stages.map((stage) => stage.active));
 
   return (
-    <div className="rounded-2xl border border-gray-200 bg-white p-5">
-      <div className="mb-1 flex flex-wrap items-baseline justify-between gap-2">
+    <div className="rounded-2xl border border-gray-200 bg-white p-3 sm:p-4">
+      <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
         <h2 className="text-base font-bold text-gray-900">وضعیت پرونده‌های ارزیابی</h2>
-        <p className="text-xs text-gray-400">
+        <p className="text-xs text-gray-500">
           <span className="tabular-nums">{faInt(totalActive)}</span> پرونده در جریان
         </p>
       </div>
-      <p className="mb-4 text-xs text-gray-400">
-        روی هر مرحله بزنید تا ببینید پرونده‌هایش دستِ چه کسی است.
-      </p>
 
-      <ul className="space-y-1.5">
+      <ul className="divide-y divide-gray-100 overflow-hidden rounded-xl border border-gray-100">
         {stages.map((stage) => (
           <StageRow
             key={stage.status}
@@ -90,17 +87,22 @@ function StageRow({
   const width = stage.active === 0 ? 0 : Math.max(6, (stage.active / maxActive) * 100);
 
   return (
-    <li className="rounded-xl border border-gray-200">
+    <li>
       <button
         type="button"
         onClick={onToggle}
         disabled={!hasOwners}
         aria-expanded={open}
-        className={`flex w-full flex-wrap items-center gap-3 rounded-xl px-3 py-2.5 text-right transition-colors ${
+        title={
+          terminal
+            ? `${faInt(stage.total)} پرونده نهایی‌شده`
+            : `روی میز: ${stage.holder} · میانگین توقف: ${days(stage.avg_dwell_days)}`
+        }
+        className={`flex min-h-10 w-full items-center gap-2.5 px-3 py-2 text-right transition-colors ${
           hasOwners ? "hover:bg-gray-50" : "cursor-default"
         }`}
       >
-        <div className="flex w-40 shrink-0 items-center gap-2 sm:w-52">
+        <div className="flex w-32 shrink-0 items-center gap-1.5 sm:w-40">
           {hasOwners ? (
             <svg
               viewBox="0 0 20 20"
@@ -120,46 +122,37 @@ function StageRow({
           <StatusBadge status={stage.status} />
         </div>
 
-        <div className="h-6 min-w-24 flex-1 rounded-lg bg-gray-50">
+        <div className="h-2 min-w-16 flex-1 overflow-hidden rounded-full bg-gray-100">
           <motion.div
-            className={`h-6 rounded-lg ${BAR[stage.status] ?? "bg-gray-400"}`}
+            className={`h-full rounded-full ${BAR[stage.status] ?? "bg-gray-400"}`}
             initial={{ width: 0 }}
             animate={{ width: `${width}%` }}
             transition={{ duration: 0.45, ease: EASE_SOFT }}
           />
         </div>
 
-        <div className="flex shrink-0 items-baseline gap-1.5">
-          <span className="text-lg font-extrabold tabular-nums text-gray-900">
+        <div className="flex shrink-0 items-baseline gap-1">
+          <span className="text-sm font-extrabold tabular-nums text-gray-900">
             {faInt(stage.active)}
           </span>
-          <span className="text-xs text-gray-400">
-            از {faInt(stage.total)} · {fa1(stage.share_pct)}٪
+          <span className="text-[11px] text-gray-400">
+            / {faInt(stage.total)}
           </span>
         </div>
-      </button>
 
-      {/* خط دوم: همان چیزهایی که یک عدد نمی‌گفت.
-          برای «نهایی‌شده» ساخته نمی‌شود: آن مرحلهٔ انتظار نیست، مقصد است — و
-          «روی میز: —، بسته‌شده: ۰، میانگین توقف: —» سه خط تیره است، نه اطلاعات. */}
-      {!terminal && (
-      <dl className="flex flex-wrap gap-x-5 gap-y-1 border-t border-gray-100 px-3 py-2 text-[11px] text-gray-500">
-        <Fact label="روی میز" value={stage.holder} />
-        <Fact label="بسته‌شده" value={faInt(stage.closed)} />
-        <Fact label="میانگین توقف" value={days(stage.avg_dwell_days)} />
-        {stage.longest_active_days !== null && (
-          <Fact label="قدیمی‌ترین در جریان" value={days(stage.longest_active_days)} />
+        {/* جزئیات عملیاتی در همان ردیف، فقط جایی که عرض کافی دارد؛ در نمایش
+            باریک، عنوان دکمه و بازشدن ردیف همان اطلاعات را بدون بلندکردن کارت
+            در اختیار می‌گذارند. */}
+        {!terminal && (
+          <div className="hidden shrink-0 items-center gap-2 border-r border-gray-100 pr-2 text-[11px] text-gray-500 xl:flex">
+            <span>روی میز: <b className="font-medium text-gray-700">{stage.holder}</b></span>
+            <span>توقف: <b className="font-medium text-gray-700">{days(stage.avg_dwell_days)}</b></span>
+            {stage.longest_active_days !== null && (
+              <span>قدیمی‌ترین: <b className="font-medium text-gray-700">{days(stage.longest_active_days)}</b></span>
+            )}
+          </div>
         )}
-        {/* ورودِ بیشتر از تعدادِ پرونده یعنی کار به این‌جا برگشته. */}
-        {stage.passes > stage.total && (
-          <Fact
-            label="برگشت به این مرحله"
-            value={`${faInt(stage.passes - stage.total)} بار`}
-            tone="text-amber-700"
-          />
-        )}
-      </dl>
-      )}
+      </button>
 
       <AnimatePresence initial={false}>
         {open && hasOwners && (
@@ -170,6 +163,14 @@ function StageRow({
             transition={{ duration: 0.22, ease: EASE_SOFT }}
             className="overflow-hidden border-t border-gray-100"
           >
+            <div className="flex flex-wrap gap-x-4 gap-y-1 border-b border-gray-100 bg-gray-50 px-3 py-2 text-[11px] text-gray-500">
+              <span>بسته‌شده: <b className="font-medium text-gray-700">{faInt(stage.closed)}</b></span>
+              {stage.passes > stage.total && (
+                <span className="text-amber-700">
+                  برگشت به این مرحله: {faInt(stage.passes - stage.total)} بار
+                </span>
+              )}
+            </div>
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-gray-100 text-[11px] text-gray-400">
@@ -196,14 +197,5 @@ function StageRow({
         )}
       </AnimatePresence>
     </li>
-  );
-}
-
-function Fact({ label, value, tone }: { label: string; value: string; tone?: string }) {
-  return (
-    <div className="flex items-baseline gap-1">
-      <dt className="text-gray-400">{label}:</dt>
-      <dd className={`mx-0 font-medium ${tone ?? "text-gray-700"}`}>{value}</dd>
-    </div>
   );
 }

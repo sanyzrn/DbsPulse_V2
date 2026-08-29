@@ -14,6 +14,7 @@ import { PasswordField } from "../../ui/PasswordField";
 import { Table } from "../../ui/Table";
 import { ROLE_LABELS, type AppUser, type Personnel, type UserRole } from "../../types";
 import { SearchInput } from "../../ui/SearchInput";
+import { SectionTabs } from "../../components/SectionTabs";
 
 const ROLES: UserRole[] = ["unit_supervisor", "hr", "deputy", "ceo", "employee"];
 /** پیش‌فرض تعداد در هر صفحه؛ کاربر می‌تواند از نوار پایین عوضش کند. */
@@ -22,7 +23,7 @@ const DEFAULT_PAGE_SIZE = 10;
 const inputClass =
   "w-full rounded-xl border border-gray-200 bg-gray-100 px-3 py-2 text-sm text-gray-900 outline-none transition-colors duration-150 focus:border-gray-900 focus:bg-white";
 
-export function UsersPage() {
+export function UsersPage({ showPersonnelTab = true }: { showPersonnelTab?: boolean } = {}) {
   const { showSuccess, showError } = useToast();
   const { user: currentUser } = useAuth();
   const confirm = useConfirm();
@@ -137,7 +138,17 @@ export function UsersPage() {
 
   return (
     <div className="space-y-4">
-      <PageHeader title="مدیریت حساب" subtitle="ساخت، ویرایش و حذف حساب‌های کاربری همهٔ نقش‌های سامانه" />
+      <PageHeader
+        title="مدیریت حساب و پرسنل"
+        subtitle="ساخت، ویرایش و حذف حساب‌های کاربری همهٔ نقش‌های سامانه"
+      />
+      <SectionTabs
+        label="مدیریت حساب و پرسنل"
+        tabs={[
+          { to: "/hr/people/accounts", label: "مدیریت حساب" },
+          ...(showPersonnelTab ? [{ to: "/hr/people/personnel", label: "پرسنل" }] : []),
+        ]}
+      />
       {showAddUser && (
         <Modal
           title="ساخت حساب کاربری"

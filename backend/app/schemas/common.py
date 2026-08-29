@@ -13,3 +13,5 @@ class AppConfig(BaseModel):
     specialized_section_weight: float
     # سقف امتیاز ویژه در طرح فعال؛ صفر یعنی فرم اصلاً این بخش را نشان ندهد.
     bonus_max_points: float
+    # حداقل طول توضیح امتیاز ویژه؛ قاعدهٔ مشترک فرانت و سرور.
+    bonus_reason_min_length: int

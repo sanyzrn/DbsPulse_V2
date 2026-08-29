@@ -125,6 +125,36 @@ function ModuleRoute({
   return moduleEnabled(module) ? <>{children}</> : <DisabledFeature title={title} />;
 }
 
+/** ورودیِ مشترک مدیریت حساب و پرسنل.
+ *
+ * مدیر منابع انسانی هر دو تب را دارد؛ حساب فنیِ دارای یک مجوز محدود، مستقیم به
+ * تنها تب مجازش می‌رود تا هیچ‌گاه با یک تبِ غیرقابل‌دسترسی روبه‌رو نشود.
+ */
+function PeopleManagementRedirect() {
+  const { user } = useAuth();
+  const { can, loading } = usePermissions();
+  if (loading) return <PageFallback />;
+  const canManagePersonnel = user?.role === "hr" || can("manage_personnel");
+  return (
+    <Navigate
+      to={canManagePersonnel ? "/hr/people/personnel" : "/hr/people/accounts"}
+      replace
+    />
+  );
+}
+
+function PeoplePersonnelRoute() {
+  const { user } = useAuth();
+  const { can } = usePermissions();
+  return <PersonnelPage showAccountsTab={user?.role === "hr" || can("manage_users")} />;
+}
+
+function PeopleAccountsRoute() {
+  const { user } = useAuth();
+  const { can } = usePermissions();
+  return <UsersPage showPersonnelTab={user?.role === "hr" || can("manage_personnel")} />;
+}
+
 function HomeRedirect() {
   const { user } = useAuth();
   if (!user) return <Navigate to="/login" replace />;
@@ -182,11 +212,20 @@ function App() {
               <Route path="/hr/periods" element={<ModuleRoute module="periods" title="دوره‌های ارزیابی"><PeriodsPage /></ModuleRoute>} />
             </Route>
 
-            <Route element={<ProtectedRoute allowedRoles={["hr"]} anyCapability={["manage_personnel"]} />}>
-              <Route path="/hr/personnel" element={<PersonnelPage />} />
-            </Route>
-            <Route element={<ProtectedRoute allowedRoles={["hr"]} anyCapability={["manage_users"]} />}>
-              <Route path="/hr/users" element={<UsersPage />} />
+            <Route
+              element={
+                <ProtectedRoute
+                  allowedRoles={["hr"]}
+                  anyCapability={["manage_personnel", "manage_users"]}
+                />
+              }
+            >
+              <Route path="/hr/people" element={<PeopleManagementRedirect />} />
+              <Route path="/hr/people/personnel" element={<PeoplePersonnelRoute />} />
+              <Route path="/hr/people/accounts" element={<PeopleAccountsRoute />} />
+              {/* نشانی‌های قدیمی در بوکمارک‌ها و اعلان‌ها به تب متناظر می‌روند. */}
+              <Route path="/hr/personnel" element={<Navigate to="/hr/people/personnel" replace />} />
+              <Route path="/hr/users" element={<Navigate to="/hr/people/accounts" replace />} />
             </Route>
             <Route element={<ProtectedRoute allowedRoles={["hr"]} anyCapability={["manage_scoring"]} />}>
               <Route path="/hr/indicators" element={<IndicatorsPage />} />

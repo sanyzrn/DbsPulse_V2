@@ -40,6 +40,7 @@ def test_config_endpoint_returns_business_rules(client, db_session):
     assert body["evidence_required_scores"] == [1, 5]
     assert body["general_section_weight"] == 0.6
     assert body["specialized_section_weight"] == 0.4
+    assert body["bonus_reason_min_length"] == 10
 
 
 def test_setting_is_manager_clears_supervisor_access(client, db_session):

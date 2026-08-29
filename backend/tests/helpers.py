@@ -4,6 +4,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.security import create_access_token, hash_password
+from app.services.authorization import DEFAULT_HR_CAPABILITIES
 from app.models.capability import UserCapability
 from app.models.enums import Capability
 from app.models.evaluation_access import EvaluationAccess
@@ -44,7 +45,11 @@ def make_user(
     db.add(user)
     db.flush()
 
-    granted = list(Capability) if (capabilities is None and role == "hr") else (capabilities or [])
+    granted = (
+        list(DEFAULT_HR_CAPABILITIES)
+        if (capabilities is None and role == "hr")
+        else (capabilities or [])
+    )
     for capability in granted:
         db.add(UserCapability(user_id=user.id, capability=capability))
     db.flush()

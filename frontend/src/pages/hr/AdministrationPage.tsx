@@ -73,6 +73,29 @@ export function AdministrationPage() {
   // اگر این‌جا فقط مجوز را می‌دیدیم، کاربر منابع انسانی کارتی را نمی‌دید که API
   // به او اجازه‌اش را می‌دهد.
   const canOrgUnits = user?.role === "hr" || can("manage_personnel");
+  const tabs = [
+    ...(canOrgUnits ? [{ id: "org-units", label: "واحدهای سازمانی", content: <OrgUnitsCard /> }] : []),
+    ...(can("manage_capabilities")
+      ? [
+          { id: "separation", label: "تفکیک وظایف", content: <SeparationCard /> },
+          { id: "capabilities", label: "مجوزهای اداری", content: <CapabilitiesCard /> },
+        ]
+      : []),
+    ...(can("manage_integrations")
+      ? [{ id: "integrations", label: "ایمیل و پیامک", content: <IntegrationsCard /> }]
+      : []),
+    ...(can("manage_ai")
+      ? [{ id: "ai", label: "دستیار هوشمند", content: <AiCard /> }]
+      : []),
+    ...(can("manage_modules")
+      ? [
+          { id: "policy", label: "قاعده‌های سازمانی", content: <PolicyCard /> },
+          { id: "modules", label: "بخش‌های سامانه", content: <ModulesCard /> },
+        ]
+      : []),
+  ];
+  const [activeTab, setActiveTab] = useState<string | null>(null);
+  const selectedTab = tabs.find((tab) => tab.id === activeTab) ?? tabs[0];
 
   return (
     <div className="space-y-5">
@@ -80,13 +103,40 @@ export function AdministrationPage() {
         title="مدیریت سامانه"
         subtitle="چه کسی می‌تواند خودِ سامانه را عوض کند، و کدام بخش‌ها فعال‌اند"
       />
-      {!loading && canOrgUnits && <OrgUnitsCard />}
-      {can("manage_capabilities") && <SeparationCard />}
-      {can("manage_capabilities") && <CapabilitiesCard />}
-      {can("manage_integrations") && <IntegrationsCard />}
-      {can("manage_ai") && <AiCard />}
-      {can("manage_modules") && <PolicyCard />}
-      {can("manage_modules") && <ModulesCard />}
+      {!loading && tabs.length > 0 && (
+        <>
+          <div className="overflow-x-auto">
+            <div
+              role="tablist"
+              aria-label="بخش‌های مدیریت سامانه"
+              className="inline-flex min-w-max gap-1 rounded-2xl border border-gray-200 bg-white p-1 shadow-sm"
+            >
+              {tabs.map((tab) => {
+                const isActive = tab.id === selectedTab?.id;
+                return (
+                  <button
+                    key={tab.id}
+                    type="button"
+                    role="tab"
+                    aria-selected={isActive}
+                    onClick={() => setActiveTab(tab.id)}
+                    className={`rounded-xl px-4 py-2 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pulse-500 focus-visible:ring-offset-1 ${
+                      isActive
+                        ? "bg-pulse-600 text-white shadow-sm"
+                        : "text-gray-600 hover:bg-gray-100 hover:text-gray-900"
+                    }`}
+                  >
+                    {tab.label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+          <div role="tabpanel" aria-label={selectedTab?.label}>
+            {selectedTab?.content}
+          </div>
+        </>
+      )}
       {/* `loading` عمداً در شرط هست.
           `can()` تا وقتی مجوزها از سرور نیامده `false` برمی‌گرداند، پس بدون این
           شرط صفحه در همان یک لحظه با اطمینان می‌گفت «مجوز ندارید» — به مدیری که
@@ -128,56 +178,60 @@ function SeparationCard() {
 
   if (data.separated) {
     return (
-      <div className="rounded-2xl border border-green-200 bg-green-50/50 p-5">
-        <p className="text-sm font-bold text-green-800">تفکیک وظایف برقرار است</p>
-        <p className="mt-1 text-xs leading-relaxed text-green-900/70">
-          هیچ حسابی هم‌زمان در زنجیرهٔ ارزیابی نیست و قواعد را عوض نمی‌کند. اگر روزی
-          نتیجه‌ای زیر سؤال برود، می‌شود نشان داد کسی که تصمیم گرفته همان کسی نبوده
-          که قاعده را نوشته.
-        </p>
-      </div>
+      <Card title="تفکیک وظایف">
+        <div className="rounded-xl border border-green-200 bg-green-50/50 p-4">
+          <p className="text-sm font-bold text-green-800">تفکیک وظایف برقرار است</p>
+          <p className="mt-1 text-xs leading-relaxed text-green-900/70">
+            هیچ حسابی هم‌زمان در زنجیرهٔ ارزیابی نیست و قواعد را عوض نمی‌کند. اگر روزی
+            نتیجه‌ای زیر سؤال برود، می‌شود نشان داد کسی که تصمیم گرفته همان کسی نبوده
+            که قاعده را نوشته.
+          </p>
+        </div>
+      </Card>
     );
   }
 
   return (
-    <div className="rounded-2xl border border-amber-200 bg-amber-50/50 p-5">
-      <p className="text-sm font-bold text-amber-900">تفکیک وظایف هنوز برقرار نیست</p>
-      <p className="mt-1 text-xs leading-relaxed text-amber-900/80">
-        این حساب‌ها هم در زنجیرهٔ ارزیابی جایگاه دارند و هم می‌توانند قواعد را عوض
-        کنند. یعنی همان کسی که پرونده‌ها را تأیید می‌کند، شاخص‌ها و قواعد نمره‌دهی را
-        هم تعیین می‌کند:
-      </p>
-      <ul className="mt-3 flex flex-wrap gap-2">
-        {data.overlapping_users.map((user) => (
-          <li
-            key={user.username}
-            className="rounded-lg bg-white px-2.5 py-1 text-xs text-amber-900 ring-1 ring-amber-200"
-          >
-            {user.username}
-            <span className="text-amber-900/50"> · {ROLE_LABELS[user.role] ?? user.role}</span>
-          </li>
-        ))}
-      </ul>
-      <p className="mt-3 border-t border-amber-200 pt-3 text-xs leading-relaxed text-amber-900/80">
-        {data.dedicated_admin_count > 0 ? (
-          <>
-            حساب اختصاصی مدیریت از قبل ساخته شده است. برای کامل‌کردن تفکیک، در
-            کارت‌های پایین مجوز «دادن مجوز» و «شاخص‌ها و طرح نمره‌دهی» را از
-            حساب‌های بالا بردارید.
-          </>
-        ) : (
-          <>
-            برای تفکیک: یک کاربر با نقش «پشتیبانی فنی» بسازید، مجوزهای اداری را به او
-            بدهید، و سپس از حساب‌های بالا بگیرید. سامانه نمی‌گذارد آخرین حسابِ
-            مجوزدهنده خودش را حذف کند، پس بن‌بست پیش نمی‌آید.
-          </>
-        )}
-      </p>
-      <p className="mt-2 text-[11px] text-amber-900/60">
-        این وضعیت عمدی و سازگار با گذشته است — نه خطا. ولی تا وقتی برقرار نشده،
-        سامانه آن را ادعا نمی‌کند.
-      </p>
-    </div>
+    <Card title="تفکیک وظایف">
+      <div className="rounded-xl border border-amber-200 bg-amber-50/50 p-4">
+        <p className="text-sm font-bold text-amber-900">تفکیک وظایف هنوز برقرار نیست</p>
+        <p className="mt-1 text-xs leading-relaxed text-amber-900/80">
+          این حساب‌ها هم در زنجیرهٔ ارزیابی جایگاه دارند و هم می‌توانند قواعد را عوض
+          کنند. یعنی همان کسی که پرونده‌ها را تأیید می‌کند، شاخص‌ها و قواعد نمره‌دهی را
+          هم تعیین می‌کند:
+        </p>
+        <ul className="mt-3 flex flex-wrap gap-2">
+          {data.overlapping_users.map((user) => (
+            <li
+              key={user.username}
+              className="rounded-lg bg-white px-2.5 py-1 text-xs text-amber-900 ring-1 ring-amber-200"
+            >
+              {user.username}
+              <span className="text-amber-900/50"> · {ROLE_LABELS[user.role] ?? user.role}</span>
+            </li>
+          ))}
+        </ul>
+        <p className="mt-3 border-t border-amber-200 pt-3 text-xs leading-relaxed text-amber-900/80">
+          {data.dedicated_admin_count > 0 ? (
+            <>
+              حساب اختصاصی مدیریت از قبل ساخته شده است. برای کامل‌کردن تفکیک، در
+              کارت‌های پایین مجوز «دادن مجوز» و «شاخص‌ها و طرح نمره‌دهی» را از
+              حساب‌های بالا بردارید.
+            </>
+          ) : (
+            <>
+              برای تفکیک: یک کاربر با نقش «پشتیبانی فنی» بسازید، مجوزهای اداری را به او
+              بدهید، و سپس از حساب‌های بالا بگیرید. سامانه نمی‌گذارد آخرین حسابِ
+              مجوزدهنده خودش را حذف کند، پس بن‌بست پیش نمی‌آید.
+            </>
+          )}
+        </p>
+        <p className="mt-2 text-[11px] text-amber-900/60">
+          این وضعیت عمدی و سازگار با گذشته است — نه خطا. ولی تا وقتی برقرار نشده،
+          سامانه آن را ادعا نمی‌کند.
+        </p>
+      </div>
+    </Card>
   );
 }
 
@@ -456,14 +510,33 @@ function PolicyCard() {
         {data.fields.map((field) => (
           <label key={field.key} className="flex flex-col gap-1 text-xs font-medium text-gray-600">
             {field.label}
-            <input
-              type="number"
-              min={field.minimum ?? undefined}
-              max={field.maximum ?? undefined}
-              className={inputClass}
-              value={String(values[field.key] ?? "")}
-              onChange={(e) => setDraft({ ...values, [field.key]: Number(e.target.value) })}
-            />
+            {field.kind === "bool" ? (
+              <button
+                type="button"
+                role="switch"
+                aria-checked={Boolean(values[field.key])}
+                onClick={() => setDraft({ ...values, [field.key]: !Boolean(values[field.key]) })}
+                className={`relative h-8 w-14 rounded-full transition-colors ${
+                  values[field.key] ? "bg-pulse-600" : "bg-gray-200"
+                }`}
+              >
+                <span
+                  className={`absolute top-1 h-6 w-6 rounded-full bg-white shadow-sm transition-all ${
+                    values[field.key] ? "right-7" : "right-1"
+                  }`}
+                />
+                <span className="sr-only">{values[field.key] ? "روشن" : "خاموش"}</span>
+              </button>
+            ) : (
+              <input
+                type="number"
+                min={field.minimum ?? undefined}
+                max={field.maximum ?? undefined}
+                className={inputClass}
+                value={String(values[field.key] ?? "")}
+                onChange={(e) => setDraft({ ...values, [field.key]: Number(e.target.value) })}
+              />
+            )}
             {field.help && (
               <span className="text-[11px] font-normal text-gray-400">{field.help}</span>
             )}
@@ -539,7 +612,12 @@ function IntegrationsCard() {
     }
   }
 
-  if (isPending || !data) return <Card title="ایمیل و پیامک"><TableSkeleton rows={3} /></Card>;
+  if (isPending || !data)
+    return (
+      <Card title="ایمیل و پیامک">
+        <TableSkeleton rows={3} />
+      </Card>
+    );
 
   return (
     <Card title="ایمیل و پیامک">

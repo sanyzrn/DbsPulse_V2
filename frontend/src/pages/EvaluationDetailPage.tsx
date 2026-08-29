@@ -802,8 +802,8 @@ function EditableScoring({
       ? "امتیاز ویژه باید یک عدد مثبت باشد"
       : bonusValue > config.bonus_max_points
         ? `امتیاز ویژه حداکثر می‌تواند ${config.bonus_max_points.toLocaleString("fa-IR")} باشد`
-        : bonusValue > 0 && bonusReason.trim() === ""
-          ? "برای امتیاز ویژه باید دلیل بنویسید"
+        : bonusValue > 0 && bonusReason.trim().length < config.bonus_reason_min_length
+          ? `توضیح امتیاز ویژه باید حداقل ${config.bonus_reason_min_length.toLocaleString("fa-IR")} نویسه باشد`
           : null;
 
   /** امتیاز ویژه را ذخیره می‌کند؛ اگر هنوز کامل نیست، بی‌صدا رد می‌شود.
@@ -1026,6 +1026,7 @@ function EditableScoring({
                 id="bonus-reason"
                 rows={2}
                 maxLength={500}
+                minLength={config.bonus_reason_min_length}
                 placeholder="این امتیاز بابت چه کاری است؟"
                 value={bonusReason}
                 onChange={(e) => {
@@ -1034,6 +1035,9 @@ function EditableScoring({
                 }}
                 className="w-full rounded-xl border border-amber-200 bg-white px-3 py-2 text-sm outline-none transition-colors duration-150 focus:border-amber-500"
               />
+              <p className="mt-1 text-[11px] text-amber-700">
+                حداقل {config.bonus_reason_min_length.toLocaleString("fa-IR")} نویسه
+              </p>
             </div>
           </div>
           {bonusError && <p className="mt-2 text-xs font-medium text-red-600">{bonusError}</p>}

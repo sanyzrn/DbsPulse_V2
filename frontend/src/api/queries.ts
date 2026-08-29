@@ -323,19 +323,21 @@ export function useNotifications() {
 }
 
 /** «کارنامه من»: نتایج نهایی‌شده ارزیابی خود کارمند (نقش employee). */
-export function useMyEvaluations() {
+export function useMyEvaluations(enabled = true) {
   return useQuery({
     queryKey: ["me", "evaluations"],
     queryFn: async () => (await apiClient.get<Page<MyEvaluation>>("/me/evaluations")).data,
+    enabled,
   });
 }
 
 /** پروندهٔ در جریانِ خود کارمند — فقط وضعیت، بدون امتیاز. */
-export function useMyOpenEvaluations() {
+export function useMyOpenEvaluations(enabled = true) {
   return useQuery({
     queryKey: ["me", "evaluations", "open"],
     queryFn: async () =>
       (await apiClient.get<import("../types").MyOpenEvaluation[]>("/me/evaluations/open")).data,
+    enabled,
   });
 }
 

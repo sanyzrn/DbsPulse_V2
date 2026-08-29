@@ -8,6 +8,7 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user
+from app.core.text_limits import BONUS_REASON_MIN
 from app.db.session import get_db
 from app.schemas.auth import CurrentUser
 from app.schemas.common import AppConfig
@@ -29,4 +30,5 @@ def get_config(
         general_section_weight=rules.general_section_weight,
         specialized_section_weight=rules.specialized_section_weight,
         bonus_max_points=rules.bonus_max_points,
+        bonus_reason_min_length=BONUS_REASON_MIN,
     )

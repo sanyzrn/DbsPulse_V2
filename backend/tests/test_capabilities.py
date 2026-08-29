@@ -26,7 +26,7 @@ ALL = [c.value for c in Capability]
 @pytest.fixture()
 def admin(db_session):
     """کاربر HR با همهٔ مجوزها — همان چیزی که مایگریشن ساخته است."""
-    user = make_user(db_session, "hr")
+    user = make_user(db_session, "hr", capabilities=list(Capability))
     db_session.commit()
     return user
 
@@ -124,13 +124,47 @@ def test_an_existing_hr_user_keeps_everything(client, admin):
         assert client.get(path, headers=auth_header(admin)).status_code == 200
 
 
-def test_the_migration_granted_every_capability_to_hr(db_session, admin):
+def test_default_hr_capabilities_match_the_operational_baseline(db_session):
+    hr = make_user(db_session, "hr")
+    db_session.commit()
     held = set(
         db_session.scalars(
-            select(UserCapability.capability).where(UserCapability.user_id == admin.id)
+            select(UserCapability.capability).where(UserCapability.user_id == hr.id)
         )
     )
-    assert held == set(Capability)
+    assert held == {
+        Capability.manage_users,
+        Capability.manage_personnel,
+        Capability.manage_scoring,
+    }
+
+
+def test_creating_or_promoting_hr_applies_the_default_capabilities(client, db_session, admin):
+    created = client.post(
+        "/api/users",
+        json={"username": "default.hr", "password": "Test12345!", "role": "hr"},
+        headers=auth_header(admin),
+    )
+    assert created.status_code == 201
+
+    target = make_user(db_session, "support", capabilities=[])
+    db_session.commit()
+    promoted = client.patch(
+        f"/api/users/{target.id}", json={"role": "hr"}, headers=auth_header(admin)
+    )
+    assert promoted.status_code == 200
+
+    for user_id in (created.json()["id"], target.id):
+        held = set(
+            db_session.scalars(
+                select(UserCapability.capability).where(UserCapability.user_id == user_id)
+            )
+        )
+        assert held == {
+            Capability.manage_users,
+            Capability.manage_personnel,
+            Capability.manage_scoring,
+        }
 
 
 # ── مجوز، نه نقش ────────────────────────────────────────────────────────────
@@ -217,7 +251,7 @@ def test_a_plain_employee_cannot_hold_capabilities(client, db_session, admin):
 def test_the_last_grantor_cannot_strip_themselves(client, db_session):
     """بدون این گارد، یک کلیک اشتباه سامانه را در حالتی قفل می‌کند که هیچ‌کس
     نمی‌تواند به کسی مجوز بدهد — و تنها راه خروج، SQL دستی روی پروداکشن است."""
-    only = make_user(db_session, "hr")
+    only = make_user(db_session, "hr", capabilities=[Capability.manage_capabilities])
     db_session.commit()
 
     response = client.put(
@@ -231,8 +265,8 @@ def test_the_last_grantor_cannot_strip_themselves(client, db_session):
 
 
 def test_with_a_second_grantor_the_first_can_step_down(client, db_session):
-    first = make_user(db_session, "hr")
-    second = make_user(db_session, "hr")
+    first = make_user(db_session, "hr", capabilities=[Capability.manage_capabilities])
+    second = make_user(db_session, "hr", capabilities=[Capability.manage_capabilities])
     db_session.commit()
 
     response = client.put(
@@ -247,7 +281,7 @@ def test_with_a_second_grantor_the_first_can_step_down(client, db_session):
 
 # ── ماژول‌ها ────────────────────────────────────────────────────────────────
 
-def test_modules_default_on_without_any_row(client, db_session, admin):
+def test_modules_use_their_declared_defaults_without_any_row(client, db_session, admin):
     """ماژول تازه‌ای که به کد اضافه شود، با حالتِ درستش شروع می‌کند — نه با
     «خاموش» فقط چون ردیف ندارد."""
     assert db_session.scalars(select(ModuleSetting)).all() == []
@@ -255,7 +289,15 @@ def test_modules_default_on_without_any_row(client, db_session, admin):
     modules = client.get("/api/administration/modules", headers=auth_header(admin)).json()
 
     assert {m["key"] for m in modules} == set(MODULES_BY_KEY)
-    assert all(m["enabled"] for m in modules)
+    enabled = {module["key"]: module["enabled"] for module in modules}
+    assert enabled["employee_overview_cards"] is False
+    assert enabled["employee_evaluation_visibility"] is False
+    assert enabled["employee_result_acknowledgement"] is False
+    assert enabled["objections"] is False
+    assert all(
+        enabled[key] is definition.default_enabled
+        for key, definition in MODULES_BY_KEY.items()
+    )
 
 
 def test_toggling_a_module_is_recorded(client, admin):
@@ -405,7 +447,7 @@ def test_support_sees_system_events_but_no_evaluation_content(client, db_session
     نتیجهٔ نهایی یک نفر را در خود نگه می‌دارند. انتقال کامل، همان چیزی را به
     پشتیبانی می‌داد که کل این تفکیک برای ممنوع‌کردنش ساخته شد.
     """
-    hr = make_user(db_session, "hr")
+    hr = make_user(db_session, "hr", capabilities=list(Capability))
     sup = make_user(db_session, "unit_supervisor")
     dep = make_user(db_session, "deputy")
     ceo = make_user(db_session, "ceo")

@@ -167,7 +167,7 @@ export function EvaluationList({
             animate={{ opacity: 1, height: "auto" }}
             exit={{ opacity: 0, height: 0 }}
             transition={{ duration: 0.2, ease: EASE_SOFT }}
-            className="overflow-hidden"
+            className="relative z-30 overflow-visible"
           >
             <div className="mb-4 grid grid-cols-1 gap-3 rounded-xl border border-gray-100 bg-gray-50/70 p-3 text-sm sm:grid-cols-2 lg:grid-cols-6">
               <label className="flex flex-col gap-1 text-xs font-medium text-gray-600">

@@ -1,3 +1,4 @@
+from app.models.enums import Capability
 from tests.helpers import auth_header, make_access, make_personnel, make_user
 
 
@@ -10,7 +11,9 @@ def test_only_hr_can_view_audit_log(client, db_session):
 
 
 def test_indicator_creation_is_logged(client, db_session):
-    hr = make_user(db_session, "hr")
+    hr = make_user(
+        db_session, "hr", capabilities=[Capability.manage_scoring, Capability.view_audit_log]
+    )
     db_session.commit()
 
     client.post(
@@ -28,7 +31,9 @@ def test_indicator_creation_is_logged(client, db_session):
 
 
 def test_evaluation_status_changes_are_logged_and_filterable(client, db_session):
-    hr = make_user(db_session, "hr")
+    hr = make_user(
+        db_session, "hr", capabilities=[Capability.manage_scoring, Capability.view_audit_log]
+    )
     sup = make_user(db_session, "unit_supervisor")
     dep = make_user(db_session, "deputy")
     ceo = make_user(db_session, "ceo")
@@ -53,7 +58,7 @@ def test_evaluation_status_changes_are_logged_and_filterable(client, db_session)
 def test_audit_log_filters_by_actor_personnel_and_org_unit(client, db_session):
     """گزارش رویدادها باید بتواند سابقهٔ یک کاربر، یک پرسنل یا یک واحد سازمانی
     مشخص را جدا و دقیق نشان دهد — نه فقط نوع رویداد و بازهٔ تاریخ."""
-    hr = make_user(db_session, "hr")
+    hr = make_user(db_session, "hr", capabilities=[Capability.view_audit_log])
     sup = make_user(db_session, "unit_supervisor")
     dep = make_user(db_session, "deputy")
     ceo = make_user(db_session, "ceo")
@@ -99,7 +104,7 @@ def test_audit_log_filters_by_contract_end_date(client, db_session):
     در یک بازهٔ مشخص است، جدا از بقیه قابل مرور باشد."""
     from datetime import date, timedelta
 
-    hr = make_user(db_session, "hr")
+    hr = make_user(db_session, "hr", capabilities=[Capability.view_audit_log])
     sup = make_user(db_session, "unit_supervisor")
     dep = make_user(db_session, "deputy")
     ceo = make_user(db_session, "ceo")
@@ -134,7 +139,9 @@ def test_audit_log_filters_by_contract_end_date(client, db_session):
 
 
 def test_audit_log_pagination(client, db_session):
-    hr = make_user(db_session, "hr")
+    hr = make_user(
+        db_session, "hr", capabilities=[Capability.manage_scoring, Capability.view_audit_log]
+    )
     db_session.commit()
     for i in range(3):
         client.post(

@@ -10,6 +10,7 @@ from sqlalchemy import select, text
 from sqlalchemy.exc import InternalError, ProgrammingError
 
 from app.models.audit_log import AuditLog
+from app.models.enums import Capability
 from app.services.audit import GENESIS_HASH, log_event, verify_chain
 from tests.helpers import auth_header, make_user
 
@@ -142,7 +143,7 @@ def test_the_database_refuses_to_delete_an_audit_row(db_session):
 
 
 def test_hr_can_check_integrity(client, db_session):
-    hr = make_user(db_session, "hr")
+    hr = make_user(db_session, "hr", capabilities=[Capability.view_audit_log])
     db_session.commit()
     # یک مسیر واقعیِ برنامه که لاگ می‌نویسد، تا چیزی برای راستی‌آزمایی وجود داشته باشد
     client.get("/api/personnel/export.xlsx", headers=auth_header(hr))
@@ -168,7 +169,7 @@ def test_improvement_goal_changes_are_logged(client, db_session):
     """محتوای یک برنامهٔ اصلاحیِ گره‌خورده به تصمیم قرارداد، تا امروز بی‌رد عوض می‌شد."""
     from tests.helpers import active_indicators, full_valid_scores, make_access, make_personnel
 
-    hr = make_user(db_session, "hr")
+    hr = make_user(db_session, "hr", capabilities=[Capability.view_audit_log])
     sup = make_user(db_session, "unit_supervisor")
     dep = make_user(db_session, "deputy")
     ceo = make_user(db_session, "ceo")
@@ -219,7 +220,7 @@ def test_improvement_goal_changes_are_logged(client, db_session):
 
 def test_the_report_export_is_logged_with_what_was_extracted(client, db_session):
     """تنها مسیر خروج داده که هیچ ردی نمی‌گذاشت."""
-    hr = make_user(db_session, "hr")
+    hr = make_user(db_session, "hr", capabilities=[Capability.view_audit_log])
     db_session.commit()
 
     assert client.get(

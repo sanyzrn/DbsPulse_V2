@@ -12,6 +12,7 @@ import {
 import { PeriodTrendChart } from "../../components/PeriodTrendChart";
 import { RoleOverviewCards } from "../../components/RoleOverviewCards";
 import { StageStatusCard } from "../../components/StageStatusCard";
+import { PaginationControls } from "../../components/PaginationControls";
 import { useToast } from "../../components/Toast";
 import { PersonScorecard } from "./PersonScorecard";
 import { ReportsSection } from "./ReportsSection";
@@ -614,10 +615,15 @@ function UnitBar({
 
 function ExpiringContractsCard() {
   const [days, setDays] = useState(60);
+  const [page, setPage] = useState(0);
+  const [pageSize, setPageSize] = useState(10);
   const [running, setRunning] = useState(false);
   const { data: contracts = [] } = useExpiringContracts(days);
   const { showSuccess, showError } = useToast();
   const queryClient = useQueryClient();
+  const totalPages = Math.max(1, Math.ceil(contracts.length / pageSize));
+  const safePage = Math.min(page, totalPages - 1);
+  const visibleContracts = contracts.slice(safePage * pageSize, (safePage + 1) * pageSize);
 
   async function runReminders() {
     setRunning(true);
@@ -666,7 +672,10 @@ function ExpiringContractsCard() {
             <select
               className="appearance-none rounded-xl border border-gray-200 bg-gray-100 px-3 py-1.5 pl-8 text-sm text-gray-700 outline-none transition-colors duration-150 focus:border-gray-900 focus:bg-white"
               value={days}
-              onChange={(e) => setDays(Number(e.target.value))}
+              onChange={(e) => {
+                setDays(Number(e.target.value));
+                setPage(0);
+              }}
             >
               {[30, 60, 90, 180].map((d) => (
                 <option key={d} value={d}>
@@ -685,10 +694,10 @@ function ExpiringContractsCard() {
       <Table
         bordered={false}
         headers={["نام", "واحد", "پایان قرارداد", "باقی‌مانده", "وضعیت ارزیابی"]}
-        rowKeys={contracts.map((c) => c.personnel_id)}
+        rowKeys={visibleContracts.map((c) => c.personnel_id)}
         animateRows={false}
         emptyMessage="در این بازه قراردادی رو به انقضا نیست."
-        rows={contracts.map((c) => [
+        rows={visibleContracts.map((c) => [
           c.full_name,
           <span key="unit" className="text-gray-500">
             {c.org_unit}
@@ -718,6 +727,17 @@ function ExpiringContractsCard() {
             </span>
           ),
         ])}
+      />
+      <PaginationControls
+        page={safePage}
+        totalPages={totalPages}
+        totalCount={contracts.length}
+        pageSize={pageSize}
+        onPageSizeChange={(size) => {
+          setPageSize(size);
+          setPage(0);
+        }}
+        onPageChange={setPage}
       />
     </div>
   );

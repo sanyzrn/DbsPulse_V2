@@ -22,6 +22,7 @@ import { Table } from "../../ui/Table";
 import { JalaliDatePicker } from "../../ui/JalaliDatePicker";
 import { SEPARATION_REASON_LABELS, type AppUser, type Personnel, type SeparationReason } from "../../types";
 import { SearchInput } from "../../ui/SearchInput";
+import { SectionTabs } from "../../components/SectionTabs";
 
 /** پیش‌فرض تعداد در هر صفحه؛ کاربر می‌تواند از نوار پایین عوضش کند. */
 const DEFAULT_PAGE_SIZE = 10;
@@ -307,7 +308,7 @@ function OrgUnitFields({
   );
 }
 
-export function PersonnelPage() {
+export function PersonnelPage({ showAccountsTab = true }: { showAccountsTab?: boolean } = {}) {
   const { showSuccess, showError } = useToast();
   const queryClient = useQueryClient();
   const [form, setForm] = useState(emptyForm);
@@ -415,7 +416,17 @@ export function PersonnelPage() {
 
   return (
     <div className="space-y-4">
-      <PageHeader title="پرسنل" subtitle="ثبت پرسنل جدید و مدیریت دسترسی زنجیره ارزیابی هر فرد" />
+      <PageHeader
+        title="مدیریت حساب و پرسنل"
+        subtitle="ثبت پرسنل جدید و مدیریت دسترسی زنجیره ارزیابی هر فرد"
+      />
+      <SectionTabs
+        label="مدیریت حساب و پرسنل"
+        tabs={[
+          ...(showAccountsTab ? [{ to: "/hr/people/accounts", label: "مدیریت حساب" }] : []),
+          { to: "/hr/people/personnel", label: "پرسنل" },
+        ]}
+      />
       <div className="space-y-4">
         {showImport && (
           <PersonnelImportDialog

@@ -8,6 +8,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user, require_chain_stage, require_roles
+from app.core.config import settings
 from app.db.session import get_db
 from app.models.audit_log import AuditLog
 from app.models.enums import (
@@ -184,7 +185,18 @@ def _self_assessment_of(db: Session, record: EvaluationRecord) -> SelfAssessment
     )
 
 
-def _to_detail(db: Session, record: EvaluationRecord) -> EvaluationDetail:
+def _may_view_self_assessment(role: UserRole) -> bool:
+    return {
+        UserRole.hr: settings.self_assessment_visible_to_hr,
+        UserRole.unit_supervisor: settings.self_assessment_visible_to_unit_supervisor,
+        UserRole.deputy: settings.self_assessment_visible_to_deputy,
+        UserRole.ceo: settings.self_assessment_visible_to_ceo,
+    }.get(role, False)
+
+
+def _to_detail(
+    db: Session, record: EvaluationRecord, current_user: CurrentUser
+) -> EvaluationDetail:
     framework = (
         db.get(IndicatorFramework, record.indicator_framework_id)
         if record.indicator_framework_id is not None
@@ -193,7 +205,11 @@ def _to_detail(db: Session, record: EvaluationRecord) -> EvaluationDetail:
     return EvaluationDetail.model_validate(record).model_copy(
         update={
             "was_returned": _was_returned(db, record.id),
-            "self_assessment": _self_assessment_of(db, record),
+            "self_assessment": (
+                _self_assessment_of(db, record)
+                if _may_view_self_assessment(current_user.role)
+                else None
+            ),
             "indicator_ids": sorted(indicator_ids_for_record(db, record)),
             "indicator_framework_version": framework.version if framework else None,
         }
@@ -595,7 +611,7 @@ def get_evaluation(
 ) -> EvaluationDetail:
     record = _get_record_or_404(db, evaluation_id)
     _ensure_can_view(record, current_user)
-    return _to_detail(db, record)
+    return _to_detail(db, record, current_user)
 
 
 @router.put("/{evaluation_id}/scores", response_model=list[ScoreRead])

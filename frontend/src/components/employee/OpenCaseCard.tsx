@@ -27,7 +27,11 @@ const SELF_ASSESSMENT_OPEN: MyOpenEvaluation["status"][] = ["draft", "hr_approve
 
 export function OpenCaseCard({ item, index }: { item: MyOpenEvaluation; index: number }) {
   const [showForm, setShowForm] = useState(false);
-  const [submitted, setSubmitted] = useState<SelfAssessment | null>(null);
+  const [submitted, setSubmitted] = useState<SelfAssessment | null>(
+    item.self_assessment_submitted_at
+      ? { submitted_at: item.self_assessment_submitted_at, note: null, scores: [] }
+      : null
+  );
   const canSelfAssess = SELF_ASSESSMENT_OPEN.includes(item.status);
 
   return (

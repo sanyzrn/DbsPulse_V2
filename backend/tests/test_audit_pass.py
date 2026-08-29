@@ -8,6 +8,7 @@ import jwt
 
 from app.core.config import settings
 from app.core.constants import CONDITIONAL_RENEWAL_RECOMMENDATION
+from app.models.enums import Capability
 from tests.helpers import (
     active_indicators,
     auth_header,
@@ -228,7 +229,11 @@ def test_users_is_active_filter_and_export(client, db_session):
 
 
 def test_audit_log_date_filter_and_export(client, db_session):
-    hr = make_user(db_session, "hr")
+    hr = make_user(
+        db_session,
+        "hr",
+        capabilities=[Capability.manage_users, Capability.view_audit_log],
+    )
     make_personnel(db_session)  # رویدادی نمی‌سازد اما جدول را پر می‌کند
     db_session.commit()
     # یک رویداد واقعی: ساخت کاربر

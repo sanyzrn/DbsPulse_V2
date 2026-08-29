@@ -3,6 +3,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { motion } from "motion/react";
 import { apiClient, extractErrorMessage } from "../../api/client";
 import { useMyEvaluations, useMyImprovementPlans, useMyOpenEvaluations } from "../../api/queries";
+import { usePermissions } from "../../auth/PermissionsContext";
 import { OpenCaseCard } from "../../components/employee/OpenCaseCard";
 import { useConfirm } from "../../components/ConfirmDialog";
 import { PdfDownloadButton } from "../../components/PdfDownloadButton";
@@ -14,7 +15,17 @@ import { PctBadge, PctBar, ScoreRing } from "../../ui/Meters";
 import { formatDate, formatDateTime } from "../../utils/dates";
 import type { ImprovementPlanDetail, MyEvaluation } from "../../types";
 
-function MyEvaluationCard({ item, index }: { item: MyEvaluation; index: number }) {
+function MyEvaluationCard({
+  item,
+  index,
+  showObjections,
+  showAcknowledgement,
+}: {
+  item: MyEvaluation;
+  index: number;
+  showObjections: boolean;
+  showAcknowledgement: boolean;
+}) {
   const { showSuccess, showError } = useToast();
   const confirm = useConfirm();
   const queryClient = useQueryClient();
@@ -61,7 +72,7 @@ function MyEvaluationCard({ item, index }: { item: MyEvaluation; index: number }
       <Card
         title={`پرونده ${item.evaluation_code}`}
         actions={
-          item.acknowledged_at ? (
+          showAcknowledgement && (item.acknowledged_at ? (
             <span className="inline-flex items-center gap-1.5 rounded-full bg-green-50 px-3 py-1 text-xs font-medium text-green-700">
               <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-green-500" />
               مشاهده شد — {formatDateTime(item.acknowledged_at)}
@@ -70,7 +81,7 @@ function MyEvaluationCard({ item, index }: { item: MyEvaluation; index: number }
             <Button onClick={acknowledge} loading={busy}>
               نتیجه را دیدم
             </Button>
-          )
+          ))
         }
       >
         <div className="flex flex-wrap items-center gap-x-8 gap-y-3">
@@ -129,7 +140,7 @@ function MyEvaluationCard({ item, index }: { item: MyEvaluation; index: number }
           />
         </div>
 
-        <ObjectionSection item={item} />
+        {showObjections && <ObjectionSection item={item} />}
       </Card>
     </motion.div>
   );
@@ -296,9 +307,18 @@ function MyPlanCard({ plan, index }: { plan: ImprovementPlanDetail; index: numbe
 }
 
 export function MyEvaluationsPage() {
-  const { data, isPending, error } = useMyEvaluations();
+  const { moduleEnabled, loading: permissionsLoading } = usePermissions();
+  // تا قبل از رسیدن تنظیمات، هیچ بخش اختیاری چشمک نمی‌زند. پیش‌فرض ماژول‌ها
+  // برای این صفحه عمداً خاموش است، پس «نامعلوم» نباید به‌اشتباه «روشن» دیده شود.
+  const showOverview = !permissionsLoading && moduleEnabled("employee_overview_cards");
+  const showEvaluationDetails =
+    !permissionsLoading && moduleEnabled("employee_evaluation_visibility");
+  const showAcknowledgement =
+    showEvaluationDetails && moduleEnabled("employee_result_acknowledgement");
+  const showObjections = showEvaluationDetails && moduleEnabled("objections");
+  const { data, isPending, error } = useMyEvaluations(showEvaluationDetails);
   const { data: plans = [], error: plansError } = useMyImprovementPlans();
-  const { data: openCases = [] } = useMyOpenEvaluations();
+  const { data: openCases = [] } = useMyOpenEvaluations(showEvaluationDetails);
 
   return (
     <div className="space-y-4">
@@ -306,11 +326,11 @@ export function MyEvaluationsPage() {
         title="کارنامه من"
         subtitle="نتایج نهایی‌شدهٔ ارزیابی عملکرد شما. ثبت مشاهده یعنی نتیجه را دیده‌اید — نه اینکه آن را پذیرفته‌اید."
       />
-      <RoleOverviewCards />
+      {showOverview && <RoleOverviewCards />}
 
       {/* پروندهٔ در جریان بالاتر از نتایج گذشته می‌آید: مهم‌ترین چیزی که فرد
           همین حالا باید بداند، این است که تصمیمی دربارهٔ او در راه است. */}
-      {openCases.map((item, i) => (
+      {showEvaluationDetails && openCases.map((item, i) => (
         <OpenCaseCard key={item.id} item={item} index={i} />
       ))}
 
@@ -322,23 +342,29 @@ export function MyEvaluationsPage() {
       {plans.map((plan, i) => (
         <MyPlanCard key={plan.id} plan={plan} index={i} />
       ))}
-      {error != null && (
+      {showEvaluationDetails && error != null && (
         <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">{extractErrorMessage(error)}</p>
       )}
-      {isPending && (
+      {showEvaluationDetails && isPending && (
         <div className="space-y-4">
           {[0, 1].map((i) => (
             <div key={i} className="skeleton h-32" />
           ))}
         </div>
       )}
-      {data && data.items.length === 0 && (
+      {showEvaluationDetails && data && data.items.length === 0 && (
         <Card>
           <EmptyState>هنوز ارزیابی نهایی‌شده‌ای برای شما ثبت نشده است.</EmptyState>
         </Card>
       )}
-      {data?.items.map((item, i) => (
-        <MyEvaluationCard key={item.id} item={item} index={i} />
+      {showEvaluationDetails && data?.items.map((item, i) => (
+        <MyEvaluationCard
+          key={item.id}
+          item={item}
+          index={i}
+          showObjections={showObjections}
+          showAcknowledgement={showAcknowledgement}
+        />
       ))}
     </div>
   );

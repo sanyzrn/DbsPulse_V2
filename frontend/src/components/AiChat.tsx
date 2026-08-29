@@ -27,8 +27,6 @@ export function AiChat() {
   const [open, setOpen] = useState(false);
 
   // دکمه‌ای که تنها پاسخش «در دسترس نیست» باشد، از نبودنِ دکمه بدتر است.
-  if (!status?.available) return null;
-
   return (
     <>
       <Tooltip label="دستیار هوشمند">
@@ -41,12 +39,20 @@ export function AiChat() {
           <SparkIcon className="h-5 w-5" />
         </button>
       </Tooltip>
-      <AnimatePresence>{open && <ChatPanel onClose={() => setOpen(false)} />}</AnimatePresence>
+      <AnimatePresence>
+        {open && <ChatPanel status={status} onClose={() => setOpen(false)} />}
+      </AnimatePresence>
     </>
   );
 }
 
-function ChatPanel({ onClose }: { onClose: () => void }) {
+function ChatPanel({
+  status,
+  onClose,
+}: {
+  status?: AiStatus;
+  onClose: () => void;
+}) {
   const { showError } = useToast();
   const queryClient = useQueryClient();
   const [conversationId, setConversationId] = useState<number | null>(null);
@@ -70,7 +76,7 @@ function ChatPanel({ onClose }: { onClose: () => void }) {
 
   async function send() {
     const text = draft.trim();
-    if (!text || busy) return;
+    if (!text || busy || !status?.available) return;
     setDraft("");
     setFailure("");
     setMessages((prev) => [...prev, { id: Date.now(), role: "user", content: text, actions: [] }]);
@@ -158,6 +164,11 @@ function ChatPanel({ onClose }: { onClose: () => void }) {
         </header>
 
         <div className="min-h-0 flex-1 space-y-3 overflow-y-auto p-4">
+          {status && !status.available && (
+            <p className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs leading-relaxed text-amber-900">
+              {status.reason || "دستیار هوشمند هنوز برای این حساب فعال نشده است."}
+            </p>
+          )}
           {messages.length === 0 && (
             <p className="py-8 text-center text-sm text-gray-400">
               دربارهٔ پرسنل، پرونده‌های ارزیابی و شاخص‌ها بپرسید. برای تغییر داده، پیشنهاد را
@@ -186,6 +197,7 @@ function ChatPanel({ onClose }: { onClose: () => void }) {
           <textarea
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
+            disabled={!status?.available || busy}
             onKeyDown={(e) => {
               if (e.key === "Enter" && !e.shiftKey) {
                 e.preventDefault();
@@ -194,14 +206,14 @@ function ChatPanel({ onClose }: { onClose: () => void }) {
             }}
             rows={2}
             placeholder="پرسشتان را بنویسید…"
-            className="max-h-32 min-h-[44px] flex-1 resize-none rounded-xl border border-gray-200 bg-gray-100 px-3 py-2 text-sm text-gray-900 outline-none transition-colors focus:border-gray-900 focus:bg-white"
+            className="max-h-32 min-h-[44px] flex-1 resize-none rounded-xl border border-gray-200 bg-gray-100 px-3 py-2 text-sm text-gray-900 outline-none transition-colors focus:border-gray-900 focus:bg-white disabled:cursor-not-allowed disabled:opacity-60"
           />
           {/* دکمه هنگام درخواستِ در جریان خاموش است: دو درخواست هم‌زمان یعنی
               هرکدام دیرتر تمام شود برنده است، که لزوماً همانی نیست که آخرین
               کلیک خواسته بود. */}
           <button
             type="submit"
-            disabled={busy || !draft.trim()}
+            disabled={busy || !status?.available || !draft.trim()}
             className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-pulse-600 text-white transition-colors hover:bg-pulse-700 disabled:opacity-40"
             aria-label="ارسال"
           >

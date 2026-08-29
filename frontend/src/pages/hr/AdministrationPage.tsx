@@ -515,7 +515,7 @@ function PolicyCard() {
                 type="button"
                 role="switch"
                 aria-checked={Boolean(values[field.key])}
-                onClick={() => setDraft({ ...values, [field.key]: !Boolean(values[field.key]) })}
+                onClick={() => setDraft({ ...values, [field.key]: !values[field.key] })}
                 className={`relative h-8 w-14 rounded-full transition-colors ${
                   values[field.key] ? "bg-pulse-600" : "bg-gray-200"
                 }`}

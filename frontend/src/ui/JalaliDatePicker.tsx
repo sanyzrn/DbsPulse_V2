@@ -53,7 +53,7 @@ export function JalaliDatePicker({
       setViewYear(selectedJalali.jy);
       setViewMonth(selectedJalali.jm);
     }
-  }, [selectedJalali?.jy, selectedJalali?.jm, selectedJalali?.jd]);
+  }, [selectedJalali]);
 
   useEffect(() => {
     if (!open) return;

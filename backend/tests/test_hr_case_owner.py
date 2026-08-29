@@ -5,6 +5,7 @@
 تأیید یا برگشت بزند، پس در سازمانی با چند نفر HR پاسخ سؤال «مسئولِ این پرونده که
 بود؟» وجود نداشت — فقط «چه کسی کلیک کرد».
 """
+from app.models.enums import Capability
 from tests.helpers import (
     active_indicators,
     auth_header,
@@ -16,7 +17,7 @@ from tests.helpers import (
 
 
 def _submitted_case(client, db_session):
-    hr = make_user(db_session, "hr")
+    hr = make_user(db_session, "hr", capabilities=[Capability.view_audit_log])
     sup = make_user(db_session, "unit_supervisor")
     dep = make_user(db_session, "deputy")
     ceo = make_user(db_session, "ceo")

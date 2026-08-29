@@ -14,6 +14,7 @@ import pytest
 
 from app.core.config import settings
 from app.core.security import hash_password
+from app.models.enums import Capability
 from app.models.login_attempt import LoginAttempt
 from app.services.login_guard import (
     clear_failures,
@@ -183,7 +184,7 @@ def test_locking_one_account_does_not_lock_another(client, db_session, account):
 def test_lockout_is_audited_and_hr_is_notified(client, db_session, account):
     from tests.helpers import auth_header
 
-    hr = make_user(db_session, "hr")
+    hr = make_user(db_session, "hr", capabilities=[Capability.view_audit_log])
     db_session.commit()
 
     for _ in range(settings.login_max_failed_attempts):

@@ -14,7 +14,7 @@
 """
 import pytest
 
-from app.models.enums import SchemeStatus
+from app.models.enums import Capability, SchemeStatus
 from app.models.evaluation import EvaluationRecord
 from app.models.scoring_scheme import ScoringScheme
 from tests.helpers import (
@@ -64,7 +64,11 @@ def _finalize(client, db_session, *, hr, sup, dep, ceo, personnel, score=4):
 @pytest.fixture()
 def org(db_session):
     """دو کاربر HR — فعال‌سازی دو نفره بدون نفر دوم قابل آزمودن نیست."""
-    hr = make_user(db_session, "hr")
+    hr = make_user(
+        db_session,
+        "hr",
+        capabilities=[Capability.manage_scoring, Capability.view_audit_log],
+    )
     hr2 = make_user(db_session, "hr")
     sup = make_user(db_session, "unit_supervisor")
     dep = make_user(db_session, "deputy")

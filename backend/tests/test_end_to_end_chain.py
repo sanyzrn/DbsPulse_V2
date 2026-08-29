@@ -18,7 +18,7 @@
 """
 import pytest
 
-from app.models.enums import EvaluationStatus
+from app.models.enums import Capability, EvaluationStatus
 from app.models.evaluation import EvaluationRecord
 from app.services.audit import verify_chain
 from tests.helpers import (
@@ -35,7 +35,7 @@ from tests.helpers import (
 def cast(db_session):
     """همهٔ بازیگرهای زنجیره، به‌علاوهٔ یک «غریبه» از هر نقش برای سنجش منفی."""
     people = {
-        "hr": make_user(db_session, "hr"),
+        "hr": make_user(db_session, "hr", capabilities=[Capability.view_audit_log]),
         "sup": make_user(db_session, "unit_supervisor"),
         "dep": make_user(db_session, "deputy"),
         "ceo": make_user(db_session, "ceo"),

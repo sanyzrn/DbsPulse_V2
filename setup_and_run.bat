@@ -66,7 +66,7 @@ set "PYTHONIOENCODING=utf-8"
 REM Sample users/personnel are seeded on purpose here: this script
 REM bootstraps a LOCAL DEVELOPMENT environment. The flag is read by
 REM the backend at startup and is never set in production.
-set "SEED_DEMO_DATA=true"
+set "SEED_DEMO_DATA=false"
 
 echo ============================================================
 echo  DbsPulse setup

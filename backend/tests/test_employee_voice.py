@@ -8,6 +8,7 @@
 from datetime import UTC, datetime, timedelta
 
 from app.core.config import settings
+from app.models.enums import Capability
 from app.models.evaluation import EvaluationRecord
 from tests.helpers import (
     active_indicators,
@@ -20,7 +21,7 @@ from tests.helpers import (
 
 
 def _case(client, db_session, *, finalize: bool):
-    hr = make_user(db_session, "hr")
+    hr = make_user(db_session, "hr", capabilities=[Capability.view_audit_log])
     sup = make_user(db_session, "unit_supervisor")
     dep = make_user(db_session, "deputy")
     ceo = make_user(db_session, "ceo")

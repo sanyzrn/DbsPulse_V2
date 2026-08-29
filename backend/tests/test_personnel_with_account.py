@@ -7,7 +7,7 @@
 """
 from sqlalchemy import select
 
-from app.models.enums import UserRole
+from app.models.enums import Capability, UserRole
 from app.models.personnel import Personnel
 from app.models.user import User
 from tests.helpers import auth_header, make_user
@@ -152,7 +152,15 @@ def test_the_username_pattern_is_the_same_one_used_for_users(client, db_session)
 
 
 def test_account_creation_is_audited_with_the_link(client, db_session):
-    hr = make_user(db_session, "hr")
+    hr = make_user(
+        db_session,
+        "hr",
+        capabilities=[
+            Capability.manage_users,
+            Capability.manage_personnel,
+            Capability.view_audit_log,
+        ],
+    )
     db_session.commit()
     client.post(
         "/api/personnel",

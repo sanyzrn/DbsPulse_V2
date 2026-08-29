@@ -16,8 +16,11 @@
 این تست همان اتفاق را غیرممکن می‌کند: اگر کسی ستون یا ایندکسی اضافه کند و اعلام
 روی مدل را جا بیندازد، این‌جا شکست می‌خورد — نه شش ماه بعد، وسط یک مایگریشن.
 """
+import warnings
+
 from alembic.autogenerate import compare_metadata
 from alembic.migration import MigrationContext
+from sqlalchemy.exc import SAWarning
 
 import app.models  # noqa: F401 — واردات مدل‌ها است که آن‌ها را در Base.metadata ثبت می‌کند
 from app.db.base import Base
@@ -39,7 +42,17 @@ def _diff(connection) -> list:
             "compare_type": False,
         },
     )
-    return compare_metadata(context, Base.metadata)
+    # SQLAlchemy emits this while reflecting valid PostgreSQL NOT VALID
+    # constraints: the inspector returns a nested ``dialect_options`` mapping
+    # that Table reflection currently treats as a dialect keyword. Keep this
+    # narrowly scoped so every other schema/reflection warning remains visible.
+    with warnings.catch_warnings():
+        warnings.filterwarnings(
+            "ignore",
+            message=r"Can't validate argument 'dialect_options'.*",
+            category=SAWarning,
+        )
+        return compare_metadata(context, Base.metadata)
 
 
 def test_autogenerate_produces_no_changes(db_session):

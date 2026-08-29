@@ -98,7 +98,11 @@ def test_search_finds_a_user_by_name_not_only_username(client, db_session):
 
 def test_audit_log_names_the_actor(client, db_session):
     """لاگ حسابرسی هر دو را می‌دهد: کدام حساب، و کدام آدم."""
-    admin = make_user(db_session, "hr")
+    admin = make_user(
+        db_session,
+        "hr",
+        capabilities=[Capability.manage_users, Capability.view_audit_log],
+    )
     admin.full_name = "منابع انسانی، خانم کریمی"
     db_session.commit()
 

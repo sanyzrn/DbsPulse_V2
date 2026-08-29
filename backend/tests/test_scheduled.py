@@ -3,6 +3,7 @@ from datetime import UTC, date, datetime, timedelta
 
 from sqlalchemy import select
 
+from app.models.enums import Capability
 from app.models.evaluation import EvaluationRecord
 from app.services.scheduled import run_contract_expiry_sweep, run_sla_sweep
 from tests.helpers import (
@@ -148,8 +149,8 @@ def test_sla_owner_follows_the_stage(client, db_session):
     assert len(_notifications_for(db_session, dep.id, "sla_reminder")) == 1
 
 
-def test_admin_run_endpoint_is_hr_only(client, db_session):
-    hr = make_user(db_session, "hr")
+def test_admin_run_endpoint_requires_diagnostics_capability(client, db_session):
+    hr = make_user(db_session, "hr", capabilities=[Capability.view_diagnostics])
     sup = make_user(db_session, "unit_supervisor")
     db_session.commit()
 

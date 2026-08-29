@@ -15,6 +15,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
 from app.core.config import settings
+from app.models.enums import Capability
 from app.models.evaluation import EvaluationRecord
 from app.models.scheduler_run import SchedulerRun
 from app.services.scheduled import run_all_sweeps, run_sla_sweep
@@ -120,7 +121,7 @@ def test_a_run_is_recorded_with_its_summary(client, db_session):
 
 
 def test_the_history_endpoint_shows_recent_runs(client, db_session):
-    hr = make_user(db_session, "hr")
+    hr = make_user(db_session, "hr", capabilities=[Capability.view_diagnostics])
     db_session.commit()
     run_sweeps_once(db_session, run_all_sweeps, trigger="scheduler")
 
@@ -164,7 +165,7 @@ def test_a_second_instance_skips_instead_of_duplicating_work(db_session):
 
 
 def test_the_manual_endpoint_refuses_to_race_the_scheduler(client, db_session):
-    hr = make_user(db_session, "hr")
+    hr = make_user(db_session, "hr", capabilities=[Capability.view_diagnostics])
     db_session.commit()
 
     engine = create_engine(settings.database_url)

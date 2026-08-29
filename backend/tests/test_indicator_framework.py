@@ -12,6 +12,7 @@
 """
 import pytest
 
+from app.models.enums import Capability
 from tests.helpers import (
     active_indicators,
     auth_header,
@@ -25,7 +26,11 @@ from tests.helpers import (
 @pytest.fixture()
 def chain(db_session):
     """یک زنجیرهٔ کامل با پرسنل — پایهٔ همهٔ سناریوهای این فایل."""
-    hr = make_user(db_session, "hr")
+    hr = make_user(
+        db_session,
+        "hr",
+        capabilities=[Capability.manage_scoring, Capability.view_audit_log],
+    )
     sup = make_user(db_session, "unit_supervisor")
     dep = make_user(db_session, "deputy")
     ceo = make_user(db_session, "ceo")

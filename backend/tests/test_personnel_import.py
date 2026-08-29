@@ -16,6 +16,7 @@ from io import BytesIO
 from openpyxl import Workbook, load_workbook
 from sqlalchemy import select
 
+from app.models.enums import Capability
 from app.models.personnel import Personnel
 from app.models.user import User
 from app.services.personnel_import import COLUMNS, parse_flexible_date
@@ -266,7 +267,11 @@ def test_invalid_rows_are_skipped_and_the_good_ones_still_land(client, db_sessio
 
 def test_the_password_never_reaches_the_audit_log(client, db_session):
     """لاگ ممیزی ماندگار و append-only است؛ رمز نباید ماندگار شود."""
-    hr = make_user(db_session, "hr")
+    hr = make_user(
+        db_session,
+        "hr",
+        capabilities=[Capability.manage_personnel, Capability.view_audit_log],
+    )
     db_session.commit()
 
     body = _upload(
@@ -285,7 +290,11 @@ def test_the_password_never_reaches_the_audit_log(client, db_session):
 
 
 def test_import_is_logged_with_the_counts(client, db_session):
-    hr = make_user(db_session, "hr")
+    hr = make_user(
+        db_session,
+        "hr",
+        capabilities=[Capability.manage_personnel, Capability.view_audit_log],
+    )
     db_session.commit()
 
     _upload(client, hr, "/api/personnel/import", _sheet([_row(code="P-9300")]))

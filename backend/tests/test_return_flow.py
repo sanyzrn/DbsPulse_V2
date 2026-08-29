@@ -2,6 +2,7 @@
 عقب بفرستد؛ امتیازها حفظ و دلیل به‌صورت کامنت + رویداد audit ثبت می‌شود."""
 from sqlalchemy import func, select
 
+from app.models.enums import Capability
 from tests.helpers import (
     active_indicators,
     auth_header,
@@ -13,7 +14,7 @@ from tests.helpers import (
 
 
 def _setup_submitted(client, db_session):
-    hr = make_user(db_session, "hr")
+    hr = make_user(db_session, "hr", capabilities=[Capability.view_audit_log])
     sup = make_user(db_session, "unit_supervisor")
     dep = make_user(db_session, "deputy")
     ceo = make_user(db_session, "ceo")

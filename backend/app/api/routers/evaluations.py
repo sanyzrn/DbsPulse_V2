@@ -474,6 +474,42 @@ def _apply_evaluation_filters(
     return query
 
 
+def scope_evaluations_for_role(query, user: CurrentUser):
+    """دامنهٔ دیدِ ارزیابی‌ها به‌صورت allowlist — یک‌جا برای فهرست و دستیار.
+
+    قبلاً همین منطق داخل endpoint فهرست بود. دستیار هوشمند هم باید *دقیقاً*
+    همان را ببیند، و دو نسخه‌کردنِ allowlist یعنی روزی یکی قاعده بگیرد و
+    دیگری نگیرد. نقش ناشناخته هیچ — پیش‌فرضِ باز ممنوع.
+    """
+    if user.role == UserRole.hr:
+        return query
+    if user.role == UserRole.unit_supervisor:
+        return query.where(EvaluationRecord.unit_supervisor_user_id == user.id)
+    if user.role == UserRole.deputy:
+        return query.where(EvaluationRecord.deputy_user_id == user.id)
+    if user.role == UserRole.ceo:
+        return query.where(EvaluationRecord.ceo_user_id == user.id)
+    if user.role == UserRole.employee:
+        # کارمند فقط ارزیابی‌های نهایی‌شده خودش را می‌بیند (رابط اصلی‌اش /api/me است)
+        if user.personnel_id is None:
+            return query.where(sa_false())
+        return query.where(
+            EvaluationRecord.subject_personnel_id == user.personnel_id,
+            EvaluationRecord.status == EvaluationStatus.finalized,
+        )
+    raise HTTPException(
+        status_code=status.HTTP_403_FORBIDDEN,
+        detail="این نقش به پرونده‌های ارزیابی دسترسی ندارد",
+    )
+
+
+def sa_false():
+    """شرطِ همیشه-نادرست: فهرستِ تهی با «همه» فرق دارد و با IN () هم یکی نیست."""
+    from sqlalchemy import literal
+
+    return literal(False)
+
+
 @router.get("", response_model=EvaluationPage)
 def list_evaluations(
     q: str | None = None,
@@ -492,36 +528,11 @@ def list_evaluations(
 ) -> EvaluationPage:
     query = select(EvaluationRecord)
     # دامنهٔ دید، به‌صورت allowlist و نه زنجیرهٔ if/elif با پیش‌فرضِ باز.
-    #
     # نسخهٔ قبلی با `# hr می‌بیند همه را` تمام می‌شد، یعنی *هر* نقشی که در
-    # شاخه‌ها نبود همه‌چیز را می‌دید. نقش `support` (نیمهٔ دوم P0-03) دقیقاً در
-    # همان تله افتاد: حسابی که قرار بود به هیچ پرونده‌ای دسترسی نداشته باشد،
-    # کل پایگاه پرونده‌ها را می‌دید. کامنتِ شاخهٔ employee همین خطر را از قبل
-    # هشدار داده بود.
-    #
-    # حالا فقط hr صراحتاً همه را می‌بیند و هر نقشِ ناشناخته هیچ — پس نقش بعدی
-    # هم به‌صورت پیش‌فرض بسته است، نه باز.
-    if current_user.role == UserRole.hr:
-        pass
-    elif current_user.role == UserRole.unit_supervisor:
-        query = query.where(EvaluationRecord.unit_supervisor_user_id == current_user.id)
-    elif current_user.role == UserRole.deputy:
-        query = query.where(EvaluationRecord.deputy_user_id == current_user.id)
-    elif current_user.role == UserRole.ceo:
-        query = query.where(EvaluationRecord.ceo_user_id == current_user.id)
-    elif current_user.role == UserRole.employee:
-        # کارمند فقط ارزیابی‌های نهایی‌شده خودش را می‌بیند (رابط اصلی‌اش /api/me است)
-        if current_user.personnel_id is None:
-            return EvaluationPage(total=0, items=[])
-        query = query.where(
-            EvaluationRecord.subject_personnel_id == current_user.personnel_id,
-            EvaluationRecord.status == EvaluationStatus.finalized,
-        )
-    else:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="این نقش به پرونده‌های ارزیابی دسترسی ندارد",
-        )
+    # شاخه‌ها نبود همه‌چیز را می‌دید (داستانِ نقش support — P0-03). حالا منطق
+    # در `scope_evaluations_for_role` است که دستیار هم از همان استفاده می‌کند؛
+    # دو نسخه یعنی روزی یکی قاعده می‌گیرد و دیگری نمی‌گیرد.
+    query = scope_evaluations_for_role(query, current_user)
 
     query = _apply_evaluation_filters(
         query,

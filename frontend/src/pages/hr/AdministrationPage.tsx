@@ -1207,6 +1207,26 @@ function AiCard() {
         <NumberField label="حداکثر طول پاسخ (توکن)" min={100} max={32000} value={value.max_tokens} onChange={(n) => set("max_tokens", n)} />
         <NumberField label="مهلت پاسخ (ثانیه)" min={5} max={300} value={value.timeout_seconds} onChange={(n) => set("timeout_seconds", n)} />
         <NumberField label="حداکثر طول پیام کاربر (نویسه)" min={200} max={20000} value={value.max_user_chars} onChange={(n) => set("max_user_chars", n)} />
+        <NumberField label="عمقِ کاری در هر نوبت" hint="بیشترین پله‌ای که همکار می‌تواند ابزار صدا بزند" min={1} max={12} value={value.max_tool_iterations} onChange={(n) => set("max_tool_iterations", n)} />
+      </div>
+
+      <h3 className="mt-6 mb-2 text-sm font-bold text-gray-900">فایل‌ها و ورود گروهی</h3>
+      <div className="grid gap-3 sm:grid-cols-2">
+        <label className="flex items-start gap-2 text-xs text-gray-700">
+          <input
+            type="checkbox"
+            checked={value.allow_uploads}
+            onChange={(e) => set("allow_uploads", e.target.checked)}
+            className="mt-0.5 h-4 w-4 cursor-pointer rounded border-gray-300 text-pulse-500"
+          />
+          <span>
+            بارگذاری اکسل در گفت‌وگو
+            <span className="mt-0.5 block text-[11px] text-gray-400">
+              فایل در گفت‌وگو بازرسی و اصلاح می‌شود؛ ورودِ نهایی همیشه با تأییدِ کاربر است.
+            </span>
+          </span>
+        </label>
+        <NumberField label="سقف حجم فایل (مگابایت)" min={1} max={20} value={value.max_upload_mb} onChange={(n) => set("max_upload_mb", n)} />
       </div>
 
       <div className="mt-4 border-t border-gray-100 pt-4">

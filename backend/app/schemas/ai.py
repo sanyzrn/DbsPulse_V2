@@ -32,6 +32,10 @@ class AiSettingsRead(BaseModel):
     context_record_limit: int
     allow_write_actions: bool
     max_user_chars: int
+    #: عمقِ حلقهٔ ابزار در یک نوبت — یعنی دستیار چند پله می‌تواند کار کند.
+    max_tool_iterations: int
+    allow_uploads: bool
+    max_upload_mb: int
 
 
 class AiSettingsUpdate(BaseModel):
@@ -49,6 +53,9 @@ class AiSettingsUpdate(BaseModel):
     context_record_limit: int | None = Field(default=None, ge=0, le=200)
     allow_write_actions: bool | None = None
     max_user_chars: int | None = Field(default=None, ge=200, le=20000)
+    max_tool_iterations: int | None = Field(default=None, ge=1, le=12)
+    allow_uploads: bool | None = None
+    max_upload_mb: int | None = Field(default=None, ge=1, le=20)
 
 
 class AiUserAccessRead(BaseModel):
@@ -80,12 +87,41 @@ class AiStatus(BaseModel):
     #: اگر نه، چرا — به زبان قابل‌اقدام
     reason: str
     allow_write_actions: bool
+    #: بارگذاری فایل برای این کاربر ممکن است یا نه
+    allow_uploads: bool = False
 
 
-class AiActionRead(BaseModel):
-    name: str
+class AiStepRead(BaseModel):
+    """ردِ یک فراخوانیِ ابزار در نوبتِ دستیار — «چه کاری انجام شد»."""
+
+    tool: str
+    status: str
+    summary: str = ""
+    detail: dict = Field(default_factory=dict)
+
+
+class AiPendingActionRead(BaseModel):
+    """کنشِ در انتظارِ تأیید — کارتِ رابط مستقیماً از همین ساخته می‌شود."""
+
+    id: int
+    tool: str
     summary: str
-    payload: dict
+    arguments: dict = Field(default_factory=dict)
+    status: str = "pending"
+    result_text: str = ""
+    expires_at: datetime | None = None
+
+
+class AiUploadRead(BaseModel):
+    id: int
+    filename: str
+    kind: str = "file"
+    size_bytes: int = 0
+    total_rows: int = 0
+    valid_count: int = 0
+    invalid_count: int = 0
+    committed: bool = False
+    note: str = ""
 
 
 class AiMessageRead(BaseModel):
@@ -93,7 +129,10 @@ class AiMessageRead(BaseModel):
     role: str
     content: str
     created_at: datetime
-    actions: list[AiActionRead] = []
+    #: سازگاری با رابط‌های قدیمی — کنش‌ها حالا در `pending` زندگی می‌کنند.
+    actions: list[AiPendingActionRead] = []
+    steps: list[AiStepRead] = []
+    pending: list[AiPendingActionRead] = []
 
 
 class AiChatRequest(BaseModel):
@@ -104,23 +143,33 @@ class AiChatRequest(BaseModel):
 class AiChatResponse(BaseModel):
     conversation_id: int
     reply: str
-    actions: list[AiActionRead] = []
+    steps: list[AiStepRead] = []
+    pending: list[AiPendingActionRead] = []
+    usage: dict = Field(default_factory=dict)
 
 
-class AiRunActionRequest(BaseModel):
-    conversation_id: int
-    name: str
-    payload: dict
-
-
-class AiRunActionResponse(BaseModel):
-    result: str
+class AiPendingDecisionRequest(BaseModel):
+    """تأیید یا رد — بدنهٔ خالی؛ همهٔ هویت از مسیر می‌آید."""
 
 
 class AiConversationRead(BaseModel):
     id: int
     title: str
     updated_at: datetime
+
+
+class AiConversationRenameRequest(BaseModel):
+    title: str = Field(min_length=1, max_length=200)
+
+
+class AiToolRead(BaseModel):
+    """ابزاری که *این* کاربر واقعاً دارد — برای پیشنهادهای رابط و شفافیت."""
+
+    name: str
+    description: str
+    category: str
+    read_only: bool
+    risky: bool
 
 
 class AiTestRequest(BaseModel):

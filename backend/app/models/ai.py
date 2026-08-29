@@ -15,16 +15,18 @@
 تنهایی هیچ کلید API معتبری نمی‌دهد. API هم هرگز مقدار را برنمی‌گرداند، فقط
 «تنظیم شده یا نه» و چهار نویسهٔ آخر.
 """
-from datetime import datetime
+from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import (
     Boolean,
     DateTime,
     ForeignKey,
     Integer,
+    LargeBinary,
     String,
     Text,
     func,
+    text,
 )
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -84,6 +86,16 @@ class AiSettings(Base):
 
     #: سقفِ پیامِ کاربر. بدون آن، یک paste بلند هم هزینه است و هم احتمال خطای سرویس.
     max_user_chars: Mapped[int] = mapped_column(Integer, default=4000, nullable=False)
+
+    #: بیشترین پله‌ای که مدل در یک نوبت می‌تواند ابزار صدا بزند. حلقهٔ کاریِ
+    #: دستیار این‌جا می‌ایستد؛ بی‌سقف، یک مدلِ گیج‌شده هزینه و زمان را باز
+    #: می‌کند.
+    max_tool_iterations: Mapped[int] = mapped_column(Integer, default=6, nullable=False)
+
+    #: بارگذاری فایل (اکسل پرسنل و…) برای دستیار. سراسری است؛ سقفِ حجمش ردیف
+    #: بعدی.
+    allow_uploads: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    max_upload_mb: Mapped[int] = mapped_column(Integer, default=5, nullable=False)
 
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
@@ -146,4 +158,82 @@ class AiMessage(Base):
     content: Mapped[str] = mapped_column(Text, nullable=False)
     #: پیشنهادهای تغییر، به‌صورت JSON. تا وقتی کاربر تأیید نکرده، فقط متن‌اند.
     actions_json: Mapped[str] = mapped_column(Text, default="", nullable=False)
+    #: ردِ پایِ کاری که دستیار در این نوبت کرد: ابزارهای صدا زده‌شده، پیوست‌ها و
+    #: کنش‌های در انتظارِ تأیید. تاریخچهٔ بازخوانی‌شده باید بگوید *چه* شد، نه
+    #: فقط چه گفته شد.
+    meta_json: Mapped[str] = mapped_column(Text, default="", nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class AiPendingAction(Base):
+    """یک کنشِ تغییردهنده که مدل پیشنهاد داده و منتظرِ تصمیمِ آدم است.
+
+    چرا جدول و نه فقط JSON داخل پیام: کنشِ در انتظار باید *خودش* اعتبار داشته
+    باشد — کاربر در تبِ دیگری تأیید می‌کند، یا بعد از بازکردنِ دوبارهٔ صفحه؛ و
+    سرور باید بتواند بگوید «این یکی قبلاً اجرا شده» و اجازهٔ اجرای دوبارهٔ
+    ندهد. هیچ‌کدام با رشتهٔ داخل پیام ممکن نیست.
+
+    چرخهٔ زندگی: ``pending`` → ``confirmed`` (اجرا شد) یا ``rejected`` یا
+    ``expired``. اجرا فقط از نقطهٔ تأیید رخ می‌دهد، و همان‌جا برای بار دوم
+    اعتبارسنجی می‌شود: هم مالکیتِ گفت‌وگو، هم مجوزِ *امروزِ* کاربر، هم آرگومان‌ها.
+    """
+
+    __tablename__ = "ai_pending_actions"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    conversation_id: Mapped[int] = mapped_column(
+        ForeignKey("ai_conversations.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    #: ساخته‌شده به دستِ کدام کاربر — و تنها او می‌تواند تأیید یا ردش کند.
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    tool_name: Mapped[str] = mapped_column(String(80), nullable=False)
+    arguments_json: Mapped[str] = mapped_column(Text, default="", nullable=False)
+    #: جمله‌ای که کارتِ تأیید نشان می‌دهد — به نامِ انسان‌ها، نه شناسه‌ها.
+    summary: Mapped[str] = mapped_column(Text, default="", nullable=False)
+    #: "pending" | "confirmed" | "rejected" | "expired" | "failed"
+    status: Mapped[str] = mapped_column(String(16), default="pending", nullable=False, index=True)
+    #: نتیجهٔ اجرا پس از تأیید — برای نمایش و برای این که «چه شد» قابل‌خواندن بماند.
+    result_text: Mapped[str] = mapped_column(Text, default="", nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    decided_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    #: انقضای پیشنهاد. کنشِ سه‌روزپیش ممکن است امروز دیگر مجاز یا درست نباشد.
+    expires_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        default=lambda: datetime.now(UTC) + timedelta(hours=24),
+        server_default=func.now() + text("interval '24 hours'"),
+    )
+
+
+class AiUpload(Base):
+    """فایلِ بارگذاری‌شده در گفت‌وگو، همراهِ دادهٔ اولیهٔ خودش.
+
+    بایت‌های خام نگه داشته می‌شوند چون اعتبارسنجیِ دوباره باید از روی *همان*
+    فایل انجام شود، نه از روی JSONِ به‌روزرسانی‌شده: ویرایشِ کاربر روی یک
+    لایهٔ نازک (overlay) می‌نشیند و هر بار فایلِ واقعی + لایه دوباره با همان
+    `parse_workbook` رسمی خوانده می‌شود. نتیجه: دستیار و فرمِ دستیِ ورود فایل
+    هر دو دقیقاً یک اعتبارسنجی می‌بینند.
+    """
+
+    __tablename__ = "ai_uploads"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    conversation_id: Mapped[int] = mapped_column(
+        ForeignKey("ai_conversations.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    filename: Mapped[str] = mapped_column(String(255), default="", nullable=False)
+    mime_type: Mapped[str] = mapped_column(String(120), default="", nullable=False)
+    size_bytes: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    content_sha256: Mapped[str] = mapped_column(String(64), default="", nullable=False)
+    #: بایت‌های فایل. برای فایل‌های اکسلِ سقفِ ۵ مگابایتی، ذخیرهٔ باینری در
+    #: دیتابیس معقول است: تراکنشی است، بک‌آپش با خود دیتابیس است، و نیازی به
+    #: سامانهٔ فایل جدید نیست.
+    content: Mapped[bytes] = mapped_column("content", LargeBinary, nullable=False)
+    #: خلاصهٔ ساختار فایل برای نمایش و برای مدل: شماره ستون‌ها، تعداد ردیف‌ها.
+    structure_json: Mapped[str] = mapped_column(Text, default="", nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

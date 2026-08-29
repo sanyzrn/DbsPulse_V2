@@ -1,9 +1,10 @@
-"""دستیار هوشمند — گفت‌وگو، کنش‌ها، و تنظیماتش.
+"""همکار هوشمند — گفت‌وگو، ابزارها، فایل‌ها، تأیید، و تنظیماتش.
 
 دو دستهٔ کاملاً جدا در یک فایل:
 
-* `/api/ai/chat`, `/status`, `/conversations`, `/run-action` — برای *کاربرِ*
-  دستیار. معاونتی که فقط باید بپرسد، همین‌ها را می‌بیند و بس.
+* مسیرهای *کاربرِ* همکار: `/chat`, `/status`, `/conversations`, `/tools`,
+  `/pending/{id}/confirm|reject`, `/conversations/{id}/attachments`.
+  معاونتی که فقط باید بپرسد همین‌ها را می‌بیند و بس.
 * `/api/ai/settings`, `/access` — پشتِ `manage_ai`. کلید API، متنِ راهنما،
   اینکه چه کسی دستیار دارد.
 
@@ -13,7 +14,7 @@
 import json
 from datetime import UTC, datetime, timedelta
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
@@ -25,34 +26,39 @@ from app.models.ai import (
     DEFAULT_INSTRUCTIONS,
     AiConversation,
     AiMessage,
+    AiPendingAction,
     AiSettings,
+    AiUpload,
     AiUserAccess,
 )
 from app.models.enums import Capability
 from app.models.user import User
 from app.schemas.ai import (
-    AiActionRead,
     AiChatRequest,
     AiChatResponse,
     AiConversationRead,
+    AiConversationRenameRequest,
     AiMessageRead,
+    AiPendingActionRead,
+    AiPendingDecisionRequest,
     AiProviderOption,
-    AiRunActionRequest,
-    AiRunActionResponse,
     AiSettingsRead,
     AiSettingsUpdate,
     AiStatus,
+    AiStepRead,
     AiTestRequest,
     AiTestResult,
+    AiToolRead,
+    AiUploadRead,
     AiUserAccessRead,
     AiUserAccessUpdate,
 )
 from app.schemas.auth import CurrentUser
-from app.services.ai import actions as action_service
-from app.services.ai import context as context_service
-from app.services.ai.port import AiRequestFailed, AiUnavailable, ChatMessage
-from app.services.ai.prompt import build_system_prompt
+from app.services.ai import confirmations
+from app.services.ai.orchestrator import run_turn
+from app.services.ai.port import AiRequestFailed, AiUnavailable
 from app.services.ai.provider import OpenAiCompatibleAdapter
+from app.services.ai.tools import base as tools_base
 from app.services.audit import log_event
 from app.services.authorization import capabilities_of
 
@@ -116,6 +122,10 @@ def _adapter(config: AiSettings, access: AiUserAccess, api_key: str) -> OpenAiCo
     )
 
 
+def _allow_writes(config: AiSettings, access: AiUserAccess) -> bool:
+    return bool(config.allow_write_actions and access.allow_write_actions)
+
+
 # ── کاربر ─────────────────────────────────────────────────────────────────
 
 
@@ -146,8 +156,37 @@ def ai_status(
     return AiStatus(
         available=True,
         reason="",
-        allow_write_actions=config.allow_write_actions and access.allow_write_actions,
+        allow_write_actions=_allow_writes(config, access),
+        allow_uploads=bool(config.allow_uploads),
     )
+
+
+@router.get("/tools", response_model=list[AiToolRead])
+def list_tools(
+    db: Session = Depends(get_db),
+    user: CurrentUser = Depends(get_current_user),
+) -> list[AiToolRead]:
+    """ابزارهایی که *این* کاربر واقعاً دارد — رابط از روی همین پیشنهاد می‌سازد.
+
+    تبلیغِ ابزاری که اجرا نمی‌شود، دکمهٔ مرده است؛ پس فهرست از همان گاردِ
+    اجرا می‌آید.
+    """
+    _resolve(db, user)
+    caps = set(capabilities_of(db, user.id))
+    config = _settings_row(db)
+    access = _access_row(db, user.id)
+    allow_writes = _allow_writes(config, access) if access else False
+    specs = tools_base.allowed_tools(user, caps, allow_writes=allow_writes)
+    return [
+        AiToolRead(
+            name=s.name,
+            description=s.description,
+            category=s.category,
+            read_only=s.read_only,
+            risky=s.risky,
+        )
+        for s in sorted(specs, key=lambda t: (t.category, t.name))
+    ]
 
 
 @router.get("/conversations", response_model=list[AiConversationRead])
@@ -159,9 +198,37 @@ def list_conversations(
         select(AiConversation)
         .where(AiConversation.user_id == user.id)
         .order_by(AiConversation.updated_at.desc())
-        .limit(30)
+        .limit(50)
     )
     return [AiConversationRead(id=c.id, title=c.title, updated_at=c.updated_at) for c in rows]
+
+
+@router.post("/conversations", response_model=AiConversationRead, status_code=status.HTTP_201_CREATED)
+def create_conversation(
+    db: Session = Depends(get_db),
+    user: CurrentUser = Depends(get_current_user),
+) -> AiConversationRead:
+    """گفت‌وگوی خالی، از قبل — دکمهٔ «گفت‌وگوی تازه» بدون پیام هم معنا دارد."""
+    _resolve(db, user)
+    convo = AiConversation(user_id=user.id, title="")
+    db.add(convo)
+    db.commit()
+    db.refresh(convo)
+    return AiConversationRead(id=convo.id, title=convo.title, updated_at=convo.updated_at)
+
+
+@router.patch("/conversations/{conversation_id}", response_model=AiConversationRead)
+def rename_conversation(
+    conversation_id: int,
+    payload: AiConversationRenameRequest,
+    db: Session = Depends(get_db),
+    user: CurrentUser = Depends(get_current_user),
+) -> AiConversationRead:
+    convo = _own_conversation(db, conversation_id, user)
+    convo.title = payload.title.strip()[:200]
+    db.commit()
+    db.refresh(convo)
+    return AiConversationRead(id=convo.id, title=convo.title, updated_at=convo.updated_at)
 
 
 @router.get("/conversations/{conversation_id}", response_model=list[AiMessageRead])
@@ -171,19 +238,32 @@ def read_conversation(
     user: CurrentUser = Depends(get_current_user),
 ) -> list[AiMessageRead]:
     convo = _own_conversation(db, conversation_id, user)
-    rows = db.scalars(
+    rows = list(db.scalars(
         select(AiMessage).where(AiMessage.conversation_id == convo.id).order_by(AiMessage.id)
+    ))
+    messages = [_to_message_read(m) for m in rows]
+    # کارت‌های تأییدِ معلق، به آخرین پیامِ دستیار می‌چسبند — وضعیت‌شان زنده از
+    # جدول می‌آید، نه عکسِ لحظهٔ چت: «قبلاً تأیید شده» همیشه حقیقتِ الان است.
+    live = _pending_of_conversation(db, convo.id)
+    if live:
+        for message in reversed(messages):
+            if message.role == "assistant":
+                message.pending = live
+                break
+    return messages
+
+
+@router.get("/conversations/{conversation_id}/attachments", response_model=list[AiUploadRead])
+def list_attachments(
+    conversation_id: int,
+    db: Session = Depends(get_db),
+    user: CurrentUser = Depends(get_current_user),
+) -> list[AiUploadRead]:
+    convo = _own_conversation(db, conversation_id, user)
+    rows = db.scalars(
+        select(AiUpload).where(AiUpload.conversation_id == convo.id).order_by(AiUpload.id)
     )
-    return [
-        AiMessageRead(
-            id=m.id,
-            role=m.role,
-            content=m.content,
-            created_at=m.created_at,
-            actions=_actions_of(m),
-        )
-        for m in rows
-    ]
+    return [_to_upload_read(row) for row in rows]
 
 
 @router.delete("/conversations/{conversation_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -192,7 +272,8 @@ def delete_conversation(
     db: Session = Depends(get_db),
     user: CurrentUser = Depends(get_current_user),
 ):
-    db.delete(_own_conversation(db, conversation_id, user))
+    convo = _own_conversation(db, conversation_id, user)
+    db.delete(convo)
     db.commit()
     return None
 
@@ -204,14 +285,116 @@ def _own_conversation(db: Session, conversation_id: int, user: CurrentUser) -> A
     return convo
 
 
-def _actions_of(message: AiMessage) -> list[AiActionRead]:
-    if not message.actions_json:
-        return []
+def _to_upload_read(upload: AiUpload) -> AiUploadRead:
     try:
-        return [AiActionRead(**a) for a in json.loads(message.actions_json)]
-    except (ValueError, TypeError):
-        # ردیفِ خرابِ تاریخچه نباید کل گفت‌وگو را از کار بیندازد.
-        return []
+        structure = json.loads(upload.structure_json or "{}")
+    except ValueError:
+        structure = {}
+    kind = structure.get("kind", "file")
+    return AiUploadRead(
+        id=upload.id,
+        filename=upload.filename,
+        kind=kind,
+        size_bytes=upload.size_bytes,
+        total_rows=int(structure.get("total_rows", 0)),
+        valid_count=int(structure.get("valid_count", 0)),
+        invalid_count=int(structure.get("invalid_count", 0)),
+        committed=bool(structure.get("committed")),
+        note=str(structure.get("note", "")),
+    )
+
+
+def _to_message_read(message: AiMessage) -> AiMessageRead:
+    steps: list[AiStepRead] = []
+    if message.meta_json:
+        try:
+            meta = json.loads(message.meta_json)
+        except ValueError:
+            meta = {}
+        steps = [AiStepRead(**s) for s in meta.get("steps", []) if isinstance(s, dict)]
+    return AiMessageRead(
+        id=message.id,
+        role=message.role,
+        content=message.content,
+        created_at=message.created_at,
+        actions=[],
+        steps=steps,
+        pending=[],
+    )
+
+
+def _pending_of_conversation(db: Session, conversation_id: int) -> list[AiPendingActionRead]:
+    rows = db.scalars(
+        select(AiPendingAction)
+        .where(AiPendingAction.conversation_id == conversation_id)
+        .order_by(AiPendingAction.id.desc())
+        .limit(20)
+    )
+    return [
+        AiPendingActionRead(
+            id=row.id,
+            tool=row.tool_name,
+            summary=row.summary,
+            arguments=json.loads(row.arguments_json or "{}"),
+            status=row.status,
+            result_text=row.result_text,
+            expires_at=row.expires_at,
+        )
+        for row in rows
+    ]
+
+
+@router.post("/conversations/{conversation_id}/attachments", response_model=AiUploadRead, status_code=status.HTTP_201_CREATED)
+async def upload_attachment(
+    conversation_id: int,
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    user: CurrentUser = Depends(get_current_user),
+) -> AiUploadRead:
+    """بارگذاری فایل در گفت‌وگو — مرحله‌بندی، نه ورود.
+
+    هیچ ردیفی ساخته نمی‌شود؛ فقط فایل ذخیره و با اعتبارسنجیِ رسمی خوانده
+    می‌شود تا دستیار بتواند خطاها را توضیح بدهد و مسیرِ درست‌کردن را بپرسد.
+    """
+    config, access, _ = _resolve(db, user)
+    if not config.allow_uploads:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "بارگذاری فایل در دستیار فعال نیست")
+    convo = _own_conversation(db, conversation_id, user)
+
+    content = await file.read()
+    max_bytes = max(1, int(config.max_upload_mb)) * 1024 * 1024
+    if len(content) > max_bytes:
+        raise HTTPException(
+            status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            f"حجم فایل بیش از حد مجاز است (حداکثر {config.max_upload_mb} مگابایت)",
+        )
+    if not content:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "فایل خالی است")
+
+    from app.services.ai.tools.uploads import stage_upload
+
+    upload, _summary = stage_upload(
+        db,
+        user,
+        convo.id,
+        filename=file.filename or "file",
+        mime_type=file.content_type or "",
+        content=content,
+    )
+    log_event(
+        db,
+        actor_user_id=user.id,
+        event_type="ai_upload_staged",
+        new_value={
+            "upload_id": upload.id,
+            "filename": upload.filename,
+            "size": len(content),
+            "conversation_id": convo.id,
+            "via": "ai_copilot",
+        },
+    )
+    db.commit()
+    return _to_upload_read(upload)
 
 
 @router.post("/chat", response_model=AiChatResponse)
@@ -258,57 +441,40 @@ async def chat(
         db.add(convo)
         db.flush()
 
-    caps = capabilities_of(db, user.id)
-    allow_writes = config.allow_write_actions and access.allow_write_actions
-    system = build_system_prompt(
-        instructions=config.instructions or DEFAULT_INSTRUCTIONS,
-        context=context_service.build(db, user, caps, config.context_record_limit),
-        user=user,
-        caps=caps,
-        allow_writes=allow_writes,
-        restrict_to_platform=config.restrict_to_platform,
-    )
-
-    history = list(
-        db.scalars(
-            select(AiMessage)
-            .where(AiMessage.conversation_id == convo.id)
-            .order_by(AiMessage.id.desc())
-            .limit(_HISTORY_TURNS)
-        )
-    )[::-1]
-    messages = [ChatMessage("system", system)]
-    messages += [ChatMessage(m.role, m.content) for m in history]
-    messages.append(ChatMessage("user", text))
-
-    db.add(AiMessage(conversation_id=convo.id, role="user", content=text))
-    db.commit()
+    allow_writes = _allow_writes(config, access)
+    user_message = AiMessage(conversation_id=convo.id, role="user", content=text)
+    db.add(user_message)
+    db.flush()
 
     try:
-        response = await _adapter(config, access, api_key).send(messages)
-    except AiUnavailable as err:
-        raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, str(err)) from None
-    except AiRequestFailed as err:
+        result = await run_turn(
+            db,
+            user=user,
+            conversation=convo,
+            config=config,
+            api_key=api_key,
+            access_model=access.model or config.model,
+            adapter_factory=lambda: _adapter(config, access, api_key),
+            user_text=text,
+            allow_writes=allow_writes,
+            user_message_id=user_message.id,
+        )
+    except (AiUnavailable, AiRequestFailed) as err:
+        db.commit()
+        detail = getattr(err, "detail", str(err))
         # متنِ خودِ سرویس، بی‌کم‌وکاست: تفاوت ۴۰۱ با «مدل پیدا نشد» چهار رفعِ
         # متفاوت است و کاربر روی سه تای آن می‌تواند کاری بکند.
-        raise HTTPException(status.HTTP_502_BAD_GATEWAY, err.detail) from None
+        raise HTTPException(
+            status.HTTP_502_BAD_GATEWAY if isinstance(err, AiRequestFailed) else status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail,
+        ) from None
 
-    parsed = action_service.parse(response.content) if allow_writes else []
-    # کنشِ خواندنی (`find`) بدون تأیید اجرا می‌شود، چون چیزی عوض نمی‌کند.
-    proposals = [a for a in parsed if not a.read_only]
-    # نثر بدون بلوک: کاربر جمله و دکمه می‌بیند، نه JSON.
-    reply = action_service.strip_action_blocks(response.content) if parsed else response.content
-    for act in (a for a in parsed if a.read_only):
-        result = action_service.execute(db, act, user, caps)
-        reply = f"{reply}\n\n**نتیجهٔ {act.summary}:**\n{result}"
-
-    action_dicts = [{"name": a.name, "summary": a.summary, "payload": a.payload} for a in proposals]
     db.add(
         AiMessage(
             conversation_id=convo.id,
             role="assistant",
-            content=reply,
-            actions_json=json.dumps(action_dicts, ensure_ascii=False) if action_dicts else "",
+            content=result.reply,
+            meta_json=result.meta_json(),
         )
     )
     convo.updated_at = datetime.now(UTC)
@@ -316,38 +482,92 @@ async def chat(
 
     return AiChatResponse(
         conversation_id=convo.id,
-        reply=reply,
-        actions=[AiActionRead(**a) for a in action_dicts],
+        reply=result.reply,
+        steps=[AiStepRead(**s.to_dict()) for s in result.steps],
+        pending=[AiPendingActionRead(**p) for p in result.pending],
+        usage=result.usage,
     )
 
 
-@router.post("/run-action", response_model=AiRunActionResponse)
-def run_action(
-    payload: AiRunActionRequest,
+# ── تأیید / رد ────────────────────────────────────────────────────────────
+
+
+@router.post("/pending/{pending_id}/confirm", response_model=AiChatResponse)
+def confirm_pending(
+    pending_id: int,
+    _payload: AiPendingDecisionRequest | None = None,
     db: Session = Depends(get_db),
     user: CurrentUser = Depends(get_current_user),
-) -> AiRunActionResponse:
-    """اجرای یک کنشِ *تأییدشده*.
+) -> AiChatResponse:
+    """تأییدِ یک کنشِ در انتظار — تنها نقطهٔ اجرای تغییراتِ پیشنهادیِ دستیار.
 
-    نکتهٔ اصلیِ کل این قابلیت همین‌جاست: تنها راهِ تغییرِ داده از مسیر دستیار،
-    فراخوانیِ صریحِ همین نقطه است — یعنی فشردنِ دکمه توسط یک آدم.
+    همه‌چیز از نو اعتبارسنجی می‌شود: مالکیت، انقضا، مجوزِ امروز، آرگومان‌ها.
     """
     config, access, _ = _resolve(db, user)
-    if not (config.allow_write_actions and access.allow_write_actions):
-        raise HTTPException(status.HTTP_403_FORBIDDEN, "دستیار شما اجازهٔ تغییر داده را ندارد")
-    _own_conversation(db, payload.conversation_id, user)
-
-    # از نو اعتبارسنجی می‌شود و به آنچه پیش‌تر ذخیره شده اعتماد نمی‌کنیم: بدنهٔ
-    # این درخواست از مرورگر می‌آید و مرورگر قابل دست‌کاری است.
-    parsed = action_service.parse(
-        json.dumps({"action": payload.name, **payload.payload}, ensure_ascii=False)
+    row, summary = confirmations.confirm(db, user=user, pending_id=pending_id, config=config, access=access)
+    return AiChatResponse(
+        conversation_id=row.conversation_id,
+        reply=summary,
+        steps=[
+            AiStepRead(
+                tool=row.tool_name,
+                status="confirmed",
+                summary=summary,
+                detail={"result": row.result_text},
+            )
+        ],
+        pending=[],
     )
-    if not parsed:
-        raise HTTPException(status.HTTP_400_BAD_REQUEST, "این کنش معتبر نیست")
 
-    caps = capabilities_of(db, user.id)
-    result = action_service.execute(db, parsed[0], user, caps)
-    return AiRunActionResponse(result=result)
+
+@router.post("/pending/{pending_id}/reject", response_model=AiPendingActionRead)
+def reject_pending(
+    pending_id: int,
+    _payload: AiPendingDecisionRequest | None = None,
+    db: Session = Depends(get_db),
+    user: CurrentUser = Depends(get_current_user),
+) -> AiPendingActionRead:
+    _resolve(db, user)
+    row = confirmations.reject(db, user=user, pending_id=pending_id)
+    return AiPendingActionRead(
+        id=row.id,
+        tool=row.tool_name,
+        summary=row.summary,
+        arguments=json.loads(row.arguments_json or "{}"),
+        status=row.status,
+        result_text=row.result_text,
+        expires_at=row.expires_at,
+    )
+
+
+@router.get("/pending", response_model=list[AiPendingActionRead])
+def list_pending(
+    conversation_id: int | None = None,
+    db: Session = Depends(get_db),
+    user: CurrentUser = Depends(get_current_user),
+) -> list[AiPendingActionRead]:
+    """کنش‌های در انتظارِ تصمیمِ من — رابط با این، کارت‌های معلق را بازسازی می‌کند."""
+    stmt = (
+        select(AiPendingAction)
+        .where(AiPendingAction.user_id == user.id, AiPendingAction.status == "pending")
+        .order_by(AiPendingAction.id.desc())
+        .limit(20)
+    )
+    if conversation_id:
+        stmt = stmt.where(AiPendingAction.conversation_id == int(conversation_id))
+    rows = list(db.scalars(stmt))
+    return [
+        AiPendingActionRead(
+            id=row.id,
+            tool=row.tool_name,
+            summary=row.summary,
+            arguments=json.loads(row.arguments_json or "{}"),
+            status=row.status,
+            result_text=row.result_text,
+            expires_at=row.expires_at,
+        )
+        for row in rows
+    ]
 
 
 # ── مدیریت ────────────────────────────────────────────────────────────────
@@ -376,6 +596,9 @@ def _to_settings_read(row: AiSettings) -> AiSettingsRead:
         context_record_limit=row.context_record_limit,
         allow_write_actions=row.allow_write_actions,
         max_user_chars=row.max_user_chars,
+        max_tool_iterations=row.max_tool_iterations,
+        allow_uploads=row.allow_uploads,
+        max_upload_mb=row.max_upload_mb,
     )
 
 
@@ -441,10 +664,16 @@ async def test_connection(
     if not adapter.available:
         return AiTestResult(ok=False, detail="آدرس سرویس، نام مدل و کلید — هر سه باید پر باشند.")
     try:
-        response = await adapter.send([ChatMessage("user", "سلام")])
+        response = await adapter.send([ChatMessageCompat("سلام")])
     except (AiUnavailable, AiRequestFailed) as err:
         return AiTestResult(ok=False, detail=getattr(err, "detail", str(err)))
     return AiTestResult(ok=True, detail=f"اتصال برقرار است. پاسخ سرویس: {response.content[:120]}")
+
+
+def ChatMessageCompat(content: str):
+    from app.services.ai.port import ChatMessage
+
+    return ChatMessage("user", content)
 
 
 @router.get("/access", response_model=list[AiUserAccessRead])

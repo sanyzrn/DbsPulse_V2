@@ -710,15 +710,18 @@ export interface PeriodProgress {
   without_chain: NotStartedPersonnel[];
 }
 
-// ── دستیار هوشمند ─────────────────────────────────────────────────────────
+// ── همکار هوشمند (دستیار) ────────────────────────────────────────────────
 
 export interface AiStatus {
   available: boolean;
   /** اگر در دسترس نیست، *چرا* — به زبان قابل‌اقدام. */
   reason: string;
   allow_write_actions: boolean;
+  /** بارگذاری فایل برای این کاربر ممکن است یا نه */
+  allow_uploads?: boolean;
 }
 
+/** @deprecated کنش‌های قدیمی؛ حالا در PendingAction زندگی می‌کنند. */
 export interface AiAction {
   name: string;
   /** جمله‌ای که زیرِ دکمهٔ تأیید نوشته می‌شود — به نام، نه به شناسه. */
@@ -726,11 +729,66 @@ export interface AiAction {
   payload: Record<string, unknown>;
 }
 
+/** ردِ یک فراخوانیِ ابزار در نوبتِ همکار — «چه کاری واقعاً انجام شد». */
+export interface AiStep {
+  tool: string;
+  status: "ok" | "awaiting_confirmation" | "error" | "confirmed" | "rejected";
+  summary: string;
+  detail: Record<string, unknown>;
+}
+
+/** کنشِ تغییردهندهٔ پیشنهادی که منتظرِ تصمیمِ کاربر است. */
+export interface AiPendingAction {
+  id: number;
+  tool: string;
+  summary: string;
+  arguments: Record<string, unknown>;
+  status: "pending" | "confirmed" | "rejected" | "expired" | "failed";
+  result_text?: string;
+  expires_at?: string;
+}
+
+export interface AiTool {
+  name: string;
+  description: string;
+  category: string;
+  read_only: boolean;
+  risky: boolean;
+}
+
+export interface AiConversation {
+  id: number;
+  title: string;
+  updated_at: string;
+}
+
 export interface AiMessage {
   id: number;
   role: "user" | "assistant";
   content: string;
   actions: AiAction[];
+  steps?: AiStep[];
+  pending?: AiPendingAction[];
+}
+
+export interface AiUploadInfo {
+  id: number;
+  filename: string;
+  kind: "personnel_import" | "excel" | "file";
+  size_bytes: number;
+  total_rows: number;
+  valid_count: number;
+  invalid_count: number;
+  committed: boolean;
+  note?: string;
+}
+
+export interface AiChatTurn {
+  conversation_id: number;
+  reply: string;
+  steps: AiStep[];
+  pending: AiPendingAction[];
+  usage?: Record<string, unknown>;
 }
 
 export interface AiProviderOption {
@@ -758,6 +816,9 @@ export interface AiSettings {
   context_record_limit: number;
   allow_write_actions: boolean;
   max_user_chars: number;
+  max_tool_iterations: number;
+  allow_uploads: boolean;
+  max_upload_mb: number;
 }
 
 export interface AiUserAccess {

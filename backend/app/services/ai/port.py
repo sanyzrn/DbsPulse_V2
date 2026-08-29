@@ -14,13 +14,52 @@ from typing import Protocol
 
 @dataclass(frozen=True)
 class ChatMessage:
-    role: str  # "system" | "user" | "assistant"
+    role: str  # "system" | "user" | "assistant" | "tool"
     content: str
+    #: فقط برای role="assistant" با فراخوانیِ ابزار: ابزارهایی که مدل خواسته.
+    tool_calls: tuple["ToolCall", ...] = ()
+    #: فقط برای role="tool": کدام فراخوانی، نتیجهٔ این پیام است.
+    tool_call_id: str = ""
+
+    def to_wire(self) -> dict:
+        """شکلِ HTTPِ این پیام — یک‌جا تا آداپتور نگرانِ جزئیات نباشد."""
+        if self.role == "assistant" and self.tool_calls:
+            message: dict = {
+                "role": "assistant",
+                "content": self.content or None,
+                "tool_calls": [
+                    {
+                        "id": call.id,
+                        "type": "function",
+                        "function": {"name": call.name, "arguments": call.arguments_json},
+                    }
+                    for call in self.tool_calls
+                ],
+            }
+            return message
+        if self.role == "tool":
+            return {
+                "role": "tool",
+                "tool_call_id": self.tool_call_id,
+                "content": self.content,
+            }
+        return {"role": self.role, "content": self.content}
+
+
+@dataclass(frozen=True)
+class ToolCall:
+    """خواستهٔ مدل برای صدا زدن یک ابزار."""
+
+    id: str
+    name: str
+    arguments_json: str
 
 
 @dataclass(frozen=True)
 class ChatResponse:
     content: str
+    #: ابزارهایی که مدل در همین پاسخ خواسته است — تهی یعنی «جوابِ نهایی».
+    tool_calls: tuple[ToolCall, ...] = ()
     #: چیزی که برای نمایش «چقدر خرج شد» لازم است. سرویس‌ها همیشه نمی‌دهند.
     usage: dict = field(default_factory=dict)
 
@@ -45,8 +84,14 @@ class AiRequestFailed(Exception):
         super().__init__(detail)
 
 
+class ToolProtocolUnsupported(AiRequestFailed):
+    """سرویس شِمای ابزار را نمی‌پذیرد — حلقه به پروتکلِ JSON می‌افتد."""
+
+
 class ChatAdapter(Protocol):
     @property
     def available(self) -> bool: ...
 
-    async def send(self, messages: list[ChatMessage]) -> ChatResponse: ...
+    async def send(
+        self, messages: list[ChatMessage], *, tools: list[dict] | None = None
+    ) -> ChatResponse: ...

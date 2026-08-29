@@ -18,6 +18,11 @@
 """
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from app.schemas.personnel import CreatedAccount
+
 import re
 from dataclasses import dataclass, field
 from datetime import date
@@ -514,3 +519,144 @@ def build_template() -> bytes:
         ]
     )
     return _to_bytes(workbook)
+
+
+# ── درج نهایی ─────────────────────────────────────────────────────────────
+#
+# این منطق قبلاً داخل روتِر `personnel.py` بود. دستیار هوشمند هم به همان مسیر
+# درج نیاز دارد — و دو نسخه‌کردنِ «ساخت پرسنل + زنجیره + حساب» یعنی روزی یکی
+# قاعدهٔ تازه‌ای بگیرد و دیگری نگیرد. پس منطق به سرویس منتقل شد و روتِر هم از
+# همین تابع استفاده می‌کند؛ رفتارشان بایت‌به‌بایت یکی است.
+
+
+def commit_import(db: Session, preview: ImportPreview, actor_user_id: int) -> "ImportCommitResult":
+    """درج ردیف‌های معتبرِ یک پیش‌نمایش، همه در یک تراکنش.
+
+    فراخواننده مسئول است: پیش از این، `parse_workbook` تازه اجرا شده باشد و
+    `file_errors` خالی باشد. ردیف‌های خطادار درج نمی‌شوند و در نتیجه شمرده
+    می‌شوند — نه «همه یا هیچ»، چون یک غلط تایپی در ردیف ۱۹۰ نباید ۱۸۹ ردیف
+    درستِ قبلی را دور بریزد.
+    """
+    from app.core.security import hash_password
+    from app.models.evaluation_access import EvaluationAccess
+    from app.schemas.personnel import CreatedAccount
+    from app.services.audit import log_event
+    from app.services.security_tokens import generate_temp_password
+
+    accounts: list[CreatedAccount] = []
+    created_personnel = 0
+    chains_created = 0
+
+    for row in preview.valid:
+        personnel = Personnel(
+            personnel_code=row.personnel_code,
+            full_name=row.full_name,
+            job_title=row.job_title,
+            org_unit=row.org_unit,
+            is_manager=row.is_manager,
+            status=row.status,
+            contract_start_date=row.contract_start_date,
+            contract_end_date=row.contract_end_date,
+            created_by_user_id=actor_user_id,
+        )
+        db.add(personnel)
+        db.flush()
+        created_personnel += 1
+        log_event(
+            db,
+            actor_user_id=actor_user_id,
+            event_type="personnel_created",
+            new_value={
+                "id": personnel.id,
+                "personnel_code": personnel.personnel_code,
+                "full_name": personnel.full_name,
+                "imported": True,
+            },
+        )
+
+        if row.has_chain:
+            db.add(
+                EvaluationAccess(
+                    personnel_id=personnel.id,
+                    unit_supervisor_user_id=row.unit_supervisor_user_id,
+                    deputy_user_id=row.deputy_user_id,
+                    ceo_user_id=row.ceo_user_id,
+                    updated_by_user_id=actor_user_id,
+                )
+            )
+            chains_created += 1
+            log_event(
+                db,
+                actor_user_id=actor_user_id,
+                event_type="evaluation_access_set",
+                new_value={
+                    "personnel_id": personnel.id,
+                    "unit_supervisor_user_id": row.unit_supervisor_user_id,
+                    "deputy_user_id": row.deputy_user_id,
+                    "ceo_user_id": row.ceo_user_id,
+                    "imported": True,
+                },
+            )
+
+        if row.username:
+            password = row.initial_password or generate_temp_password()
+            user = User(
+                username=row.username,
+                password_hash=hash_password(password),
+                role=UserRole.employee,
+                personnel_id=personnel.id,
+                is_active=True,
+                must_change_password=True,
+            )
+            db.add(user)
+            db.flush()
+            # رمز عمداً در لاگ ممیزی نیست: لاگ ماندگار است و رمز نباید ماندگار شود.
+            log_event(
+                db,
+                actor_user_id=actor_user_id,
+                event_type="user_created",
+                new_value={
+                    "id": user.id,
+                    "username": user.username,
+                    "role": user.role.value,
+                    "created_with_personnel": personnel.id,
+                    "imported": True,
+                },
+            )
+            accounts.append(
+                CreatedAccount(
+                    personnel_code=personnel.personnel_code,
+                    full_name=personnel.full_name,
+                    username=user.username,
+                    temporary_password=password,
+                )
+            )
+
+    log_event(
+        db,
+        actor_user_id=actor_user_id,
+        event_type="personnel_imported",
+        new_value={
+            "created_personnel": created_personnel,
+            "created_accounts": len(accounts),
+            "skipped_rows": len(preview.invalid),
+        },
+    )
+    db.commit()
+
+    return ImportCommitResult(
+        created_personnel=created_personnel,
+        created_chains=chains_created,
+        skipped_rows=len(preview.invalid),
+        accounts=accounts,
+    )
+
+
+@dataclass
+class ImportCommitResult:
+    """نتیجهٔ درج: چند پرسنل، چند زنجیره، چند حساب؛ و رمزهای موقتِ یک‌بارمصرف."""
+
+    created_personnel: int
+    created_chains: int
+    skipped_rows: int
+    accounts: list[CreatedAccount]

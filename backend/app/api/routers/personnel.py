@@ -15,7 +15,6 @@ from app.models.personnel import Personnel
 from app.models.user import User
 from app.schemas.auth import CurrentUser
 from app.schemas.personnel import (
-    CreatedAccount,
     ImportRowIssue,
     PersonnelCreate,
     PersonnelCreated,
@@ -28,8 +27,7 @@ from app.schemas.personnel import (
 from app.services.audit import log_event
 from app.services.excel import build_personnel_workbook
 from app.services.org_unit import known_sites, units_in_site
-from app.services.personnel_import import ImportPreview, build_template, parse_workbook
-from app.services.security_tokens import generate_temp_password
+from app.services.personnel_import import ImportPreview, build_template, commit_import, parse_workbook
 from app.services.self_assessment import OPEN_STATUSES as SELF_ASSESSMENT_OPEN_STATUSES
 from app.services.self_assessment import invite as invite_to_self_assessment_service
 from app.services.self_assessment import state_of as self_assessment_state
@@ -447,9 +445,9 @@ async def commit_personnel_import(
     آن‌چه در پیش‌نمایش دیده شد: بین دو درخواست ممکن است کد پرسنلی یا نام کاربری
     را کس دیگری ثبت کرده باشد.
 
-    ردیف‌های خطادار رد می‌شوند و بقیه درج — نه «همه یا هیچ». دلیلش این است که
-    یک غلط تایپی در ردیف ۱۹۰ نباید ۱۸۹ ردیف درستِ قبلی را دور بریزد؛ گزارش
-    خروجی صریح می‌گوید چند ردیف رد شد.
+    منطقِ درج در `services/personnel_import.commit_import` است — همان مسیری که
+    دستیار هوشمند هم پس از تأیید کاربر طی می‌کند. دو نسخه از «ساخت پرسنل +
+    زنجیره + حساب» یعنی روزی یکی قاعده می‌گیرد و دیگری نمی‌گیرد.
     """
     preview = parse_workbook(await _read_upload(file), db)
     if preview.file_errors:
@@ -457,121 +455,15 @@ async def commit_personnel_import(
             status_code=status.HTTP_400_BAD_REQUEST, detail=preview.file_errors[0]
         )
 
-    accounts: list[CreatedAccount] = []
-    created_personnel = 0
-    chains_created = 0
-
-    for row in preview.valid:
-        personnel = Personnel(
-            personnel_code=row.personnel_code,
-            full_name=row.full_name,
-            job_title=row.job_title,
-            org_unit=row.org_unit,
-            is_manager=row.is_manager,
-            status=row.status,
-            contract_start_date=row.contract_start_date,
-            contract_end_date=row.contract_end_date,
-            created_by_user_id=current_user.id,
-        )
-        db.add(personnel)
-        db.flush()
-        created_personnel += 1
-        log_event(
-            db,
-            actor_user_id=current_user.id,
-            event_type="personnel_created",
-            new_value={
-                "id": personnel.id,
-                "personnel_code": personnel.personnel_code,
-                "full_name": personnel.full_name,
-                "imported": True,
-            },
-        )
-
-        # زنجیرهٔ ارزیابی، از همان ردیف. بدون این، ایمپورت ۴۲ نفره یعنی ۴۲ نفر
-        # که هیچ‌کس نمی‌تواند ارزیابی‌شان کند، و تنظیمش ۴۲ بار باز کردن فرم
-        # ویرایش است.
-        if row.has_chain:
-            db.add(
-                EvaluationAccess(
-                    personnel_id=personnel.id,
-                    unit_supervisor_user_id=row.unit_supervisor_user_id,
-                    deputy_user_id=row.deputy_user_id,
-                    ceo_user_id=row.ceo_user_id,
-                    updated_by_user_id=current_user.id,
-                )
-            )
-            chains_created += 1
-            log_event(
-                db,
-                actor_user_id=current_user.id,
-                event_type="evaluation_access_set",
-                new_value={
-                    "personnel_id": personnel.id,
-                    "unit_supervisor_user_id": row.unit_supervisor_user_id,
-                    "deputy_user_id": row.deputy_user_id,
-                    "ceo_user_id": row.ceo_user_id,
-                    "imported": True,
-                },
-            )
-
-        if row.username:
-            # رمزِ دادهٔ فایل مقدم است. سامانه فقط وقتی خودش می‌سازد که ستون
-            # خالی باشد — وگرنه کاربر رمزی را که خودش تعیین کرده در گزارش
-            # پایانی دوباره می‌دید و نمی‌دانست کدام‌یک واقعی است.
-            password = row.initial_password or generate_temp_password()
-            user = User(
-                username=row.username,
-                password_hash=hash_password(password),
-                role=UserRole.employee,
-                personnel_id=personnel.id,
-                is_active=True,
-                must_change_password=True,
-            )
-            db.add(user)
-            db.flush()
-            # رمز عمداً در لاگ ممیزی نیست: لاگ ماندگار است و رمز نباید ماندگار شود.
-            log_event(
-                db,
-                actor_user_id=current_user.id,
-                event_type="user_created",
-                new_value={
-                    "id": user.id,
-                    "username": user.username,
-                    "role": user.role.value,
-                    "created_with_personnel": personnel.id,
-                    "imported": True,
-                },
-            )
-            accounts.append(
-                CreatedAccount(
-                    personnel_code=personnel.personnel_code,
-                    full_name=personnel.full_name,
-                    username=user.username,
-                    temporary_password=password,
-                )
-            )
-
-    log_event(
-        db,
-        actor_user_id=current_user.id,
-        event_type="personnel_imported",
-        new_value={
-            "created_personnel": created_personnel,
-            "created_accounts": len(accounts),
-            "skipped_rows": len(preview.invalid),
-        },
-    )
-    db.commit()
+    result = commit_import(db, preview, current_user.id)
 
     return PersonnelImportResult(
-        created_personnel=created_personnel,
-        created_chains=chains_created,
-        created_accounts=len(accounts),
-        skipped_rows=len(preview.invalid),
-        accounts=accounts,
+        created_personnel=result.created_personnel,
+        created_chains=result.created_chains,
+        created_accounts=len(result.accounts),
+        skipped_rows=result.skipped_rows,
+        accounts=result.accounts,
     )
-
 
 
 @router.get("/{personnel_id}", response_model=PersonnelRead)

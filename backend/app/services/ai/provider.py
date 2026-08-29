@@ -1,11 +1,20 @@
 """لایهٔ ۲ — آداپتور یک سرویسِ سازگار با OpenAI.
 
 هیچ‌چیزِ این فایل دربارهٔ ارزیابی عملکرد نمی‌داند؛ فقط پیام می‌گیرد و متن
-برمی‌گرداند.
+(یا خواستهٔ فراخوانیِ ابزار) برمی‌گرداند.
 """
+import json
+
 import httpx
 
-from app.services.ai.port import AiRequestFailed, AiUnavailable, ChatMessage, ChatResponse
+from app.services.ai.port import (
+    AiRequestFailed,
+    AiUnavailable,
+    ChatMessage,
+    ChatResponse,
+    ToolCall,
+    ToolProtocolUnsupported,
+)
 
 
 class OpenAiCompatibleAdapter:
@@ -30,16 +39,21 @@ class OpenAiCompatibleAdapter:
     def available(self) -> bool:
         return bool(self._base_url and self._api_key and self._model)
 
-    async def send(self, messages: list[ChatMessage]) -> ChatResponse:
+    async def send(
+        self, messages: list[ChatMessage], *, tools: list[dict] | None = None
+    ) -> ChatResponse:
         if not self.available:
             raise AiUnavailable("دستیار هوشمند هنوز پیکربندی نشده است")
 
-        payload = {
+        payload: dict = {
             "model": self._model,
-            "messages": [{"role": m.role, "content": m.content} for m in messages],
+            "messages": [m.to_wire() for m in messages],
             "temperature": self._temperature,
             "max_tokens": self._max_tokens,
         }
+        if tools:
+            payload["tools"] = tools
+
         url = f"{self._base_url}/chat/completions"
 
         try:
@@ -60,18 +74,47 @@ class OpenAiCompatibleAdapter:
             raise AiRequestFailed(f"اتصال به سرویس ممکن نشد: {err}") from None
 
         if response.status_code >= 400:
-            raise AiRequestFailed(_error_text(response), response.status_code)
+            text = _error_text(response)
+            # برخی سرویس‌ها (و نسخه‌های قدیمیِ خودمیزبان) شِمای tools را
+            # نمی‌شناسند. این خطا «سرویس خراب» نیست؛ «پروتکل را عوض کن» است.
+            lowered = text.lower()
+            if tools and response.status_code in (400, 404, 422) and any(
+                needle in lowered for needle in ("tool", "function", "unrecognized", "unknown", "invalid type", "extra fields")
+            ):
+                raise ToolProtocolUnsupported(text, response.status_code)
+            raise AiRequestFailed(text, response.status_code)
 
         try:
             body = response.json()
-            content = body["choices"][0]["message"]["content"]
+            choice = body["choices"][0]
+            message = choice["message"]
+            content = message.get("content") or ""
+            raw_calls = message.get("tool_calls") or []
         except (ValueError, KeyError, IndexError, TypeError):
             raise AiRequestFailed(
                 "پاسخ سرویس قابل خواندن نبود. معمولاً یعنی آدرس سرویس به یک نقطهٔ "
                 f"پایانیِ سازگار با OpenAI اشاره نمی‌کند. پاسخ: {response.text[:200]}"
             ) from None
 
-        return ChatResponse(content=content or "", usage=body.get("usage") or {})
+        calls: list[ToolCall] = []
+        for raw in raw_calls:
+            function = raw.get("function") or {}
+            arguments = function.get("arguments")
+            if not isinstance(arguments, str):
+                arguments = json.dumps(arguments or {}, ensure_ascii=False)
+            calls.append(
+                ToolCall(
+                    id=str(raw.get("id") or f"call_{len(calls)}"),
+                    name=str(function.get("name") or "").strip(),
+                    arguments_json=arguments,
+                )
+            )
+
+        return ChatResponse(
+            content=content or "",
+            tool_calls=tuple(calls),
+            usage=body.get("usage") or {},
+        )
 
 
 def _error_text(response: httpx.Response) -> str:

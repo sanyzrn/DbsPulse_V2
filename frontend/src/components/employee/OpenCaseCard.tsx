@@ -21,10 +21,6 @@ import type { MyOpenEvaluation, SelfAssessment } from "../../types";
 
 const SCORE_OPTIONS = [1, 2, 3, 4, 5];
 
-// خودارزیابی فقط تا پیش از قطعی‌شدن نمرهٔ ارزیاب معنا دارد — بعد از آن دیگر دیدگاه
-// مستقل نیست، واکنش به نمره است. (بک‌اند همین را اعمال می‌کند.)
-const SELF_ASSESSMENT_OPEN: MyOpenEvaluation["status"][] = ["draft", "hr_approved"];
-
 export function OpenCaseCard({ item, index }: { item: MyOpenEvaluation; index: number }) {
   const [showForm, setShowForm] = useState(false);
   const [submitted, setSubmitted] = useState<SelfAssessment | null>(
@@ -32,7 +28,9 @@ export function OpenCaseCard({ item, index }: { item: MyOpenEvaluation; index: n
       ? { submitted_at: item.self_assessment_submitted_at, note: null, scores: [] }
       : null
   );
-  const canSelfAssess = SELF_ASSESSMENT_OPEN.includes(item.status);
+  // پنجره را سرور تعیین می‌کند. پیش از این همین‌جا فهرستِ وضعیت‌ها دستی کپی شده
+  // بود و می‌توانست بی‌سروصدا از بک‌اند جدا بیفتد — که افتاده بود.
+  const canSelfAssess = item.self_assessment_open;
 
   return (
     <motion.div

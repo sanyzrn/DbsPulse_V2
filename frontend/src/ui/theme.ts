@@ -12,7 +12,7 @@
 export type ThemeChoice = "light" | "dark" | "system";
 export type ResolvedTheme = "light" | "dark";
 
-export const THEME_STORAGE_KEY = "dbspulse:theme";
+export const THEME_STORAGE_KEY = "nafas-hr:theme";
 
 /** رنگ نوار مرورگر/سیستم‌عامل برای هر تم — با زمینهٔ صفحه یکی است. */
 const THEME_COLOR: Record<ResolvedTheme, string> = {

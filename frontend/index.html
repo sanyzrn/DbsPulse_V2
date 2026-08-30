@@ -3,22 +3,19 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="description" content="DbsPulse — سامانه ارزیابی عملکرد سازمانی؛ مدیریت زنجیره تأیید ارزیابی پیش از تمدید قرارداد" />
+    <meta name="description" content="NafasHR — سامانه ارزیابی عملکرد نفس زیست فارمد" />
     <!-- رنگ پوستهٔ مرورگر و آیکن باید همان قرمز برند باشد؛ فیروزه‌ای/بنفشِ
          قبلی از قالب اولیه مانده بود و با هیچ‌جای محصول نمی‌خواند. -->
     <meta name="theme-color" content="#b61615" />
-    <link
-      rel="icon"
-      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%23db1a18'/%3E%3Cstop offset='1' stop-color='%23760f0f'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='32' height='32' rx='7' fill='url(%23g)'/%3E%3Cpath d='M5 17h5l2.5-7 5 12 3-8.5 1.5 3.5h5' fill='none' stroke='white' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E"
-    />
+    <link rel="icon" type="image/png" href="/icons/icon-192.png" />
     <!-- PWA (P2-04): قابل نصب روی موبایل، تا مسئول واحدِ سرِ خط تولید و
          مدیری که بین دو جلسه است مجبور نباشند نشانی را به خاطر بسپارند. -->
     <link rel="manifest" href="/manifest.webmanifest" />
     <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
-    <meta name="apple-mobile-web-app-title" content="DbsPulse" />
-    <title>DbsPulse — سامانه ارزیابی عملکرد</title>
+    <meta name="apple-mobile-web-app-title" content="NafasHR" />
+    <title>NafasHR — سامانه ارزیابی عملکرد</title>
     <!-- تم پیش از اولین رنگ‌آمیزی تعیین می‌شود.
          اگر منتظر بارگذاری React بمانیم، کاربرِ تم شب یک لحظه صفحهٔ سفید
          می‌بیند و بعد سرمه‌ای — همان «پرش» که آدم را از یک تم تیره بیزار می‌کند.
@@ -27,7 +24,7 @@
     <script>
       (function () {
         try {
-          var stored = localStorage.getItem("dbspulse:theme");
+          var stored = localStorage.getItem("nafas-hr:theme");
           var dark =
             stored === "dark" ||
             (stored !== "light" &&

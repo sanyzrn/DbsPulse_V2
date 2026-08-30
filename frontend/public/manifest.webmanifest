@@ -1,7 +1,7 @@
 {
-  "name": "DbsPulse — سامانه ارزیابی عملکرد",
-  "short_name": "DbsPulse",
-  "description": "ثبت، بررسی و تأیید ارزیابی عملکرد سازمانی",
+  "name": "NafasHR — سامانه ارزیابی عملکرد نفس زیست فارمد",
+  "short_name": "NafasHR",
+  "description": "ثبت، بررسی و تأیید ارزیابی عملکرد در نفس زیست فارمد",
   "lang": "fa",
   "dir": "rtl",
   "start_url": "/",

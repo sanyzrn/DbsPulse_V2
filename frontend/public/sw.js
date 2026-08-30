@@ -1,4 +1,4 @@
-/* سرویس‌ورکر DbsPulse (P2-04).
+/* سرویس‌ورکر NafasHR.
  *
  * دو تصمیم که همهٔ این فایل رویشان بنا شده:
  *
@@ -21,7 +21,7 @@
  */
 
 // با هر تغییر در استراتژی کش، این عدد را جلو ببرید تا کش قدیمی پاک شود.
-const CACHE_VERSION = "dbspulse-v1";
+const CACHE_VERSION = "nafas-hr-v1";
 const SHELL_CACHE = `${CACHE_VERSION}-shell`;
 const ASSET_CACHE = `${CACHE_VERSION}-assets`;
 

@@ -1,5 +1,5 @@
-import { APP_NAME, APP_VERSION, DEVELOPER_NAME, DEVELOPER_URL } from "../appInfo";
-import { BrandMark, DevMark } from "./Brand";
+import { APP_NAME, APP_VERSION, DEVELOPER_NAME } from "../appInfo";
+import { BrandMark } from "./Brand";
 
 /** پاصفحهٔ سراسری: نام و نسخه برنامه + توسعه‌دهنده.
  *  مثل نوار بالا و ناوبری، یک قابِ گردِ جدا از لبه‌هاست تا پوستهٔ برنامه یک
@@ -16,16 +16,9 @@ export function Footer() {
             v{APP_VERSION}
           </span>
         </div>
-        <a
-          dir="ltr"
-          href={DEVELOPER_URL}
-          target="_blank"
-          rel="noreferrer noopener"
-          className="flex items-center gap-1.5 rounded-lg transition-colors hover:text-gray-700"
-        >
-          <span>Developed by {DEVELOPER_NAME}</span>
-          <DevMark className="h-4 w-4" />
-        </a>
+        <span dir="ltr" className="text-[10px] text-gray-400/75">
+          Developed by {DEVELOPER_NAME}
+        </span>
       </div>
     </footer>
   );

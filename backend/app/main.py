@@ -52,14 +52,14 @@ logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s %(levelname)s %(name)s %(message)s",
 )
-logger = logging.getLogger("dbspulse")
+logger = logging.getLogger("nafas_hr")
 
 # در production مستندات Swagger/OpenAPI عمداً خاموش است تا نقشه کامل API در
 # دسترس عموم نباشد؛ برای توسعه محلی همچنان روی /docs فعال است.
 _docs_disabled = settings.environment == "production"
 
 app = FastAPI(
-    title="DbsPulse — سامانه ارزیابی عملکرد",
+    title="NafasHR — سامانه ارزیابی عملکرد نفس زیست فارمد",
     docs_url=None if _docs_disabled else "/docs",
     redoc_url=None if _docs_disabled else "/redoc",
     openapi_url=None if _docs_disabled else "/openapi.json",

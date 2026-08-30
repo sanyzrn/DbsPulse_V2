@@ -12,7 +12,7 @@ import { Sidebar } from "./Sidebar";
 import { navItemsFor } from "./nav";
 import { EASE_SOFT } from "../ui/motion";
 
-const COLLAPSE_KEY = "dbspulse:sidebar-collapsed";
+const COLLAPSE_KEY = "nafas-hr:sidebar-collapsed";
 
 function readCollapsed(): boolean {
   try {

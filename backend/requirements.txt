@@ -17,5 +17,3 @@ jdatetime==5.3.0
 prometheus-client==0.21.1
 openpyxl==3.1.5
 qrcode[pil]==8.2
-cryptography==44.0.0  # رمزنگاری کلیدهای API دستیار پیش از ذخیره در دیتابیس
-httpx==0.28.1  # کلاینت HTTP سرویس دستیار هوشمند؛ در زمان import بک‌اند لازم است

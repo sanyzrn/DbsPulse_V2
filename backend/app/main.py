@@ -15,7 +15,6 @@ from sqlalchemy.orm import Session
 from app.api.routers import (
     admin,
     administration,
-    ai,
     analytics,
     audit_log,
     auth,
@@ -160,7 +159,6 @@ app.include_router(notifications.router)
 app.include_router(periods.router)
 app.include_router(scoring_schemes.router)
 app.include_router(verify.router)
-app.include_router(ai.router)
 
 
 @app.get("/api/health")

@@ -81,23 +81,6 @@ function renderPage() {
 function mockGets() {
   vi.mocked(apiClient.get).mockImplementation(async (url: string) => {
     if (url === "/administration/policy") return { data: { fields: POLICY_FIELDS } } as never;
-    if (url === "/ai/settings")
-      return {
-        data: {
-          enabled: false,
-          provider: "custom",
-          providers: [
-            { id: "openai", label: "OpenAI", base_url: "https://api.openai.com/v1",
-              default_model: "gpt-4o-mini", note: "" },
-            { id: "custom", label: "سفارشی", base_url: "", default_model: "", note: "" },
-          ],
-          base_url: "", model: "", api_key_hint: "", api_key_configured: false,
-          temperature: 30, max_tokens: 1200, timeout_seconds: 60, instructions: "x",
-          restrict_to_platform: true, context_record_limit: 25,
-          allow_write_actions: true, max_user_chars: 4000,
-        },
-      } as never;
-    if (url === "/ai/access") return { data: [] } as never;
     if (url === "/administration/integrations")
       return { data: { fields: [], secrets: [], active_channels: [] } } as never;
     if (url === "/administration/modules") return { data: [] } as never;
@@ -119,19 +102,11 @@ describe("تب‌های مدیریت سامانه", () => {
     renderPage();
 
     const tabs = await screen.findAllByRole("tab");
-    expect(tabs).toHaveLength(7);
+    expect(tabs).toHaveLength(6);
     expect(screen.getByRole("tab", { name: "واحدهای سازمانی" })).toHaveAttribute(
       "aria-selected",
       "true",
     );
-    expect(screen.queryByText("دستیار در این سامانه فعال باشد")).not.toBeInTheDocument();
-
-    await openTab("دستیار هوشمند");
-    expect(screen.getByRole("tab", { name: "دستیار هوشمند" })).toHaveAttribute(
-      "aria-selected",
-      "true",
-    );
-    expect(await screen.findByText("دستیار در این سامانه فعال باشد")).toBeInTheDocument();
   });
 });
 
@@ -175,29 +150,5 @@ describe("کارت قاعده‌های سازمانی", () => {
     renderPage();
     await openTab("قاعده‌های سازمانی");
     expect(await screen.findByRole("button", { name: "ذخیرهٔ قاعده‌ها" })).toBeDisabled();
-  });
-});
-
-
-describe("کارت دستیار هوشمند", () => {
-  it("انتخاب یک سرویس، آدرس و مدلش را با هم می‌گذارد", async () => {
-    // نیمی از مشکلات راه‌اندازی یک `/v1` جامانده در آدرس بود؛ این‌جا هر دو با
-    // یک کلیک می‌آیند و ذخیره باید همان‌ها را بفرستد.
-    mockGets();
-    vi.mocked(apiClient.put).mockResolvedValue({ data: {} } as never);
-    renderPage();
-    await openTab("دستیار هوشمند");
-
-    await userEvent.click(await screen.findByRole("button", { name: /OpenAI/ }));
-    await userEvent.click(screen.getByRole("button", { name: /ذخیرهٔ تنظیمات دستیار/ }));
-
-    await waitFor(() => expect(apiClient.put).toHaveBeenCalledWith(
-      "/ai/settings",
-      expect.objectContaining({
-        provider: "openai",
-        base_url: "https://api.openai.com/v1",
-        model: "gpt-4o-mini",
-      }),
-    ));
   });
 });

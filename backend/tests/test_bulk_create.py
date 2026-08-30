@@ -176,8 +176,12 @@ def test_running_twice_does_not_create_a_second_file(client, db_session, cohort)
 
 
 def test_a_manager_goes_down_the_manager_path(client, db_session, cohort):
-    """پرسنل «مدیر» نمره‌دهندهٔ اولش معاونت است و پرونده مستقیماً در وضعیت
-    hr_approved ساخته می‌شود — همان قاعدهٔ مسیر تک‌رکوردی."""
+    """پرسنل «مدیر» نمره‌دهندهٔ اولش معاونت است، ولی پرونده — مثل هر پروندهٔ
+    دیگری — در وضعیت `draft` ساخته می‌شود تا بررسیِ منابع انسانی رد نشود.
+
+    پیش از این دسته‌ای مستقیماً در `hr_approved` ساخته می‌شد: معاونت همان نمرهٔ
+    خودش را تأیید می‌کرد و پرونده می‌توانست بدون هیچ نمره‌ای نهایی شود. همان
+    اشتباهی که مایگریشن a7f3c9b52d18 در مسیر تک‌رکوردی اصلاح کرد."""
     manager = make_personnel(
         db_session, full_name="مدیر واحد", org_unit="واحد مدیران", is_manager=True
     )
@@ -191,7 +195,44 @@ def test_a_manager_goes_down_the_manager_path(client, db_session, cohort):
     record = db_session.get(EvaluationRecord, created["evaluation_id"])
     db_session.refresh(record)
     assert record.unit_supervisor_user_id is None
-    assert record.status == EvaluationStatus.hr_approved
+    assert record.deputy_user_id == cohort["dep"].id
+    assert record.status == EvaluationStatus.draft
+
+
+def test_a_bulk_manager_case_is_scored_by_the_deputy_and_needs_hr_review(
+    client, db_session, cohort
+):
+    """سفرِ کاملِ یک پروندهٔ مدیریِ ساخته‌شدهٔ دسته‌ای: معاونت نمره می‌دهد و ثبت
+    می‌کند، منابع انسانی بررسی می‌کند، مدیرعامل نهایی می‌کند — هیچ مرحله‌ای رد
+    نمی‌شود و پرونده فقط با نتیجهٔ محاسبه‌شده بسته می‌شود."""
+    from tests.helpers import active_indicators, full_valid_scores
+
+    manager = make_personnel(
+        db_session, full_name="مدیرِ کامل", org_unit="واحد مدیران", is_manager=True
+    )
+    make_access(db_session, manager, None, cohort["dep"], cohort["ceo"])
+    db_session.commit()
+
+    created = _by_name(_run(client, cohort["hr"], org_unit="واحد مدیران"))["مدیرِ کامل"]
+    evaluation_id = created["evaluation_id"]
+
+    client.put(
+        f"/api/evaluations/{evaluation_id}/scores",
+        json={"scores": full_valid_scores(active_indicators(db_session))},
+        headers=auth_header(cohort["dep"]),
+    )
+    client.post(f"/api/evaluations/{evaluation_id}/submit", headers=auth_header(cohort["dep"]))
+    # بررسیِ منابع انسانی: در مسیر «مدیر» مستقیم به میز مدیرعامل می‌رود
+    client.post(f"/api/evaluations/{evaluation_id}/hr-approve", headers=auth_header(cohort["hr"]))
+    finalized = client.post(
+        f"/api/evaluations/{evaluation_id}/ceo-finalize", headers=auth_header(cohort["ceo"])
+    )
+
+    assert finalized.status_code == 200, finalized.text
+    record = db_session.get(EvaluationRecord, evaluation_id)
+    db_session.refresh(record)
+    assert record.status == EvaluationStatus.finalized
+    assert record.final_weighted_pct is not None
 
 
 def test_the_cohort_filters_combine(client, db_session, cohort):

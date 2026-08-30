@@ -16,8 +16,8 @@ from fastapi import HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.models.enums import Capability, CommentStage, EvaluationStatus, UserRole
-from app.models.evaluation import EvaluationComment, EvaluationRecord
+from app.models.enums import Capability, EvaluationStatus, UserRole
+from app.models.evaluation import EvaluationRecord
 from app.models.personnel import Personnel
 from app.services.ai.tools.base import ToolContext, ToolOutcome, json_content, tool
 from app.services.workflow import apply_transition
@@ -224,9 +224,10 @@ advance_evaluation.describe = _describe_advance
 
 @tool(
     name="add_evaluation_comment",
-    description="ثبت دیدگاه روی پروندهٔ ارزیابی (پاسخِ رشته‌ای با parent_comment_id). فقط اعضای زنجیره و منابع انسانی.",
+    description="ثبت دیدگاه روی پروندهٔ ارزیابی (پاسخِ رشته‌ای با parent_comment_id). "
+    "فقط اعضای زنجیره و منابع انسانی، و فقط در مرحله‌ای که رابط هم اجازه می‌دهد؛ پس از تأیید کاربر ثبت می‌شود.",
     category="ارزیابی",
-    risky=False,
+    risky=True,
     read_only=False,
     parameters={
         "type": "object",
@@ -241,53 +242,27 @@ advance_evaluation.describe = _describe_advance
 def add_evaluation_comment(
     ctx: ToolContext, evaluation_id: int, comment_text: str, parent_comment_id: int | None = None
 ) -> ToolOutcome:
-    db = ctx.db
-    record = _record_or_404(db, evaluation_id)
-    from app.api.routers.evaluations import _ensure_can_view
+    """همان مسیرِ رسمیِ رابط، نه یک نسخهٔ موازی.
 
-    _ensure_can_view(record, ctx.user)
-    text = (comment_text or "").strip()
-    if not text:
-        raise HTTPException(status.HTTP_400_BAD_REQUEST, "متن دیدگاه خالی است")
+    پیش از این بدنهِ خودش stage می‌ساخت: attributionِ مرحله غلط از آب درمی‌آمد و
+    شایستگیِ ثبت هم از ماتریسِ مرحله/صندلیِ رابط بازتر بود. حالا endpointِ رسمی
+    صدا زده می‌شود — همان گاردِ مرحله و صندلی، همان برچسبِ stage، همان لاگ.
+    اجرا هم فقط از نقطهٔ تأیید رخ می‌دهد (risky=True)."""
+    from app.api.routers.evaluations import add_comment as add_comment_endpoint
+    from app.schemas.evaluation import CommentCreate
 
-    stage_map = {
-        UserRole.hr: CommentStage.hr_review,
-        UserRole.unit_supervisor: CommentStage.hr_review,
-        UserRole.deputy: CommentStage.deputy_review,
-        UserRole.ceo: CommentStage.ceo_final,
-    }
-    stage = stage_map.get(ctx.user.role, CommentStage.hr_review)
-    if record.status is EvaluationStatus.finalized:
-        stage = CommentStage.ceo_final
-    parent = None
-    if parent_comment_id:
-        parent = db.get(EvaluationComment, int(parent_comment_id))
-        if parent is None or parent.evaluation_record_id != record.id:
-            raise HTTPException(status.HTTP_400_BAD_REQUEST, "دیدگاهِ مبدأ در همین پرونده نیست")
-
-    comment = EvaluationComment(
-        evaluation_record_id=record.id,
-        commenter_user_id=ctx.user.id,
-        parent_comment_id=parent.id if parent else None,
-        stage=stage,
-        comment_text=text[:4000],
+    comment = add_comment_endpoint(
+        evaluation_id=int(evaluation_id),
+        payload=CommentCreate(
+            comment_text=(comment_text or "").strip()[:4000],
+            parent_comment_id=int(parent_comment_id) if parent_comment_id else None,
+        ),
+        db=ctx.db,
+        current_user=ctx.user,
     )
-    db.add(comment)
-    db.flush()
-
-    from app.services.audit import log_event
-
-    log_event(
-        db,
-        actor_user_id=ctx.user.id,
-        event_type="comment_added",
-        evaluation_record_id=record.id,
-        new_value={"comment_id": comment.id, "via": "ai_copilot"},
-    )
-    db.commit()
     return ToolOutcome(
-        content=json_content({"comment_id": comment.id, "evaluation_code": record.evaluation_code}),
-        summary=f"دیدگاه روی پروندهٔ {record.evaluation_code} ثبت شد",
+        content=json_content({"comment_id": comment.id, "stage": comment.stage.value}),
+        summary="دیدگاه روی پرونده ثبت شد",
     )
 
 
@@ -328,22 +303,39 @@ def invite_self_assessment(ctx: ToolContext, personnel_id: int) -> ToolOutcome:
 )
 def my_open_cases(ctx: ToolContext, limit: int = 15) -> ToolOutcome:
     db = ctx.db
+    from app.api.routers.evaluations import sa_false
+
     role = ctx.user.role
     if role == UserRole.unit_supervisor:
         stage_condition = (EvaluationRecord.status == EvaluationStatus.draft) & (
             EvaluationRecord.unit_supervisor_user_id == ctx.user.id
         )
     elif role == UserRole.hr:
+        # صفِ مشترکِ منابع انسانی — همان چیزی که فهرست رابط هم نشان می‌دهد.
         stage_condition = EvaluationRecord.status == EvaluationStatus.submitted
     elif role == UserRole.deputy:
+        # هر دو پا به صندلیِ خودِ این معاونت گره خورده است؛ پیش از این پال
+        # `hr_approved` بدون فیلترِ مالک بود و پروندهٔ معاونت‌های دیگر را هم
+        # نشان می‌داد (C-2 در گزارش ممیزی).
         stage_condition = (
-            (EvaluationRecord.status == EvaluationStatus.hr_approved)
-            | ((EvaluationRecord.status == EvaluationStatus.draft) & (EvaluationRecord.deputy_user_id == ctx.user.id))
+            (EvaluationRecord.deputy_user_id == ctx.user.id)
+            & (
+                (EvaluationRecord.status == EvaluationStatus.hr_approved)
+                | (EvaluationRecord.status == EvaluationStatus.draft)
+            )
         )
     elif role == UserRole.ceo:
         stage_condition = EvaluationRecord.status == EvaluationStatus.deputy_approved
     elif role == UserRole.employee:
-        stage_condition = EvaluationRecord.status == EvaluationStatus.finalized
+        # کارمند فقط نتیجهٔ نهاییِ *خودش* را می‌بیند — همان قاعدهٔ
+        # scope_evaluations_for_role. پیش از این هیچ فیلترِ موضوعی نبود و
+        # نمره و پیشنهادِ کل سازمان برمی‌گشت.
+        if ctx.user.personnel_id is None:
+            stage_condition = sa_false()
+        else:
+            stage_condition = (EvaluationRecord.status == EvaluationStatus.finalized) & (
+                EvaluationRecord.subject_personnel_id == ctx.user.personnel_id
+            )
     else:
         raise HTTPException(status.HTTP_403_FORBIDDEN, "این نقش به پرونده‌های ارزیابی دسترسی ندارد")
 

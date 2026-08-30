@@ -251,7 +251,9 @@ def test_import_is_risky_and_runs_only_through_confirmation(client, db_session):
 
 
 def test_full_turn_model_proposes_import_and_user_confirms(client, db_session, monkeypatch):
-    """مدلِ قلابی سناریو را کامل می‌کند: بازرسی ← اصلاح ← پیشنهاد ← تأیید کاربر."""
+    """مدلِ قلابی سناریو را کامل می‌کند: بازرسی ← پیشنهادِ اصلاح ← تأییدِ کاربر ←
+    پیشنهادِ ورود ← تأییدِ کاربر. اصلاحِ لایه هم تغییرِ داده است و مثل ورود،
+    فقط با تأییدِ صریح کاربر اجرا می‌شود (H-1)."""
     from app.models.personnel import Personnel
 
     hr = make_user(db_session, "hr", username="xu_turn", capabilities=[Capability.manage_personnel])
@@ -262,7 +264,7 @@ def test_full_turn_model_proposes_import_and_user_confirms(client, db_session, m
     reset(ScriptedAdapter)
     ScriptedAdapter.script = [
         response(
-            "خطای ردیف ۲ را می‌بینم.",
+            "خطای ردیف ۲ را می‌بینم؛ اصلاحش را پیشنهاد می‌دهم.",
             calls=[
                 tool_call("c1", "inspect_upload", {"upload_id": upload["id"]}),
                 tool_call("c2", "patch_upload_rows", {
@@ -271,7 +273,7 @@ def test_full_turn_model_proposes_import_and_user_confirms(client, db_session, m
                 }),
             ],
         ),
-        response("فایل سالم شد؛ تکمیلش کردم."),
+        response("منتظر تأیید شما برای اصلاح هستم."),
     ]
     body = client.post(
         "/api/ai/chat",
@@ -279,8 +281,15 @@ def test_full_turn_model_proposes_import_and_user_confirms(client, db_session, m
         headers=auth_header(hr),
     ).json()
 
-    assert [s["status"] for s in body["steps"]] == ["ok", "ok"]
-    assert len(body["pending"]) == 0  # اصلاحِ لایه به دادهٔ سامانه کاری ندارد
+    assert [s["status"] for s in body["steps"]] == ["ok", "awaiting_confirmation"]
+    assert len(body["pending"]) == 1
+    assert body["pending"][0]["tool"] == "patch_upload_rows"
+
+    # تأییدِ کاربر: اصلاحِ لایه اعمال و اعتبارسنجیِ رسمی از نو اجرا می‌شود
+    confirmed = client.post(
+        f"/api/ai/pending/{body['pending'][0]['id']}/confirm", headers=auth_header(hr)
+    )
+    assert confirmed.status_code == 200, confirmed.text
 
     # نوبت بعدی: مدل پیشنهادِ ورود می‌دهد
     reset(ScriptedAdapter)

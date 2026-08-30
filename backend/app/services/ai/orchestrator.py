@@ -227,7 +227,9 @@ async def run_turn(
     """یک نوبت کامل. `adapter_factory` تنها برای تست تزریق می‌شود."""
     caps = set(capabilities_of(db, user.id))
     specs = tools_base.allowed_tools(user, caps, allow_writes=allow_writes)
-    ctx = ToolContext(db=db, user=user, caps=frozenset(caps), conversation_id=conversation.id)
+    ctx = ToolContext(
+        db=db, user=user, caps=frozenset(caps), conversation_id=conversation.id, allow_writes=allow_writes
+    )
 
     messages: list[ChatMessage] = []
     fallback_mode = False
@@ -341,7 +343,11 @@ async def run_turn(
                 result_text = json_content({"error": err.detail})
                 steps.append(StepTrace(tool=spec.name, status="error", summary=str(err.detail), detail={"status": err.status_code}))
             messages.append(ChatMessage("tool", result_text, tool_call_id=call.id))
-        db.commit()  # هر پله سالم ماندگار می‌شود؛ شکستِ پلهٔ بعد پیشین‌ها را نمی‌بَرد
+            # هر پله سالم ماندگار می‌شود؛ شکستِ پلهٔ بعد پیشین‌ها را نمی‌بَرد.
+            # کامیتِ نوبت‌به‌نوبتِ قبلی یعنی پله‌های همین دورِ حلقه تا آخرِ آن
+            # نیمه‌کاره می‌ماندند و rollbackِ شکستِ یک ابزار، پیشنهادِ در-انتظارِ
+            # تأییدِ همان دور را هم می‌بُرد (H-3).
+            db.commit()
 
     if not reply:
         reply = (

@@ -101,6 +101,11 @@ class ToolContext:
     user: CurrentUser
     caps: frozenset[Capability]
     conversation_id: int
+    #: سوییچِ اصلیِ نوشتنِ دستیار (تنظیمات + دسترسیِ کاربر). فقط برای *تبلیغ*
+    #: نیست؛ execute_tool در لحظهٔ اجرا هم آن را سنجد تا ابزاری که به هر
+    #: شکلی (بلوکِ JSON، ابزارِ تبلیغ‌نشده، ابزارِ تازه) صدا زده شد نتواند
+    #: سوییچِ خاموش را دور بزند.
+    allow_writes: bool = True
 
 
 # ── ثبت ────────────────────────────────────────────────────────────────────
@@ -257,16 +262,32 @@ def strip_fallback_blocks(reply: str) -> str:
 
 # ── اجرا ───────────────────────────────────────────────────────────────────
 
-#: کلیدهایی که هرگز در لاگِ ممیزی نمی‌نشینند.
-_SENSITIVE_KEYS = {"password", "initial_password", "api_key", "new_password", "current_password"}
+#: کلیدهایی که هرگز در لاگِ ممیزی نمی‌نشینند — در هیچ عمقی.
+_SENSITIVE_KEYS = {"password", "initial_password", "api_key", "new_password", "current_password", "temporary_password"}
+#: برچسبِ ستونِ رمز در قالبِ رسمیِ ورود پرسنل و نام‌های رایج فارسیِ رمز —
+#: مقادیر این کلیدها وقتی آرگومانِ ابزارند (مثلاً در editsِ اکسل) هم محرمانه‌اند.
+_SENSITIVE_KEYS |= {"رمز اولیه", "رمز عبور", "گذرواژه"}
+
+
+def _sanitize_value(value):
+    """پاک‌سازیِ بازگشتی: راز در هر عمقی ماسک می‌شود، نه فقط در سطحِ اول.
+
+    پیش از این فقط کلیدهای سطحِ بالا سنجیده می‌شدند؛ آرگومانِ «لیستِ ویرایش‌ها»
+    یا هر آبجکتِ تو در تو، رمزِ داخلش را بی‌صدا به لاگِ ممیزیِ زنجیره‌دار
+    می‌فرستاد (M-8 در گزارش ممیزی).
+    """
+    if isinstance(value, dict):
+        return {
+            k: ("***" if k in _SENSITIVE_KEYS else _sanitize_value(v))
+            for k, v in value.items()
+        }
+    if isinstance(value, (list, tuple)):
+        return [_sanitize_value(item) for item in value]
+    return value
 
 
 def sanitize_arguments(arguments: dict) -> dict:
-    return {
-        k: ("***" if k in _SENSITIVE_KEYS else v)
-        for k, v in arguments.items()
-        if k not in _SENSITIVE_KEYS
-    }
+    return _sanitize_value(arguments)
 
 
 def execute_tool(ctx: ToolContext, spec: ToolSpec, arguments: dict) -> ToolOutcome:
@@ -277,12 +298,22 @@ def execute_tool(ctx: ToolContext, spec: ToolSpec, arguments: dict) -> ToolOutco
     یا نقطهٔ تأیید.
     """
     guard(spec, ctx.user, ctx.caps)
+    # سوییچِ نوشتن، در لحظهٔ اجرا — مستقل از تبلیغ. تبلیغ فقط فهرستِ پیشنهادی
+    # است؛ مدل می‌تواند نامِ ابزاری را صدا بزند که به او نشان داده نشده. (H-1)
+    if not spec.read_only and not ctx.allow_writes:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="اجازهٔ تغییر داده ندارید؛ دستیار شما در حالت فقط-خواندنی است.",
+        )
 
     from app.services.audit import log_event
 
     try:
         outcome = spec.handler(ctx, **_clean_kwargs(spec.handler, arguments))
     except HTTPException:
+        # نوشته‌های ناقصِ همین ابزار باید دور ریخته شود — نه اینکه لاگِ شکست
+        # نیمه‌کاره‌ها را *کامیت* کند (H-3). لاگ در تراکنشِ تمیزِ بعدی می‌نشیند.
+        ctx.db.rollback()
         log_event(
             ctx.db,
             actor_user_id=ctx.user.id,
@@ -294,8 +325,10 @@ def execute_tool(ctx: ToolContext, spec: ToolSpec, arguments: dict) -> ToolOutco
                 "via": "ai_copilot",
             },
         )
+        ctx.db.commit()
         raise
     except Exception as exc:  # noqa: BLE001 — خطای خام ابزار، خطای ممیزی‌پذیر می‌شود
+        ctx.db.rollback()
         log_event(
             ctx.db,
             actor_user_id=ctx.user.id,
@@ -308,6 +341,7 @@ def execute_tool(ctx: ToolContext, spec: ToolSpec, arguments: dict) -> ToolOutco
                 "via": "ai_copilot",
             },
         )
+        ctx.db.commit()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="اجرای این کار در سامانه شکست خورد. جزئیات در گزارش رویدادها ثبت شد.",

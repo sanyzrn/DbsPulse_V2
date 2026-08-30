@@ -232,17 +232,8 @@ def activate_scheme(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="فقط پیش‌نویس را می‌توان فعال کرد؛ نسخهٔ فعال یا بازنشسته تغییرناپذیر است",
         )
-    # جداسازی وظایف: سازندهٔ طرح نمی‌تواند فعالش کند. تغییر قاعدهٔ نمره‌دهیِ کل
-    # سازمان نباید تصمیم یک نفرِ تنها باشد.
-    if scheme.created_by_user_id == current_user.id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail=(
-                "فعال‌سازی طرح باید توسط کاربر دیگری از منابع انسانی انجام شود؛ "
-                "سازندهٔ طرح نمی‌تواند خودش آن را فعال کند"
-            ),
-        )
-
+    # جداسازیِ وظایف (سازنده ≠ فعال‌کننده) داخل خودِ سرویس سنجیده می‌شود تا
+    # *هر* مسیری که activate() را صدا می‌زند — رابط و دستیار — از آن عبور نکند.
     previous = db.scalar(
         select(ScoringScheme).where(ScoringScheme.status == SchemeStatus.active)
     )

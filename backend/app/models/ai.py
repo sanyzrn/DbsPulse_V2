@@ -173,9 +173,11 @@ class AiPendingAction(Base):
     سرور باید بتواند بگوید «این یکی قبلاً اجرا شده» و اجازهٔ اجرای دوبارهٔ
     ندهد. هیچ‌کدام با رشتهٔ داخل پیام ممکن نیست.
 
-    چرخهٔ زندگی: ``pending`` → ``confirmed`` (اجرا شد) یا ``rejected`` یا
-    ``expired``. اجرا فقط از نقطهٔ تأیید رخ می‌دهد، و همان‌جا برای بار دوم
-    اعتبارسنجی می‌شود: هم مالکیتِ گفت‌وگو، هم مجوزِ *امروزِ* کاربر، هم آرگومان‌ها.
+    چرخهٔ زندگی: ``pending`` → ``executing`` (مالکیتِ اجرا گرفته شد؛ وضعیتِ
+    گذرا برای claimingِ اتمی) → ``confirmed`` (اجرا شد)، یا ``pending`` →
+    ``rejected`` یا ``expired`` یا ``failed``. اجرا فقط از نقطهٔ تأیید رخ
+    می‌دهد، و همان‌جا برای بار دوم اعتبارسنجی می‌شود: هم مالکیتِ گفت‌وگو، هم
+    مجوزِ *امروزِ* کاربر، هم آرگومان‌ها.
     """
 
     __tablename__ = "ai_pending_actions"
@@ -192,7 +194,7 @@ class AiPendingAction(Base):
     arguments_json: Mapped[str] = mapped_column(Text, default="", nullable=False)
     #: جمله‌ای که کارتِ تأیید نشان می‌دهد — به نامِ انسان‌ها، نه شناسه‌ها.
     summary: Mapped[str] = mapped_column(Text, default="", nullable=False)
-    #: "pending" | "confirmed" | "rejected" | "expired" | "failed"
+    #: "pending" | "executing" | "confirmed" | "rejected" | "expired" | "failed"
     status: Mapped[str] = mapped_column(String(16), default="pending", nullable=False, index=True)
     #: نتیجهٔ اجرا پس از تأیید — برای نمایش و برای این که «چه شد» قابل‌خواندن بماند.
     result_text: Mapped[str] = mapped_column(Text, default="", nullable=False)

@@ -9,6 +9,8 @@
 from dataclasses import dataclass
 from datetime import UTC, datetime
 
+from fastapi import HTTPException
+from fastapi import status as http_status
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
@@ -118,8 +120,22 @@ def next_version(db: Session) -> int:
 def activate(db: Session, scheme: ScoringScheme, *, actor_user_id: int) -> None:
     """طرح را فعال و طرح فعلی را بازنشسته می‌کند.
 
+    جداسازیِ وظایف *داخلِ سرویس* سنجیده می‌شود، نه در endpoint: سازندهٔ طرح
+    نمی‌تواند خودش فعالش کند. پیش از این این قانون فقط در مسیر رابط بود و
+    دستیار — که همین تابع را مستقیم صدا می‌زد — از آن عبور می‌کرد (H-2 در
+    گزارش ممیزی): یک نفرِ تنها با مجوزِ manage_scoring می‌توانست قاعدهٔ
+    نمره‌دهیِ کل سازمان را بسازد و فعال کند.
+
     commit با فراخواننده است تا لاگ ممیزی در همان تراکنش بنشیند.
     """
+    if scheme.created_by_user_id is not None and scheme.created_by_user_id == actor_user_id:
+        raise HTTPException(
+            status_code=http_status.HTTP_403_FORBIDDEN,
+            detail=(
+                "فعال‌سازی طرح باید توسط کاربر دیگری از منابع انسانی انجام شود؛ "
+                "سازندهٔ طرح نمی‌تواند خودش آن را فعال کند"
+            ),
+        )
     now = datetime.now(UTC)
     previous = active_scheme(db)
     if previous is not None:

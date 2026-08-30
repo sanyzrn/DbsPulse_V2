@@ -5,6 +5,37 @@ from app.core.text_limits import BONUS_REASON_MIN
 from app.models.indicator import Indicator
 from app.services.scoring_scheme import LEGACY_RULES, Rules
 
+#: صندلی‌های زنجیرهٔ ارزیابی به ترتیب مرحله — برای پیام‌های خطای خوانا.
+_CHAIN_SEATS: tuple[tuple[str, str], ...] = (
+    ("مسئول واحد", "unit_supervisor_user_id"),
+    ("معاونت", "deputy_user_id"),
+    ("مدیرعامل", "ceo_user_id"),
+)
+
+
+def inactive_seat_labels(db: Session, access) -> list[str]:
+    """صندلی‌هایی از زنجیره که کاربرِ نشسته بر آن‌ها غیرفعال است.
+
+    وضعیتِ فعال‌بودن صندلی‌ها فقط هنگام *نوشتنِ* دسترسی سنجیده می‌شد؛ حسابی که
+    بعداً غیرفعال شود (جدایی، انتقال) صندلی را مرده می‌گذاشت و پرونده‌ای که
+    بعداً باز می‌شد هرگز جلو نمی‌رفت — و یادآوریِ SLA هم برای حسابِ مرده
+    می‌رفت (M-1 در گزارش ممیزی). بازکردنِ پرونده روی زنجیرهٔ نیمه‌مُرده ممنوع.
+    """
+    from app.models.evaluation_access import EvaluationAccess
+    from app.models.user import User
+
+    if not isinstance(access, EvaluationAccess):
+        return []
+    labels: list[str] = []
+    for label, field_name in _CHAIN_SEATS:
+        user_id = getattr(access, field_name)
+        if user_id is None:
+            continue
+        user = db.get(User, user_id)
+        if user is None or not user.is_active:
+            labels.append(label)
+    return labels
+
 
 def word_count(text_value: str | None) -> int:
     if not text_value:

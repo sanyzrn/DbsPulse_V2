@@ -11,7 +11,7 @@ from datetime import UTC, datetime
 
 from fastapi import HTTPException
 from fastapi import status as http_status
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.core.metrics import workflow_transitions
@@ -232,6 +232,29 @@ def apply_transition(
 ) -> None:
     """اعتبارسنجی گذار، اجرای منطق اختصاصی (مثل نهایی‌سازی امتیازها)، تغییر وضعیت و audit."""
     spec = ensure_transition_allowed(record, action, current_user)
+    # نهایی‌سازی بدون نتیجه ممنوع — گاردِ دومِ اصلاحِ C-1. پرونده‌ای که مسیر
+    # سالمش رفته باشد در `submit` نتیجه‌اش محاسبه شده؛ `final_weighted_pct`
+    # خالی یعنی این پرونده از مسیری آمده که نمره‌دهی نداشته (مثل باگِ قدیمیِ
+    # ساختِ دسته‌ایِ مدیران). این گارد در apply_transition است تا هم رابط و
+    # هم دستیار — که هر دو از همین تابع می‌گذرند — نتوانند پروندهٔ بی‌نمره
+    # را با امضای «نهایی‌شده» ببندند.
+    if spec.to_status is EvaluationStatus.finalized:
+        has_scores = (
+            db.scalar(
+                select(func.count())
+                .select_from(EvaluationScore)
+                .where(EvaluationScore.evaluation_record_id == record.id)
+            )
+            or 0
+        )
+        if record.final_weighted_pct is None or has_scores == 0:
+            raise HTTPException(
+                status_code=http_status.HTTP_400_BAD_REQUEST,
+                detail=(
+                    "این پرونده نتیجهٔ محاسبه‌شده ندارد (امتیازی ثبت نشده است)؛ "
+                    "نهایی‌سازی بدون نتیجهٔ معتبر ممکن نیست"
+                ),
+            )
     # اقدام روی پروندهٔ بی‌مالک، همان اقدام را به مالک‌شدن تبدیل می‌کند — تا بعداً
     # معلوم باشد «مسئولش که بود»، نه فقط «کی کلیک کرد».
     if (

@@ -260,10 +260,11 @@ def inspect_upload(ctx: ToolContext, upload_id: int) -> ToolOutcome:
 
 @tool(
     name="patch_upload_rows",
-    description="اصلاح ردیف‌های اکسل پرسنلِ مرحله‌بندی‌شده با مقادیری که کاربر داده — مثلاً تکمیل تاریخ پایان قراردادِ جاافتاده. پس از اصلاح، اعتبارسنجیِ رسمی از نو اجرا می‌شود.",
+    description="اصلاح ردیف‌های اکسل پرسنلِ مرحله‌بندی‌شده با مقادیری که کاربر داده — "
+    "مثلاً تکمیل تاریخ پایان قراردادِ جاافتاده. تغییرِ داده است؛ پس از تأیید کاربر اعمال و اعتبارسنجیِ رسمی از نو اجرا می‌شود.",
     category="فایل‌ها",
     read_only=False,
-    risky=False,
+    risky=True,
     capabilities=(Capability.manage_personnel,),
     roles=(UserRole.hr,),
     parameters={

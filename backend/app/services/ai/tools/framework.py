@@ -583,9 +583,10 @@ def create_improvement_plan(
 
 @tool(
     name="update_improvement_plan_goal",
-    description="علامت‌زدن انجام‌شدن یکی از اهداف برنامهٔ بهبود. پیگیرِ برنامه مجاز است، نه فقط منابع انسانی.",
+    description="علامت‌زدن انجام‌شدن یکی از اهداف برنامهٔ بهبود. پیگیرِ برنامه مجاز است، نه فقط منابع انسانی. "
+    "تغییرِ داده است و پس از تأیید کاربر اجرا می‌شود.",
     category="برنامه بهبود",
-    risky=False,
+    risky=True,
     roles=(UserRole.hr, UserRole.unit_supervisor, UserRole.deputy, UserRole.ceo),
     parameters={
         "type": "object",

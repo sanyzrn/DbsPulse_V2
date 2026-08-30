@@ -69,6 +69,11 @@ server {
     # http://backend:8000 کار می‌کند؛ روی Railway/Render باید به آدرس عمومی یا
     # داخلی سرویس بک‌اند مقداردهی شود.
     location /api/ {
+        # سقفِ آپلود باید با سقفی که خودِ بک‌اند قبول می‌کند یکی باشد (L-3): ورود
+        # اکسلِ پرسنل تا ۵ مگابایت و آپلودِ فایل در دستیار تا ۲۰ مگابایت (سقفِ
+        # schema). بدون این خط، پیش‌فرضِ nginx (۱ مگابایت) فایلِ بزرگ‌تر را با
+        # 413 مبهم پشتِ پراکسی می‌کُشت — قبل از اینکه خطایِ معنادارِ بک‌اند برسد.
+        client_max_body_size 20m;
         proxy_pass ${BACKEND_ORIGIN}/api/;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;

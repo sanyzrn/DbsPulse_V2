@@ -34,7 +34,7 @@ from app.models.evaluation import EvaluationRecord
 from app.models.evaluation_access import EvaluationAccess
 from app.models.evaluation_period import EvaluationPeriod
 from app.models.personnel import Personnel
-from app.services.evaluation import next_evaluation_code
+from app.services.evaluation import inactive_seat_labels, next_evaluation_code
 from app.services.indicator_framework import ensure_framework
 from app.services.scoring_scheme import active_scheme
 from app.services.workflow import IS_OPEN_RECORD
@@ -56,6 +56,7 @@ class BulkOutcome(str, Enum):
     blocked_inactive = "blocked_inactive"
     blocked_no_access_row = "blocked_no_access_row"
     blocked_no_supervisor = "blocked_no_supervisor"
+    blocked_inactive_seat = "blocked_inactive_seat"
     blocked_conflict = "blocked_conflict"
 
 
@@ -66,6 +67,7 @@ OUTCOME_LABELS: dict[BulkOutcome, str] = {
     BulkOutcome.blocked_inactive: "پرسنل غیرفعال است",
     BulkOutcome.blocked_no_access_row: "دسترسی زنجیرهٔ ارزیابی برایش تعریف نشده است",
     BulkOutcome.blocked_no_supervisor: "مسئول واحد برایش تعیین نشده است",
+    BulkOutcome.blocked_inactive_seat: "یکی از صندلی‌های زنجیره‌اش (مسئول واحد/معاونت/مدیرعامل) غیرفعال است",
     BulkOutcome.blocked_conflict: "هم‌زمان پروندهٔ دیگری برایش ساخته شد",
 }
 
@@ -73,6 +75,7 @@ BLOCKED = {
     BulkOutcome.blocked_inactive,
     BulkOutcome.blocked_no_access_row,
     BulkOutcome.blocked_no_supervisor,
+    BulkOutcome.blocked_inactive_seat,
     BulkOutcome.blocked_conflict,
 }
 
@@ -112,8 +115,10 @@ class PersonPlan:
     evaluation_code: str | None = None
     #: مسئولی که پرونده به او سپرده می‌شود (نمره‌دهندهٔ اول)
     assignee_user_id: int | None = None
-    #: مسیر «مدیر» — معاونت خودش نمره‌دهندهٔ اول است و پرونده مستقیماً در وضعیت
-    #: hr_approved ساخته می‌شود. در پاسخ API نمی‌آید؛ فقط execute به آن نیاز دارد.
+    #: مسیر «مدیر» — معاونت خودش نمره‌دهندهٔ اول است. وضعیتِ آغاز همان `draft` است
+    #: (مثل هر پروندهٔ دیگری؛ مایگریشن a7f3c9b52d18 مسیر تک‌رکوردی را هم اصلاح کرد)
+    #: تا بررسیِ منابع انسانی *رد نشود* و پروندهٔ مدیر بدون نمره نهایی نشود.
+    #: در پاسخ API نمی‌آید؛ فقط execute به آن نیاز دارد.
     manager_path: bool = False
 
     @property
@@ -157,11 +162,14 @@ def plan(db: Session, cohort: CohortFilter) -> list[PersonPlan]:
 
     plans = []
     for person in people:
-        plans.append(_plan_one(person, access_by_person.get(person.id), open_by_person.get(person.id)))
+        plans.append(
+            _plan_one(db, person, access_by_person.get(person.id), open_by_person.get(person.id))
+        )
     return plans
 
 
 def _plan_one(
+    db: Session,
     person: Personnel,
     access: EvaluationAccess | None,
     open_record: EvaluationRecord | None,
@@ -187,9 +195,15 @@ def _plan_one(
         return PersonPlan(**base, outcome=BulkOutcome.blocked_no_access_row)
     if not person.is_manager and access.unit_supervisor_user_id is None:
         return PersonPlan(**base, outcome=BulkOutcome.blocked_no_supervisor)
+    # صندلی‌های زنجیره باید زنده باشند: پرونده‌ای که برای حسابِ غیرفعال باز شود
+    # هرگز جلو نمی‌رود و یادآوری‌ها هم به جایی نمی‌رسد (M-1).
+    if inactive_seat_labels(db, access):
+        return PersonPlan(**base, outcome=BulkOutcome.blocked_inactive_seat)
 
-    # مسیر «مدیر»: معاونت خودش نمره‌دهندهٔ اول است و پرونده مستقیماً در وضعیت
-    # hr_approved ساخته می‌شود — همان قاعده‌ای که create_evaluation دارد.
+    # مسیر «مدیر»: معاونت خودش نمره‌دهندهٔ اول است. پرونده از `draft` شروع می‌شود —
+    # دقیقاً مثل create_evaluation. پیش از این دسته‌ای مستقیماً در `hr_approved`
+    # ساخته می‌شد: بررسیِ منابع انسانی رد می‌شد و پرونده می‌توانست بدون هیچ نمره‌ای
+    # تا نهایی‌شدن برود (C-1 در گزارش ممیزی).
     assignee = access.deputy_user_id if person.is_manager else access.unit_supervisor_user_id
     return PersonPlan(
         **base,
@@ -239,11 +253,9 @@ def execute(db: Session, cohort: CohortFilter) -> list[PersonPlan]:
             period_id=open_period.id if open_period else None,
             scoring_scheme_id=scheme.id if scheme else None,
             indicator_framework_id=framework.id,
-            status=(
-                EvaluationStatus.hr_approved
-                if person_plan.manager_path
-                else EvaluationStatus.draft
-            ),
+            # هر دو مسیر از `draft` شروع می‌شوند — همان رفتار create_evaluation.
+            # تفاوتِ مسیر «مدیر» فقط در *نمره‌دهندهٔ اول* است (معاونت)، نه در وضعیت.
+            status=EvaluationStatus.draft,
         )
         # savepoint تودرتو: اگر ایندکس یکتای جزئی این ردیف را رد کند، فقط همین
         # ردیف برمی‌گردد و بقیهٔ کار دست‌نخورده می‌ماند.

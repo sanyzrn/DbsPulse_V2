@@ -18,6 +18,7 @@ import json
 from datetime import UTC, datetime
 
 from fastapi import HTTPException, status
+from sqlalchemy import update
 from sqlalchemy.orm import Session
 
 from app.models.ai import AiConversation, AiMessage, AiPendingAction
@@ -33,6 +34,31 @@ def _pending_or_404(db: Session, pending_id: int, user: CurrentUser) -> AiPendin
     if row is None or row.user_id != user.id:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "این پیشنهاد پیدا نشد")
     return row
+
+
+def _claim_for_execution(db: Session, row: AiPendingAction) -> None:
+    """مالکیتِ تک‌بارهٔ اجرا — با UPDATEِ شرطی، نه با قفلی که تا آخرِ اجرا نشسته
+    بماند (M-7).
+
+    قفلِ ردیفی کافی نیست: ابزارهایی که داخل خودشان commit می‌کنند قفل را وسط
+    اجرا آزاد می‌کنند و تأییدِ دوم می‌تواند «در حالِ اجرا» را ببیند و دوباره
+    اجرا کند. این‌جا claiming با یک UPDATEِ اتمیِ شرط‌دار انجام می‌شود و بلافاصله
+    commit می‌شود: هر تأییدِ هم‌زمانِ دیگری rowcount=۰ می‌بیند و با ۴۰۹ رد
+    می‌شود — حتی اگر اجرای اولی هنوز تمام نشده باشد. اجرا هرگز دوبار رخ نمی‌دهد.
+
+    اگر پروسه بینِ claim و پایانِ اجرا بمیرد، ردیف در وضعیتِ ``executing``
+    می‌ماند: از کارت‌های رابط حذف می‌شود (فهرست فقط ``pending`` را
+    نشان می‌دهد) و برای بازسازیِ «چه اتفاقی افتاد» باقی می‌ماند.
+    """
+    claimed = db.execute(
+        update(AiPendingAction)
+        .where(AiPendingAction.id == row.id, AiPendingAction.status == "pending")
+        .values(status="executing")
+    )
+    if claimed.rowcount != 1:
+        db.rollback()
+        raise HTTPException(status.HTTP_409_CONFLICT, "این پیشنهاد قبلاً تعیین تکلیف شده است")
+    db.commit()
 
 
 def _ensure_decidable(db: Session, row: AiPendingAction, user: CurrentUser, config, access) -> None:
@@ -77,8 +103,15 @@ def confirm(
         raise HTTPException(status.HTTP_403_FORBIDDEN, "اجازهٔ تغییر داده ندارید")
     tools_base.guard(spec, user, caps)
 
+    # مالکیتِ اجرا *پیش از* اجرا گرفته و ماندگار می‌شود — از این‌جا به بعد هر
+    # تأییدِ موازی دیگری ۴۰۹ می‌گیرد، هر چه هم اجرای ما طول بکشد.
+    _claim_for_execution(db, row)
+
     arguments = json.loads(row.arguments_json or "{}")
-    ctx = ToolContext(db=db, user=user, caps=frozenset(caps), conversation_id=row.conversation_id)
+    ctx = ToolContext(
+        db=db, user=user, caps=frozenset(caps), conversation_id=row.conversation_id,
+        allow_writes=allow_writes,
+    )
 
     # کنشِ دوپله‌ای (ورود گروهی): پیشنهادش فقط «اعتبارسنجی» بود؛ اجرای واقعی
     # تابعِ جداگانه‌ای دارد که خودش هنگام ثبتِ ابزار اعلام می‌کند.
@@ -89,6 +122,11 @@ def confirm(
         row.status = "confirmed"
         row.result_text = outcome.summary or "انجام شد"
     except HTTPException as err:
+        # اولِ دورِ ریختنِ نوشته‌های ناقصِ همان کنش، بعدِ ثبتِ وضعیتِ شکست (H-3).
+        # پیش از این commitِ مستقیم، نیمه‌کاره‌های اجرای شکست‌خورده (مثلاً چند
+        # ردیف از ورود گروهی) هم ماندگار می‌شد در حالی که رابط «شکست» می‌خواند.
+        db.rollback()
+        row = db.get(AiPendingAction, row.id)
         row.status = "failed"
         row.result_text = str(err.detail)
         row.decided_at = datetime.now(UTC)
@@ -102,6 +140,8 @@ def confirm(
         db.commit()
         raise
     except Exception as err:  # noqa: BLE001
+        db.rollback()
+        row = db.get(AiPendingAction, row.id)
         row.status = "failed"
         row.result_text = str(err)[:200]
         row.decided_at = datetime.now(UTC)
@@ -160,9 +200,17 @@ def reject(
     row = _pending_or_404(db, pending_id, user)
     if row.status != "pending":
         raise HTTPException(status.HTTP_409_CONFLICT, "این پیشنهاد قبلاً تعیین تکلیف شده است")
-    row.status = "rejected"
-    row.decided_at = datetime.now(UTC)
-    db.add(row)
+    # رد هم مثل تأیید، claimingِ اتمی دارد: ردِ هم‌زمان با تأیید، هر کدام زودتر
+    # UPDATEِ شرط‌دار را بِردَ برنده است و دیگری ۴۰۹ می‌گیرد.
+    claimed = db.execute(
+        update(AiPendingAction)
+        .where(AiPendingAction.id == row.id, AiPendingAction.status == "pending")
+        .values(status="rejected", decided_at=datetime.now(UTC))
+    )
+    if claimed.rowcount != 1:
+        db.rollback()
+        raise HTTPException(status.HTTP_409_CONFLICT, "این پیشنهاد قبلاً تعیین تکلیف شده است")
+    db.refresh(row)
     db.add(
         AiMessage(
             conversation_id=row.conversation_id,

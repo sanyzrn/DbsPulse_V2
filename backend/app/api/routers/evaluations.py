@@ -47,7 +47,7 @@ from app.schemas.evaluation import (
 )
 from app.services.audit import log_event
 from app.services.documents import archive_final_pdf, archive_final_pdf_detached
-from app.services.evaluation import next_evaluation_code, validate_bonus
+from app.services.evaluation import inactive_seat_labels, next_evaluation_code, validate_bonus
 from app.services.excel import build_evaluations_workbook
 from app.services.indicator_framework import (
     ensure_framework,
@@ -284,6 +284,21 @@ def create_evaluation(
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="دسترسی ارزیابی برای این پرسنل هنوز توسط منابع انسانی تعریف نشده است",
+        )
+
+    # صندلی‌های زنجیره باید زنده باشند (M-1): حسابِ غیرفعالِ هر مرحله یعنی
+    # پرونده‌ای که هرگز جلو نمی‌رود. وضعیتِ فعال‌بودن هنگام *نوشتنِ* دسترسی
+    # سنجیده می‌شود، ولی صندلی ممکن است بعداً مرده باشد — پس هنگام بازکردنِ
+    # پرونده هم سنجیده می‌شود.
+    inactive_seats = inactive_seat_labels(db, access)
+    if inactive_seats:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=(
+                "صندلی‌های غیرفعال در زنجیرهٔ ارزیابی این فرد: "
+                + "، ".join(inactive_seats)
+                + "؛ ابتدا منابع انسانی باید زنجیره را اصلاح کند"
+            ),
         )
 
     if personnel.is_manager:

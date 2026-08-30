@@ -33,6 +33,32 @@ function chartEmptyMessage(totalRows: number, visibleRows: number, fallback: str
 const inputClass =
   "w-full rounded-xl border border-gray-200 bg-gray-100 px-3 py-1.5 text-sm text-gray-700 outline-none transition-colors duration-150 focus:border-gray-900 focus:bg-white";
 
+/** حالتِ خطای سرور — عمداً از «خالی» جدا است (H-7 در گزارش ممیزی).
+ *
+ * پیش از این خطای ۵xx مثل نبودِ داده رندر می‌شد: کارتِ صفر و «داده‌ای وجود
+ * ندارد» با تمامِ اطمینانِ بصری. HR در حینِ اختلال می‌خواند «این واحد صفر
+ * ارزیابی داشته» — یک نتیجه‌گیریِ غلطِ منابع انسانی، نه یک پیامِ خطا.
+ * این‌جا خطا با پس‌زمینهٔ هشدار و دکمهٔ تلاشِ دوباره، از خالیِ واقعی تفکیک می‌شود. */
+function ReportErrorState({ onRetry }: { onRetry: () => void }) {
+  return (
+    <div
+      role="alert"
+      className="flex flex-col items-start gap-2 rounded-xl border border-red-200 bg-red-50 p-4 sm:flex-row sm:items-center sm:justify-between"
+    >
+      <p className="text-sm font-medium text-red-700">
+        دریافت گزارش با خطا مواجه شد. این «بدون داده» نیست — نمایش داده‌ها متوقف شده است.
+      </p>
+      <button
+        type="button"
+        onClick={onRetry}
+        className="shrink-0 rounded-xl border border-red-300 bg-white px-3 py-1.5 text-sm font-medium text-red-700 transition-colors hover:bg-red-100"
+      >
+        تلاش دوباره
+      </button>
+    </div>
+  );
+}
+
 /** بخش گزارش‌های تحلیلی فیلترشونده — جدا از کارت‌های خلاصهٔ همیشگیِ بالای داشبورد.
  * همهٔ فیلترها ترکیب‌پذیرند و روی همهٔ نمودارها/خروجی‌های این بخش اعمال می‌شوند.
  *
@@ -59,11 +85,18 @@ export function ReportsSection() {
       }, new Map<string, typeof indicators>())
       .entries(),
   );
-  const { data: summary, isPending: summaryPending } = useReportSummary(filters);
-  const { data: indicatorBreakdown, isPending: indicatorPending } = useIndicatorBreakdown(
-    selectedIndicatorId,
-    filters
-  );
+  const {
+    data: summary,
+    isPending: summaryPending,
+    isError: summaryError,
+    refetch: refetchSummary,
+  } = useReportSummary(filters);
+  const {
+    data: indicatorBreakdown,
+    isPending: indicatorPending,
+    isError: indicatorError,
+    refetch: refetchIndicatorBreakdown,
+  } = useIndicatorBreakdown(selectedIndicatorId, filters);
 
   function patch(next: Partial<ReportFilters>) {
     setFilters((prev) => ({ ...prev, ...next }));
@@ -247,6 +280,8 @@ export function ReportsSection() {
         <Card>
           <TableSkeleton rows={3} />
         </Card>
+      ) : summaryError ? (
+        <ReportErrorState onRetry={() => void refetchSummary()} />
       ) : (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div className="flex items-center gap-4 rounded-2xl border border-gray-200 bg-white p-4">
@@ -281,6 +316,8 @@ export function ReportsSection() {
       >
         {summaryPending ? (
           <TableSkeleton rows={4} />
+        ) : summaryError ? (
+          <ReportErrorState onRetry={() => void refetchSummary()} />
         ) : unitChartData.length === 0 ? (
           <EmptyState>
             {chartEmptyMessage((summary?.by_org_unit ?? []).length, unitChartData.length, "برای فیلترهای فعلی داده‌ای وجود ندارد.")}
@@ -312,6 +349,8 @@ export function ReportsSection() {
       >
         {summaryPending ? (
           <TableSkeleton rows={5} />
+        ) : summaryError ? (
+          <ReportErrorState onRetry={() => void refetchSummary()} />
         ) : visibleIndicatorCount === 0 ? (
           <EmptyState>
             {chartEmptyMessage((summary?.by_indicator ?? []).length, visibleIndicatorCount, "برای فیلترهای فعلی داده‌ای وجود ندارد.")}
@@ -354,6 +393,8 @@ export function ReportsSection() {
           <EmptyState>برای دیدن گزارش، یک شاخص انتخاب کنید.</EmptyState>
         ) : indicatorPending ? (
           <TableSkeleton rows={4} />
+        ) : indicatorError ? (
+          <ReportErrorState onRetry={() => void refetchIndicatorBreakdown()} />
         ) : indicatorUnitData.length === 0 ? (
           <EmptyState>
             {chartEmptyMessage((indicatorBreakdown?.by_org_unit ?? []).length, indicatorUnitData.length, "برای این شاخص و فیلترها داده‌ای وجود ندارد.")}

@@ -21,7 +21,6 @@ const NotificationPreferencesPage = lazy(() =>
 const SessionsPage = lazy(() =>
   import("./pages/SessionsPage").then((m) => ({ default: m.SessionsPage }))
 );
-const CopilotPage = lazy(() => import("./pages/CopilotPage"));
 const EvaluationDetailPage = lazy(() =>
   import("./pages/EvaluationDetailPage").then((m) => ({ default: m.EvaluationDetailPage }))
 );
@@ -186,10 +185,6 @@ function App() {
             <Route path="/" element={<HomeRedirect />} />
             <Route path="/change-password" element={<ChangePasswordPage />} />
             <Route path="/sessions" element={<SessionsPage />} />
-            {/* همکار در صفحهٔ کامل — همان گفت‌وگوی پنجرهٔ شناور، با جای بیشتر.
-                دسترسی‌پذیری‌اش سمت سرور تعیین می‌شود (وضعیت دستیار)؛ این‌جا فقط
-                مسیر است. */}
-            <Route path="/copilot" element={<CopilotPage />} />
             <Route path="/notification-preferences" element={<NotificationPreferencesPage />} />
             <Route path="/evaluations/:id" element={<EvaluationDetailPage />} />
             {/* برنامه‌های بهبود پشت گاردِ hr نیستند چون «مسئول پیگیری» هم باید

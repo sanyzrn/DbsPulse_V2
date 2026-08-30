@@ -4,7 +4,6 @@ import { AnimatePresence, motion } from "motion/react";
 import { useAuth } from "../auth/AuthContext";
 import { usePermissions } from "../auth/PermissionsContext";
 import { ErrorBoundary } from "./ErrorBoundary";
-import { Copilot } from "./copilot/Copilot";
 import { Footer } from "./Footer";
 import { NotificationBell } from "./NotificationBell";
 import { ThemeToggle } from "../ui/ThemeToggle";
@@ -197,9 +196,6 @@ export function Layout() {
 
         <Footer />
       </div>
-
-      {/* دستیار هوشمند — خودش تصمیم می‌گیرد دیده شود یا نه (بر پایهٔ /ai/status) */}
-      <Copilot />
     </div>
   );
 }

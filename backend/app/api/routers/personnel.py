@@ -445,9 +445,8 @@ async def commit_personnel_import(
     آن‌چه در پیش‌نمایش دیده شد: بین دو درخواست ممکن است کد پرسنلی یا نام کاربری
     را کس دیگری ثبت کرده باشد.
 
-    منطقِ درج در `services/personnel_import.commit_import` است — همان مسیری که
-    دستیار هوشمند هم پس از تأیید کاربر طی می‌کند. دو نسخه از «ساخت پرسنل +
-    زنجیره + حساب» یعنی روزی یکی قاعده می‌گیرد و دیگری نمی‌گیرد.
+    منطقِ درج در `services/personnel_import.commit_import` است تا دو نسخه از
+    «ساخت پرسنل + زنجیره + حساب» روزی از یکدیگر جدا نشوند.
     """
     preview = parse_workbook(await _read_upload(file), db)
     if preview.file_errors:
@@ -647,4 +646,3 @@ def update_personnel(
     db.commit()
     db.refresh(personnel)
     return personnel
-

@@ -200,7 +200,12 @@ def enrich_excel_structure(db: Session, upload) -> dict:
     headers = [str(c).strip() if c is not None else "" for c in rows[0]]
     sample = []
     for raw in rows[1:6]:
-        sample.append({headers[i] if i < len(headers) and headers[i] else f"ستون {i + 1}": str(c) if c is not None else "" for i, c in enumerate(raw)})
+        sample.append(
+            {
+                headers[i] if i < len(headers) and headers[i] else f"ستون {i + 1}": str(c) if c is not None else ""
+                for i, c in enumerate(raw)
+            }
+        )
     return {
         "kind": "excel",
         "headers": headers,
@@ -234,7 +239,9 @@ def _require_importer(ctx: ToolContext) -> None:
 
 @tool(
     name="inspect_upload",
-    description="بازرسی فایل بارگذاری‌شده در همین گفت‌وگو: ردیف‌ها، خطای هر ردیف و علتش. برای اکسل پرسنل، گزارش ورود گروهی است.",
+    description=(
+        "بازرسی فایل بارگذاری‌شده در همین گفت‌وگو: ردیف‌ها، خطای هر ردیف و علتش. برای اکسل پرسنل، گزارش ورود گروهی است."
+    ),
     category="فایل‌ها",
     read_only=True,
     parameters={"type": "object", "properties": {"upload_id": {"type": "integer"}}, "required": ["upload_id"]},
@@ -246,7 +253,10 @@ def inspect_upload(ctx: ToolContext, upload_id: int) -> ToolOutcome:
         return ToolOutcome(
             content=json_content(summary),
             ui={"kind": "upload_report", "summary": {k: v for k, v in summary.items() if k != "rows"}},
-            summary=f"بازرسی «{upload.filename}»: {summary['valid_count']} ردیف سالم، {summary['invalid_count']} خطادار",
+            summary=(
+                f"بازرسی «{upload.filename}»: "
+                f"{summary['valid_count']} ردیف سالم، {summary['invalid_count']} خطادار"
+            ),
         )
     structure = structure_of(upload)
     if structure.get("kind") in ("excel", "file"):
@@ -261,7 +271,8 @@ def inspect_upload(ctx: ToolContext, upload_id: int) -> ToolOutcome:
 @tool(
     name="patch_upload_rows",
     description="اصلاح ردیف‌های اکسل پرسنلِ مرحله‌بندی‌شده با مقادیری که کاربر داده — "
-    "مثلاً تکمیل تاریخ پایان قراردادِ جاافتاده. تغییرِ داده است؛ پس از تأیید کاربر اعمال و اعتبارسنجیِ رسمی از نو اجرا می‌شود.",
+    "مثلاً تکمیل تاریخ پایان قراردادِ جاافتاده. تغییرِ داده است؛ پس از تأیید کاربر "
+    "اعمال و اعتبارسنجیِ رسمی از نو اجرا می‌شود.",
     category="فایل‌ها",
     read_only=False,
     risky=True,
@@ -281,7 +292,7 @@ def inspect_upload(ctx: ToolContext, upload_id: int) -> ToolOutcome:
                     },
                     "required": ["row_number", "fields"],
                 },
-                "description": "نمونه: [{\"row_number\": 3, \"fields\": {\"پایان قرارداد\": \"1406/05/01\"}}]",
+                "description": 'نمونه: [{"row_number": 3, "fields": {"پایان قرارداد": "1406/05/01"}}]',
             },
         },
         "required": ["upload_id", "edits"],
@@ -347,7 +358,10 @@ patch_upload_rows.describe = _describe_patch
 
 @tool(
     name="import_personnel",
-    description="ورود ردیف‌های سالمِ اکسل پرسنل به سامانه — ساخت پرسنل، زنجیرهٔ ارزیابی و حساب‌ها. فقط پس از تأیید صریح کاربر اجرا می‌شود و پیش از اجرا، اعتبارسنجی از نو انجام می‌گیرد.",
+    description=(
+        "ورود ردیف‌های سالمِ اکسل پرسنل به سامانه — ساخت پرسنل، زنجیرهٔ ارزیابی و حساب‌ها. فقط پس از تأیید صریح کاربر "
+        "اجرا می‌شود و پیش از اجرا، اعتبارسنجی از نو انجام می‌گیرد."
+    ),
     category="فایل‌ها",
     read_only=False,
     risky=True,
@@ -428,7 +442,12 @@ def execute_import(ctx: ToolContext, upload_id: int) -> ToolOutcome:
     ctx.db.flush()
 
     accounts = [
-        {"personnel_code": a.personnel_code, "full_name": a.full_name, "username": a.username, "temporary_password": a.temporary_password}
+        {
+            "personnel_code": a.personnel_code,
+            "full_name": a.full_name,
+            "username": a.username,
+            "temporary_password": a.temporary_password,
+        }
         for a in result.accounts
     ]
     payload = {

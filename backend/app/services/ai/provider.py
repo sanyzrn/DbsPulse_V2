@@ -79,7 +79,8 @@ class OpenAiCompatibleAdapter:
             # نمی‌شناسند. این خطا «سرویس خراب» نیست؛ «پروتکل را عوض کن» است.
             lowered = text.lower()
             if tools and response.status_code in (400, 404, 422) and any(
-                needle in lowered for needle in ("tool", "function", "unrecognized", "unknown", "invalid type", "extra fields")
+                needle in lowered
+                for needle in ("tool", "function", "unrecognized", "unknown", "invalid type", "extra fields")
             ):
                 raise ToolProtocolUnsupported(text, response.status_code)
             raise AiRequestFailed(text, response.status_code)

@@ -103,7 +103,9 @@ def create_indicator(ctx: ToolContext, section: str, category: str, description:
     )
     db.commit()
     return ToolOutcome(
-        content=json_content({"created": True, "indicator": {"id": indicator.id, "description": indicator.description}}),
+        content=json_content(
+            {"created": True, "indicator": {"id": indicator.id, "description": indicator.description}}
+        ),
         summary=f"شاخص «{indicator.category}» افزوده شد",
     )
 
@@ -117,7 +119,10 @@ create_indicator.describe = _describe_create_indicator
 
 @tool(
     name="update_indicator",
-    description="ویرایش متن یا دستهٔ شاخص، یا غیرفعال‌کردنش. تغییرِ معنایی شاخصِ استفاده‌شده باید به «جایگزینی» برسد؛ این‌جا ویرایشِ نگارشی است.",
+    description=(
+        "ویرایش متن یا دستهٔ شاخص، یا غیرفعال‌کردنش. تغییرِ معنایی شاخصِ استفاده‌شده باید به «جایگزینی» برسد؛ این‌جا "
+        "ویرایشِ نگارشی است."
+    ),
     category="چارچوب",
     risky=True,
     capabilities=(Capability.manage_scoring,),
@@ -274,14 +279,19 @@ def create_scoring_scheme_draft(
     )
     db.commit()
     return ToolOutcome(
-        content=json_content({"created": True, "scheme": {"id": scheme.id, "version": scheme.version, "name": scheme.name}}),
+        content=json_content(
+            {"created": True, "scheme": {"id": scheme.id, "version": scheme.version, "name": scheme.name}}
+        ),
         summary=f"پیش‌نویس طرح نمره‌دهی نسخهٔ {scheme.version} ساخته شد",
     )
 
 
 @tool(
     name="activate_scoring_scheme",
-    description="فعال‌کردن نسخهٔ طرح نمره‌دهی. دو نفره است: سازنده نمی‌تواند خودش فعالش کند. اثرش روی پرونده‌های آینده است، نه گذشته.",
+    description=(
+        "فعال‌کردن نسخهٔ طرح نمره‌دهی. دو نفره است: سازنده نمی‌تواند خودش فعالش کند. اثرش روی پرونده‌های آینده است، نه "
+        "گذشته."
+    ),
     category="چارچوب",
     risky=True,
     capabilities=(Capability.manage_scoring,),
@@ -438,7 +448,10 @@ def preview_bulk_evaluations(
 
 @tool(
     name="run_bulk_evaluations",
-    description="اجرای واقعی آغاز گروهی ارزیابی برای یک گروه. پرونده‌های تازه به دورهٔ باز و طرحِ فعال مهر می‌خورند؛ بلاک‌ها رد می‌شوند و در نتیجه می‌آیند.",
+    description=(
+        "اجرای واقعی آغاز گروهی ارزیابی برای یک گروه. پرونده‌های تازه به دورهٔ باز و طرحِ فعال مهر می‌خورند؛ بلاک‌ها رد "
+        "می‌شوند و در نتیجه می‌آیند."
+    ),
     category="دوره‌ها",
     risky=True,
     roles=(UserRole.hr,),
@@ -498,7 +511,13 @@ def run_bulk_evaluations(
     category="برنامه بهبود",
     read_only=True,
     roles=(UserRole.hr, UserRole.unit_supervisor, UserRole.deputy, UserRole.ceo),
-    parameters={"type": "object", "properties": {"status": {"type": "string", "enum": ["open", "completed", "cancelled"]}, "limit": {"type": "integer"}}},
+    parameters={
+        "type": "object",
+        "properties": {
+            "status": {"type": "string", "enum": ["open", "completed", "cancelled"]},
+            "limit": {"type": "integer"},
+        },
+    },
 )
 def search_improvement_plans(ctx: ToolContext, status: str = "", limit: int = 15) -> ToolOutcome:
     from app.models.improvement_plan import ImprovementPlan

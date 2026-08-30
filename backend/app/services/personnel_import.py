@@ -529,7 +529,7 @@ def build_template() -> bytes:
 # همین تابع استفاده می‌کند؛ رفتارشان بایت‌به‌بایت یکی است.
 
 
-def commit_import(db: Session, preview: ImportPreview, actor_user_id: int) -> "ImportCommitResult":
+def commit_import(db: Session, preview: ImportPreview, actor_user_id: int) -> ImportCommitResult:
     """درج ردیف‌های معتبرِ یک پیش‌نمایش، همه در یک تراکنش.
 
     فراخواننده مسئول است: پیش از این، `parse_workbook` تازه اجرا شده باشد و

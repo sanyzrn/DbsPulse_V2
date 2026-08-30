@@ -124,7 +124,7 @@ export function Layout() {
               initial={{ x: "100%" }}
               animate={{ x: 0 }}
               exit={{ x: "100%" }}
-              transition={{ duration: 0.24, ease: EASE_SOFT }}
+              transition={{ duration: 0.2, ease: EASE_SOFT }}
             >
               <Sidebar
                 items={items}
@@ -184,10 +184,10 @@ export function Layout() {
             <AnimatePresence mode="wait">
               <motion.div
                 key={location.pathname}
-                initial={{ opacity: 0, y: 6 }}
+                initial={{ opacity: 0, y: 4 }}
                 animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -4 }}
-                transition={{ duration: 0.28, ease: EASE_SOFT }}
+                exit={{ opacity: 0, y: -3 }}
+                transition={{ duration: 0.18, ease: EASE_SOFT }}
               >
                 <Outlet />
               </motion.div>

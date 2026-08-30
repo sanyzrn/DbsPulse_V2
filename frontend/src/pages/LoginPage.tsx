@@ -499,7 +499,7 @@ export function LoginPage() {
           <motion.section
             initial={{ opacity: 0, x: -20 }}
             animate={{ opacity: 1, x: 0 }}
-            transition={{ duration: 0.55, ease: "easeOut" }}
+            transition={{ duration: 0.4, ease: "easeOut" }}
             className="relative hidden min-h-[620px] items-center justify-center overflow-hidden lg:flex"
           >
             <div className="w-full max-w-[580px] self-center">
@@ -511,7 +511,7 @@ export function LoginPage() {
             dir="rtl"
             initial={{ opacity: 0, x: 20 }}
             animate={{ opacity: 1, x: 0 }}
-            transition={{ duration: 0.55, ease: "easeOut", delay: 0.05 }}
+            transition={{ duration: 0.4, ease: "easeOut", delay: 0.05 }}
             className="flex items-center justify-center"
           >
             <div className="w-full max-w-md rounded-[28px] border border-white/80 bg-white/90 p-6 shadow-float backdrop-blur md:p-8">
@@ -537,7 +537,7 @@ export function LoginPage() {
                 className="space-y-4"
                 initial={{ opacity: 0, scale: 0.98 }}
                 animate={{ opacity: 1, scale: 1 }}
-                transition={{ duration: 0.5, delay: 0.12 }}
+                transition={{ duration: 0.35, delay: 0.1 }}
               >
                 <Field label="نام کاربری" htmlFor="login-username">
                   <input

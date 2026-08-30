@@ -108,8 +108,8 @@ export function EvaluationList({
   }
 
   return (
-    <div className="rounded-2xl border border-gray-200 bg-white p-5">
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+    <div className="rounded-2xl border border-gray-200 bg-white p-4">
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
         <div>
           <h2 className="text-base font-bold text-gray-900">{title}</h2>
           {subtitle && <p className="mt-0.5 text-xs text-gray-400">{subtitle}</p>}

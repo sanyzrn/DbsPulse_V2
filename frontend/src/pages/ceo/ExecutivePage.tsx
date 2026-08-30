@@ -82,7 +82,7 @@ export function ExecutivePage() {
 
       {/* ── سه عدد سرصفحه ── */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <div className="flex items-center justify-between gap-4 rounded-2xl border border-gray-200 bg-white p-5">
+        <div className="flex items-center justify-between gap-4 rounded-2xl border border-gray-200 bg-white p-4">
           <div>
             <p className="text-xs text-gray-500">میانگین امتیاز نهایی سازمان</p>
             <p className="mt-0.5 text-sm text-gray-400">در همهٔ ارزیابی‌های نهایی‌شده</p>

@@ -44,7 +44,7 @@ export function formatPct(value: number | null): string {
 export function CountUp({
   value,
   format = "fa-pct",
-  duration = 1.2,
+  duration = 0.8,
   prefix = "",
 }: {
   value: number | null;
@@ -126,7 +126,7 @@ export function PctBar({
         style={{ backgroundColor: RING_STOP_COLOR[resolved] }}
         initial={{ width: 0 }}
         animate={{ width: `${clamped}%` }}
-        transition={{ duration: 1, ease: "easeOut" }}
+        transition={{ duration: 0.55, ease: "easeOut" }}
       />
     </div>
   );
@@ -173,7 +173,7 @@ export function ScoreRing({
             strokeDasharray={circumference}
             initial={{ strokeDashoffset: circumference }}
             animate={{ strokeDashoffset: circumference * (1 - clamped / 100) }}
-            transition={{ duration: 1.2, ease: "easeOut" }}
+            transition={{ duration: 0.7, ease: "easeOut" }}
           />
         </svg>
         <span
@@ -183,7 +183,7 @@ export function ScoreRing({
           {value === null ? (
             "—"
           ) : (
-            <CountUp value={value} format="fa-pct" duration={1.2} />
+            <CountUp value={value} format="fa-pct" duration={0.8} />
           )}
         </span>
       </div>

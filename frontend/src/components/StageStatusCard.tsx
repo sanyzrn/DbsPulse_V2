@@ -122,12 +122,12 @@ function StageRow({
           <StatusBadge status={stage.status} />
         </div>
 
-        <div className="h-2 min-w-16 flex-1 overflow-hidden rounded-full bg-gray-100">
+        <div className="h-1.5 min-w-16 flex-1 overflow-hidden rounded-full bg-gray-100">
           <motion.div
             className={`h-full rounded-full ${BAR[stage.status] ?? "bg-gray-400"}`}
             initial={{ width: 0 }}
             animate={{ width: `${width}%` }}
-            transition={{ duration: 0.45, ease: EASE_SOFT }}
+            transition={{ duration: 0.35, ease: EASE_SOFT }}
           />
         </div>
 
@@ -160,7 +160,7 @@ function StageRow({
             initial={{ height: 0, opacity: 0 }}
             animate={{ height: "auto", opacity: 1 }}
             exit={{ height: 0, opacity: 0 }}
-            transition={{ duration: 0.22, ease: EASE_SOFT }}
+            transition={{ duration: 0.18, ease: EASE_SOFT }}
             className="overflow-hidden border-t border-gray-100"
           >
             <div className="flex flex-wrap gap-x-4 gap-y-1 border-b border-gray-100 bg-gray-50 px-3 py-2 text-[11px] text-gray-500">

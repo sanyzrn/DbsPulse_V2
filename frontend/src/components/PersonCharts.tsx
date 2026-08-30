@@ -98,7 +98,7 @@ function AngleTick({ x = 0, y = 0, textAnchor, payload }: TickProps) {
 export function CompetencyRadar({
   data,
   gradientId,
-  height = 340,
+  height = 280,
 }: {
   data: RadarPoint[];
   /** شناسهٔ گرادیان باید در هر صفحه یکتا باشد، وگرنه دو نمودار هم‌زمان تداخل می‌کنند */
@@ -148,7 +148,7 @@ export function CompetencyRadar({
 export function ScoreTrend({
   data,
   gradientId,
-  height = 340,
+  height = 260,
 }: {
   data: TrendPoint[];
   gradientId: string;
@@ -204,11 +204,11 @@ export function ScoreTrend({
             dataKey="final_weighted_pct"
             name="امتیاز نهایی"
             stroke={SERIES_COLOR}
-            strokeWidth={2.5}
+            strokeWidth={2}
             fill={`url(#${gradientId})`}
-            dot={{ r: 4, fill: "#fff", strokeWidth: 2.5, stroke: SERIES_COLOR }}
-            activeDot={{ r: 6, fill: SERIES_COLOR, strokeWidth: 2, stroke: "#fff" }}
-            animationDuration={1200}
+            dot={{ r: 3, fill: "#fff", strokeWidth: 2, stroke: SERIES_COLOR }}
+            activeDot={{ r: 5, fill: SERIES_COLOR, strokeWidth: 2, stroke: "#fff" }}
+            animationDuration={700}
           />
         </AreaChart>
       </ResponsiveContainer>

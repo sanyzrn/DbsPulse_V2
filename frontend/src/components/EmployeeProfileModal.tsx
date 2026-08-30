@@ -183,14 +183,14 @@ export function EmployeeProfileModal({
           </div>
         )}
 
-        <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+        <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
           <div>
-            <h3 className="mb-3 text-sm font-semibold text-gray-600">میانگین امتیاز هر شاخص (از ۵)</h3>
-            <CompetencyRadar data={radar} gradientId="profile-radar-fill" height={300} />
+            <h3 className="mb-2 text-sm font-semibold text-gray-600">میانگین امتیاز هر شاخص (از ۵)</h3>
+            <CompetencyRadar data={radar} gradientId="profile-radar-fill" height={260} />
           </div>
           <div>
-            <h3 className="mb-3 text-sm font-semibold text-gray-600">روند امتیاز نهایی (٪)</h3>
-            <ScoreTrend data={trend} gradientId="profile-trend-fill" height={300} />
+            <h3 className="mb-2 text-sm font-semibold text-gray-600">روند امتیاز نهایی (٪)</h3>
+            <ScoreTrend data={trend} gradientId="profile-trend-fill" height={260} />
           </div>
         </div>
       </div>

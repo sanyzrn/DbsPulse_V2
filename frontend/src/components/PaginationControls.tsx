@@ -31,7 +31,7 @@ export function PaginationControls({
   if (!multiplePages && !canResize) return null;
 
   return (
-    <div className="mt-4 flex flex-wrap items-center justify-between gap-3 text-sm">
+    <div className="mt-3 flex flex-wrap items-center justify-between gap-3 text-sm">
       <div className="flex items-center gap-3">
         <span className="text-gray-500">{totalCount.toLocaleString("fa-IR")} مورد</span>
         {canResize && (
@@ -59,7 +59,7 @@ export function PaginationControls({
           <button
             disabled={page === 0}
             onClick={() => onPageChange(page - 1)}
-            className="flex h-9 w-9 items-center justify-center rounded-xl border border-gray-200 bg-white font-medium text-gray-700 shadow-sm transition-all duration-200 hover:bg-gray-50 hover:shadow-md disabled:pointer-events-none disabled:opacity-40"
+            className="flex h-8 w-8 items-center justify-center rounded-xl border border-gray-200 bg-white font-medium text-gray-700 transition-colors duration-150 hover:bg-gray-50 disabled:pointer-events-none disabled:opacity-40"
             aria-label="صفحه قبل"
           >
             <svg viewBox="0 0 20 20" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -72,7 +72,7 @@ export function PaginationControls({
           <button
             disabled={page + 1 >= totalPages}
             onClick={() => onPageChange(page + 1)}
-            className="flex h-9 w-9 items-center justify-center rounded-xl border border-gray-200 bg-white font-medium text-gray-700 shadow-sm transition-all duration-200 hover:bg-gray-50 hover:shadow-md disabled:pointer-events-none disabled:opacity-40"
+            className="flex h-8 w-8 items-center justify-center rounded-xl border border-gray-200 bg-white font-medium text-gray-700 transition-colors duration-150 hover:bg-gray-50 disabled:pointer-events-none disabled:opacity-40"
             aria-label="صفحه بعد"
           >
             <svg viewBox="0 0 20 20" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">

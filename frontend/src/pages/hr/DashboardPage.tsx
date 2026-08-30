@@ -158,7 +158,7 @@ export function DashboardPage() {
             role="tab"
             aria-selected={analysisTab === t.key}
             onClick={() => setAnalysisTab(t.key)}
-            className={`rounded-lg px-3.5 py-1.5 text-sm font-medium transition-all duration-300 ${
+            className={`rounded-lg px-3.5 py-1.5 text-sm font-medium transition-colors duration-150 ${
               analysisTab === t.key ? "bg-white text-gray-900 shadow-sm" : "text-gray-500 hover:text-gray-800"
             }`}
           >
@@ -253,13 +253,13 @@ export function DashboardPage() {
 function PeriodTrendCard({ site }: { site: string }) {
   const { data = [], isPending } = usePeriodTrend(site || undefined);
   return (
-    <div className="rounded-2xl border border-gray-200 bg-white p-5">
-      <div className="mb-3">
+    <div className="rounded-2xl border border-gray-200 bg-white p-4">
+      <div className="mb-2">
         <h3 className="text-base font-bold text-gray-900">روند میانگین سازمان</h3>
         <p className="mt-0.5 text-xs text-gray-400">میانگین امتیاز نهایی در هر دورهٔ ارزیابی</p>
       </div>
       {isPending ? (
-        <div className="skeleton h-64" aria-hidden />
+        <div className="skeleton h-[260px]" aria-hidden />
       ) : (
         <PeriodTrendChart data={data} />
       )}
@@ -314,7 +314,7 @@ function OrgSummaryCard({ overview }: { overview: DashboardOverviewData }) {
   const mix = overview.outcome_mix;
   return (
     <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-      <div className="flex items-center justify-between gap-4 rounded-2xl border border-gray-200 bg-white p-5">
+      <div className="flex items-center justify-between gap-4 rounded-2xl border border-gray-200 bg-white p-4">
         <div>
           <p className="text-sm font-medium text-gray-500">میانگین امتیاز کل سازمان</p>
           <p className="mt-1 text-xs text-gray-400">
@@ -360,15 +360,15 @@ function SharePanel({
   text: string;
 }) {
   return (
-    <div className="rounded-2xl border border-gray-200 bg-white p-5">
+    <div className="rounded-2xl border border-gray-200 bg-white p-4">
       <p className="text-sm font-medium text-gray-500">{label}</p>
-      <p className={`mt-1 text-3xl font-extrabold tabular-nums ${text}`}>
+      <p className={`mt-0.5 text-2xl font-extrabold tabular-nums ${text}`}>
         {value === null ? "—" : `${value.toLocaleString("fa-IR", { maximumFractionDigits: 1 })}٪`}
       </p>
       <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-gray-100">
         <div className={`h-full rounded-full ${bar}`} style={{ width: `${value ?? 0}%` }} />
       </div>
-      <p className="mt-2 text-[11px] text-gray-400">{hint}</p>
+      <p className="mt-1.5 text-[11px] text-gray-400">{hint}</p>
       <p className="text-[11px] text-gray-400">
         از {people.toLocaleString("fa-IR")} نفرِ دارای ارزیابی نهایی‌شده
       </p>
@@ -397,7 +397,7 @@ function IndicatorRankCard({
   const rows = tab === "weak" ? weakest : strongest;
 
   return (
-    <div className="rounded-2xl border border-gray-200 bg-white p-5">
+    <div className="rounded-2xl border border-gray-200 bg-white p-4">
       <div className="mb-3 flex flex-wrap items-start justify-between gap-2">
         <div>
           <h3 className="text-base font-bold text-gray-900">{title}</h3>
@@ -456,7 +456,7 @@ function PeopleNeedingAttentionCard({ people }: { people: PersonStatData[] }) {
   const visible = site ? people.filter((p) => p.site === site) : people;
 
   return (
-    <div className="rounded-2xl border border-gray-200 bg-white p-5">
+    <div className="rounded-2xl border border-gray-200 bg-white p-4">
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
         <div>
           <h3 className="text-base font-bold text-gray-900">افراد نیازمند توجه</h3>
@@ -504,7 +504,7 @@ function ScoreOutOfFive({ value }: { value: number | null }) {
           initial={{ width: 0 }}
           whileInView={{ width: `${pct}%` }}
           viewport={{ once: true }}
-          transition={{ duration: 0.8, ease: "easeOut" }}
+          transition={{ duration: 0.45, ease: "easeOut" }}
         />
       </span>
       <span className="text-xs font-semibold tabular-nums text-gray-700">
@@ -545,11 +545,11 @@ function BarByOrgUnitCard({ data }: { data: UnitStatData[] }) {
   if (visible.length === 0) return null;
 
   return (
-    <div className="rounded-2xl border border-gray-200 bg-white p-5">
+    <div className="rounded-2xl border border-gray-200 bg-white p-4">
       <h2 className="mb-1 text-base font-bold text-gray-900">
         امتیاز و مقایسهٔ واحدهای سازمانی
       </h2>
-      <p className="mb-4 text-xs text-gray-400">
+      <p className="mb-3 text-xs text-gray-400">
         امتیاز کل، و تفکیکش به دو بخشِ فرم. واحدی که کلش خوب است ممکن است در یکی از دو بخش
         ضعیف باشد — و عددِ کل آن را پنهان می‌کند.
       </p>
@@ -597,7 +597,7 @@ function UnitBar({
       <span className={`w-28 shrink-0 text-[11px] ${bold ? "font-semibold text-gray-700" : "text-gray-500"}`}>
         {label}
       </span>
-      <span className="h-2 min-w-0 flex-1 overflow-hidden rounded-full bg-gray-100">
+      <span className="h-1.5 min-w-0 flex-1 overflow-hidden rounded-full bg-gray-100">
         {value !== null && (
           <span className={`block h-full rounded-full ${bar}`} style={{ width: `${value}%` }} />
         )}
@@ -649,7 +649,7 @@ function ExpiringContractsCard() {
   }
 
   return (
-    <div className="rounded-2xl border-2 border-amber-100 bg-white p-5">
+    <div className="rounded-2xl border border-amber-200 bg-white p-4">
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
         <h2 className="flex items-center gap-2 text-base font-bold text-gray-900">
           <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-amber-50 text-amber-600">
@@ -664,7 +664,7 @@ function ExpiringContractsCard() {
           <button
             onClick={runReminders}
             disabled={running}
-            className="rounded-xl border border-gray-200 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 shadow-sm transition-all duration-200 hover:bg-gray-50 hover:shadow-md disabled:opacity-50"
+            className="rounded-xl border border-gray-200 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 transition-colors duration-150 hover:bg-gray-50 disabled:opacity-50"
           >
             {running ? "در حال بررسی…" : "بررسی و ارسال یادآوری‌ها"}
           </button>

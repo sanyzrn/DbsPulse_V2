@@ -120,7 +120,7 @@ export function AdministrationPage() {
                     role="tab"
                     aria-selected={isActive}
                     onClick={() => setActiveTab(tab.id)}
-                    className={`rounded-xl px-4 py-2 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pulse-500 focus-visible:ring-offset-1 ${
+                    className={`rounded-xl px-3.5 py-1.5 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pulse-500 focus-visible:ring-offset-1 ${
                       isActive
                         ? "bg-pulse-600 text-white shadow-sm"
                         : "text-gray-600 hover:bg-gray-100 hover:text-gray-900"

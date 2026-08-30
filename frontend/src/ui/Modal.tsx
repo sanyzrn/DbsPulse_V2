@@ -92,14 +92,14 @@ export function Modal({
   return createPortal(
     <AnimatePresence>
       <motion.div
-        className="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/40 p-4 backdrop-blur-md"
+        className="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/40 p-4 backdrop-blur-sm"
         onMouseDown={(e) => {
           if (e.target === e.currentTarget) onClose();
         }}
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        transition={{ duration: 0.28, ease: EASE_SOFT }}
+        transition={{ duration: 0.16, ease: EASE_SOFT }}
       >
         <motion.div
           ref={dialogRef}
@@ -107,15 +107,15 @@ export function Modal({
           aria-modal="true"
           aria-label={typeof title === "string" ? title : undefined}
           tabIndex={-1}
-          className={`max-h-[90vh] w-full ${SIZES[size]} overflow-y-auto rounded-3xl bg-white shadow-float outline-none`}
-          initial={{ opacity: 0, scale: 0.96, y: 12 }}
+          className={`max-h-[90vh] w-full ${SIZES[size]} overflow-y-auto rounded-2xl bg-white shadow-float outline-none`}
+          initial={{ opacity: 0, scale: 0.97, y: 8 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
-          exit={{ opacity: 0, scale: 0.97, y: 8 }}
+          exit={{ opacity: 0, scale: 0.98, y: 4 }}
           transition={SPRING_SOFT}
         >
           {/* بالای مودال: عنوان + دکمه بستن */}
-          <div className="mb-3 flex items-start justify-between gap-3 border-b border-gray-100 px-6 pt-5 pb-4">
-            <h3 className="text-base font-bold text-gray-900">{title}</h3>
+          <div className="mb-2.5 flex items-start justify-between gap-3 border-b border-gray-100 px-5 pt-4 pb-3">
+            <h3 className="text-sm font-bold text-gray-900 sm:text-base">{title}</h3>
             <button
               onClick={onClose}
               aria-label="بستن"
@@ -128,12 +128,12 @@ export function Modal({
           </div>
           {/* بدونِ footer، همین بخش کفِ مودال است — و padding پایین لازم دارد.
               وگرنه آخرین سطرِ متن به لبهٔ کارت می‌چسبد؛ جایی که footer هست،
-              خودش `py-4` دارد و فاصله را می‌دهد. */}
-          <div className={`px-6 ${footer ? "" : "pb-6"}`}>
+              خودش `py-3` دارد و فاصله را می‌دهد. */}
+          <div className={`px-5 ${footer ? "" : "pb-5"}`}>
             {children}
           </div>
           {footer && (
-            <div className="mt-5 flex justify-end gap-2 border-t border-gray-100 px-6 py-4">
+            <div className="mt-4 flex justify-end gap-2 border-t border-gray-100 px-5 py-3">
               {footer}
             </div>
           )}

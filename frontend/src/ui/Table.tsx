@@ -49,7 +49,7 @@ export function Table({
         <thead>
           <tr className="border-b border-gray-200">
             {headers.map((h, i) => (
-              <th key={i} className="px-3 py-2.5 text-right text-xs font-semibold text-gray-500">
+              <th key={i} className="px-3 py-2 text-right text-xs font-semibold text-gray-500">
                 {h}
               </th>
             ))}
@@ -59,7 +59,7 @@ export function Table({
           {rows.map((row, idx) => {
             const key = rowKeys?.[idx] ?? idx;
             const cells = row.map((cell, cIdx) => (
-              <td key={cIdx} className="px-3 py-2.5 text-gray-700">
+              <td key={cIdx} className="px-3 py-2 text-gray-700">
                 {cell}
               </td>
             ));
@@ -69,7 +69,7 @@ export function Table({
                 className={rowClass}
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
-                transition={{ duration: 0.2, delay: idx * 0.03 }}
+                transition={{ duration: 0.15, delay: Math.min(idx * 0.02, 0.2) }}
               >
                 {cells}
               </motion.tr>
@@ -131,7 +131,7 @@ export function Table({
   );
 
   return bordered ? (
-    <div className="rounded-2xl border border-gray-200 bg-white p-5">{content}</div>
+    <div className="rounded-2xl border border-gray-200 bg-white p-4">{content}</div>
   ) : (
     content
   );

@@ -27,7 +27,7 @@ import type { PeriodTrendPoint } from "../types";
  *  کنار می‌روند ولی در متنِ زیرش شمرده می‌شوند: خطی که از رویشان بپرد، شکافِ
  *  داده را شبیهِ روندِ صاف نشان می‌دهد.
  */
-export function PeriodTrendChart({ data, height = 300 }: { data: PeriodTrendPoint[]; height?: number }) {
+export function PeriodTrendChart({ data, height = 260 }: { data: PeriodTrendPoint[]; height?: number }) {
   const plotted = data.filter((point) => point.avg_final_pct !== null);
   const hidden = data.length - plotted.length;
 
@@ -67,11 +67,11 @@ export function PeriodTrendChart({ data, height = 300 }: { data: PeriodTrendPoin
               dataKey="avg_final_pct"
               name="میانگین نهایی"
               stroke={SERIES_COLOR}
-              strokeWidth={2.5}
+              strokeWidth={2}
               fill="url(#period-trend-fill)"
-              dot={{ r: 4, fill: "#fff", strokeWidth: 2.5, stroke: SERIES_COLOR }}
-              activeDot={{ r: 6, fill: SERIES_COLOR, strokeWidth: 2, stroke: "#fff" }}
-              animationDuration={1200}
+              dot={{ r: 3, fill: "#fff", strokeWidth: 2, stroke: SERIES_COLOR }}
+              activeDot={{ r: 5, fill: SERIES_COLOR, strokeWidth: 2, stroke: "#fff" }}
+              animationDuration={700}
             />
           </AreaChart>
         </ResponsiveContainer>

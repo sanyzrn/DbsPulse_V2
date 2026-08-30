@@ -268,7 +268,7 @@ export function EvaluationDetailPage() {
         بازگشت
       </button>
 
-      <div className="rounded-2xl border border-gray-200 bg-white p-5">
+      <div className="rounded-2xl border border-gray-200 bg-white p-4">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div>
             <h1 className="text-xl font-bold text-gray-900">{personnel.full_name}</h1>
@@ -372,7 +372,7 @@ export function EvaluationDetailPage() {
         />
       )}
 
-      <div className="rounded-2xl border border-gray-200 bg-white p-5">
+      <div className="rounded-2xl border border-gray-200 bg-white p-4">
         <h2 className="mb-3 text-base font-bold text-gray-900">کامنت‌ها</h2>
         {topLevelComments.length === 0 && <p className="text-sm text-gray-400">کامنتی ثبت نشده است.</p>}
         <ul className="space-y-2">
@@ -735,7 +735,7 @@ function ReadOnlyScoring({
       ) : null}
 
       {evaluatorComment && (
-        <div className="rounded-2xl border border-gray-200 bg-white p-5">
+        <div className="rounded-2xl border border-gray-200 bg-white p-4">
           <h3 className="mb-1 text-base font-bold text-gray-900">{commentLabel}</h3>
           <p className="text-sm text-gray-700">{evaluatorComment}</p>
         </div>
@@ -1045,7 +1045,7 @@ function EditableScoring({
       )}
 
       {showEvaluatorComment && (
-        <div className="rounded-2xl border border-gray-200 bg-white p-5">
+        <div className="rounded-2xl border border-gray-200 bg-white p-4">
           <h3 className="mb-2 text-base font-bold text-gray-900">{commentLabel}</h3>
           <textarea
             className="w-full rounded-xl border border-gray-200 bg-gray-100 px-3 py-2 outline-none transition-colors duration-150 focus:border-gray-900 focus:bg-white text-sm"

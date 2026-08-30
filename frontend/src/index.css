@@ -347,6 +347,18 @@ body {
   transition: background-color 200ms ease;
 }
 
+/* اسکرولِ لینک‌های درون‌صفحه‌ای نرم باشد؛ مدیای «کاهش حرکت» پایین‌تر آن را
+   برای کاربرانِ حساس خاموش می‌کند. */
+html {
+  scroll-behavior: smooth;
+}
+
+/* انتخابِ متن با ته‌رنگِ برند — جزئیاتِ کوچکی است ولی در هر کپی/پیست حسِ
+   یکدست‌بودنِ سامانه را می‌رساند. */
+::selection {
+  background-color: rgba(182, 22, 21, 0.16);
+}
+
 /* ═══════════════════════════════════════════════════════════════════════
    Focus Outline — keyboard navigation only (no glow/ring)
    ═══════════════════════════════════════════════════════════════════════ */
@@ -414,7 +426,7 @@ button:disabled,
   border-radius: 8px;
 }
 
-/* Modern scrollbar */
+/* Modern scrollbar — باریک و بی‌صدا؛ فقط هنگام hover رنگ می‌گیرد */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
@@ -425,12 +437,12 @@ button:disabled,
 }
 
 ::-webkit-scrollbar-thumb {
-  background: rgba(182, 22, 21, 0.2);
+  background: rgba(148, 163, 184, 0.35);
   border-radius: 3px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(182, 22, 21, 0.4);
+  background: rgba(182, 22, 21, 0.35);
 }
 
 /* ═══════════════════════════════════════════════════════════════════════

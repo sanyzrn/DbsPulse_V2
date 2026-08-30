@@ -84,7 +84,7 @@ export function ChartDownloadCard({
       </div>
 
       {/* ناحیهٔ ضبط: عنوان + زیرعنوان + خودِ نمودار */}
-      <div ref={captureRef} className="rounded-2xl bg-white p-5">
+      <div ref={captureRef} className="rounded-2xl bg-white p-4">
         {/* فضای دکمه‌ها رزرو می‌شود تا عنوان زیرشان نرود — هنگام ضبط برداشته می‌شود */}
         <div ref={headingRef} style={{ paddingInlineEnd: "13rem" }}>
           <h3 className="text-base font-bold text-gray-900">{title}</h3>

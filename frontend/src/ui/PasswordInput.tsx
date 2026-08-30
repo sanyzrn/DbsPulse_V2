@@ -8,7 +8,7 @@ import { useId, useState, type InputHTMLAttributes } from "react";
 /** ظاهرِ پیش‌فرض. جای چشم (`pl-11`) بخشی از همین قرارداد است: هر جا که این
  *  پایه عوض می‌شود، فضای چشم هم باید در نسخهٔ تازه باشد. */
 const INPUT_CLASS =
-  "w-full rounded-xl border border-gray-200 bg-gray-100 px-4 py-2.5 pl-11 text-sm text-gray-900 outline-none transition-colors duration-150 focus:border-gray-900 focus:bg-white";
+  "w-full rounded-xl border border-gray-200 bg-gray-100 px-4 py-2 pl-11 text-sm text-gray-900 outline-none transition-colors duration-150 focus:border-gray-900 focus:bg-white";
 
 interface PasswordInputProps extends Omit<InputHTMLAttributes<HTMLInputElement>, "type"> {
   /** جایگزینِ کاملِ کلاس‌های پایه — نه افزوده به آن‌ها.

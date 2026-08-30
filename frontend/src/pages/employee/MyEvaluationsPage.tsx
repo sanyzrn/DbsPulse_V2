@@ -342,6 +342,17 @@ export function MyEvaluationsPage() {
       {plans.map((plan, i) => (
         <MyPlanCard key={plan.id} plan={plan} index={i} />
       ))}
+      {/* همهٔ بخش‌های این صفحه به ماژول‌های اختیاری گره خورده‌اند؛ وقتی هیچ‌کدام
+          روشن نیست و برنامهٔ بهبودی هم وجود ندارد، صفحهٔ کاملاً خالی چیزی شبیه
+          خرابیِ سامانه خوانده می‌شود — یک جملهٔ آرام بهتر از سکوت است. */}
+      {!permissionsLoading && !showEvaluationDetails && plans.length === 0 && plansError == null && (
+        <Card>
+          <EmptyState>
+            نمایش جزئیات کارنامه در این سازمان فعال نشده است. اگر فکر می‌کنید باید نتیجهٔ
+            ارزیابی‌تان را این‌جا ببینید، از منابع انسانی بپرسید.
+          </EmptyState>
+        </Card>
+      )}
       {showEvaluationDetails && error != null && (
         <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">{extractErrorMessage(error)}</p>
       )}

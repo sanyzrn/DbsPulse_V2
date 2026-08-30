@@ -152,7 +152,7 @@ export function PeriodsPage() {
 
       {openPeriod && <OpenPeriodCard period={openPeriod} onClose={() => closePeriod(openPeriod)} />}
 
-      <div className="rounded-2xl border border-gray-200 bg-white p-5">
+      <div className="rounded-2xl border border-gray-200 bg-white p-4">
         <h2 className="mb-4 text-base font-bold text-gray-900">تاریخچه دوره‌ها</h2>
         {loadError != null && (
           <p className="mb-2 text-sm text-red-600">{extractErrorMessage(loadError)}</p>
@@ -199,7 +199,7 @@ function OpenPeriodCard({ period, onClose }: { period: EvaluationPeriod; onClose
 
   return (
     <motion.div
-      className="rounded-2xl border-2 border-pulse-100 bg-white p-5"
+      className="rounded-2xl border-2 border-pulse-100 bg-white p-4"
       initial={{ opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.4 }}

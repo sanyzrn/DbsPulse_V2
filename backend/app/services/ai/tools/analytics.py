@@ -28,7 +28,10 @@ def _parse_date(value: str | None) -> date | None:
 
 @tool(
     name="report_summary",
-    description="گزارش تحلیلی ارزیابی‌های نهایی‌شده: شمار کل، میانگین نهایی، تفکیک میانگین به‌تفکیک واحد و به‌تفکیک شاخص. با فیلترهای دوره، واحد، بازهٔ تاریخ.",
+    description=(
+        "گزارش تحلیلی ارزیابی‌های نهایی‌شده: شمار کل، میانگین نهایی، تفکیک میانگین به‌تفکیک واحد و به‌تفکیک شاخص. با "
+        "فیلترهای دوره، واحد، بازهٔ تاریخ."
+    ),
     category="گزارش",
     read_only=True,
     parameters={
@@ -99,7 +102,9 @@ def employee_vs_unit(ctx: ToolContext, personnel_id: int, period_id: int | None 
 
 @tool(
     name="dashboard_overview",
-    description="کارت‌های خلاصهٔ داشبورد منابع انسانی: شمار پرسنل، پرونده‌های در جریان، نهایی‌شده‌ها، قراردادهای رو به اتمام.",
+    description=(
+        "کارت‌های خلاصهٔ داشبورد منابع انسانی: شمار پرسنل، پرونده‌های در جریان، نهایی‌شده‌ها، قراردادهای رو به اتمام."
+    ),
     category="گزارش",
     read_only=True,
     parameters={"type": "object", "properties": {}},
@@ -120,7 +125,10 @@ def dashboard_overview(ctx: ToolContext) -> ToolOutcome:
     read_only=True,
     parameters={
         "type": "object",
-        "properties": {"days": {"type": "integer", "description": "پیش‌فرض ۶۰ روز"}, "include_expired": {"type": "boolean"}},
+        "properties": {
+            "days": {"type": "integer", "description": "پیش‌فرض ۶۰ روز"},
+            "include_expired": {"type": "boolean"},
+        },
     },
 )
 def expiring_contracts(ctx: ToolContext, days: int = 60, include_expired: bool = True) -> ToolOutcome:
@@ -173,7 +181,10 @@ def my_scoring_analysis(ctx: ToolContext) -> ToolOutcome:
 
 @tool(
     name="search_audit_log",
-    description="گزارش رویدادهای سامانه — در همان دو دامنهٔ دیدِ رابط: «گزارش کامل» یا فقط رویدادهای سامانه‌ای. فیلتر بر نوع رویداد، کاربر، پرونده و بازه.",
+    description=(
+        "گزارش رویدادهای سامانه — در همان دو دامنهٔ دیدِ رابط: «گزارش کامل» یا فقط رویدادهای سامانه‌ای. فیلتر بر نوع "
+        "رویداد، کاربر، پرونده و بازه."
+    ),
     category="گزارش",
     read_only=True,
     parameters={

@@ -8,7 +8,7 @@ import pytest
 
 from app.core.crypto import decrypt, encrypt
 from app.models.ai import AiSettings, AiUserAccess
-from app.models.enums import Capability, UserRole
+from app.models.enums import Capability
 from app.schemas.auth import CurrentUser
 from app.services.ai.prompt import build_system_prompt
 from app.services.ai.tools import base as tools_base
@@ -116,7 +116,13 @@ def test_prompt_only_advertises_tools_the_executor_would_run(db_session):
 
 def test_risky_tools_are_always_flagged_for_confirmation():
     """کنش‌های تغییردهندهٔ مهم نباید «خودکار» شوند — نه در هیچ نقشی."""
-    for name in ("create_personnel", "separate_personnel", "import_personnel", "advance_evaluation", "grant_capabilities"):
+    for name in (
+        "create_personnel",
+        "separate_personnel",
+        "import_personnel",
+        "advance_evaluation",
+        "grant_capabilities",
+    ):
         spec = tools_base.REGISTRY[name]
         assert spec.risky is True, name
         assert spec.read_only is False, name
@@ -373,7 +379,15 @@ def test_pending_action_cannot_be_confirmed_without_permission(client, db_sessio
         conversation_id=convo.id,
         user_id=user.id,
         tool_name="create_personnel",
-        arguments_json=json.dumps({"full_name": "x", "personnel_code": "Y-1", "job_title": "j", "org_unit": "u", "contract_end_date": "2026-01-01"}),
+        arguments_json=json.dumps(
+            {
+                "full_name": "x",
+                "personnel_code": "Y-1",
+                "job_title": "j",
+                "org_unit": "u",
+                "contract_end_date": "2026-01-01",
+            }
+        ),
         status="pending",
     )
     db_session.add(row)

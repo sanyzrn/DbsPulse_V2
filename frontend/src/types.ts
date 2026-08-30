@@ -229,6 +229,8 @@ export interface MyOpenEvaluation {
   stage_label: string;
   /** شاخص‌های همین پرونده (P1-05) — فرم خودارزیابی از روی این ساخته می‌شود. */
   indicator_ids: number[];
+  /** آیا پنجرهٔ خودارزیابی هنوز باز است — سرور تصمیم می‌گیرد، نه فرانت. */
+  self_assessment_open: boolean;
 }
 
 export interface SelfAssessmentScoreRow {

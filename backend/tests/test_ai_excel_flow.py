@@ -94,10 +94,27 @@ def test_upload_stages_the_file_and_reports_row_errors(client, db_session):
     _enable_ai(db_session, hr)
     conversation_id = _new_conversation(client, hr)
 
-    content = _workbook([
-        ["X-1", "نفرِ سالم", "کارشناس", "دفتر مرکزی", "فروش", "خیر", "فعال", "1405/01/01", "1406/01/01", "", "", "", "", ""],
-        BROKEN_ROW,
-    ])
+    content = _workbook(
+        [
+            [
+                "X-1",
+                "نفرِ سالم",
+                "کارشناس",
+                "دفتر مرکزی",
+                "فروش",
+                "خیر",
+                "فعال",
+                "1405/01/01",
+                "1406/01/01",
+                "",
+                "",
+                "",
+                "",
+                "",
+            ],
+            BROKEN_ROW,
+        ]
+    )
     response = _upload(client, hr, "people.xlsx", content, conversation_id)
     assert response.status_code == 201, response.text
     body = response.json()
@@ -199,8 +216,12 @@ def test_import_is_risky_and_runs_only_through_confirmation(client, db_session):
 
     conversation_id = _new_conversation(client, hr)
     upload = _upload(
-        client, hr, "people.xlsx",
-        _workbook([["X-1", "نفرِ ناقص", "کارشناس", "", "فروش", "خیر", "فعال", "1405/01/01", "", "", "", "xu_sup", "", ""]]),
+        client,
+        hr,
+        "people.xlsx",
+        _workbook(
+            [["X-1", "نفرِ ناقص", "کارشناس", "", "فروش", "خیر", "فعال", "1405/01/01", "", "", "", "xu_sup", "", ""]]
+        ),
         conversation_id,
     ).json()
     ctx = _tool_ctx(db_session, hr, conversation_id)

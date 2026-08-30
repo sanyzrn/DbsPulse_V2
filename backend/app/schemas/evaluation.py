@@ -254,6 +254,12 @@ class MyOpenEvaluation(BaseModel):
     #: نه از «شاخص‌های فعالِ امروز». وگرنه کارمند به مجموعه‌ای پاسخ می‌دهد که
     #: ارزیاب به آن نمره نمی‌دهد، و مقایسهٔ دو دیدگاه بی‌معنا می‌شود.
     indicator_ids: list[int] = []
+    #: آیا پنجرهٔ خودارزیابی هنوز باز است.
+    #:
+    #: سرور محاسبه‌اش می‌کند چون تعریفِ پنجره یک جا بیشتر نیست
+    #: (`services/self_assessment.OPEN_STATUSES`). پیش از این فرانت فهرستِ
+    #: وضعیت‌ها را دستی کپی کرده بود و می‌توانست از بک‌اند جدا بیفتد.
+    self_assessment_open: bool = False
 
     @computed_field  # type: ignore[prop-decorator]
     @property

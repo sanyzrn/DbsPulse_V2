@@ -344,7 +344,11 @@ def _pending_of_conversation(db: Session, conversation_id: int) -> list[AiPendin
     ]
 
 
-@router.post("/conversations/{conversation_id}/attachments", response_model=AiUploadRead, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/conversations/{conversation_id}/attachments",
+    response_model=AiUploadRead,
+    status_code=status.HTTP_201_CREATED,
+)
 async def upload_attachment(
     conversation_id: int,
     file: UploadFile = File(...),

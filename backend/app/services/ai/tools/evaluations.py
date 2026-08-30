@@ -58,7 +58,10 @@ def _describe_record(db: Session, record: EvaluationRecord) -> dict:
 
 @tool(
     name="search_evaluations",
-    description="جست‌وجوی پرونده‌های ارزیابی در دامنهٔ دسترسی خودتان (بسته به نقش). می‌توانید بر وضعیت، واحد، کد پرونده یا نام فرد فیلتر کنید.",
+    description=(
+        "جست‌وجوی پرونده‌های ارزیابی در دامنهٔ دسترسی خودتان (بسته به نقش). می‌توانید بر وضعیت، واحد، کد پرونده یا نام "
+        "فرد فیلتر کنید."
+    ),
     category="ارزیابی",
     read_only=True,
     parameters={
@@ -91,7 +94,9 @@ def search_evaluations(
         max_final_pct=None,
         subject_personnel_id=subject_personnel_id,
     )
-    records = list(db.scalars(query.order_by(EvaluationRecord.created_at.desc()).limit(max(1, min(int(limit or 15), 50)))))
+    records = list(
+        db.scalars(query.order_by(EvaluationRecord.created_at.desc()).limit(max(1, min(int(limit or 15), 50))))
+    )
     items = []
     for record in records:
         item = _describe_record(db, record)
@@ -118,7 +123,10 @@ search_evaluations.describe = _describe_search_evaluations
 
 @tool(
     name="get_evaluation",
-    description="نمای کامل یک پرونده: مرحلهٔ گردش‌کار، امتیاز شاخص‌ها، نتیجهٔ نهایی، دیدگاه‌ها و خودارزیابی (در حد دسترسی نقش شما).",
+    description=(
+        "نمای کامل یک پرونده: مرحلهٔ گردش‌کار، امتیاز شاخص‌ها، نتیجهٔ نهایی، دیدگاه‌ها و خودارزیابی (در حد دسترسی نقش "
+        "شما)."
+    ),
     category="ارزیابی",
     read_only=True,
     parameters={"type": "object", "properties": {"evaluation_id": {"type": "integer"}}, "required": ["evaluation_id"]},
@@ -143,7 +151,10 @@ def get_evaluation(ctx: ToolContext, evaluation_id: int) -> ToolOutcome:
 
 @tool(
     name="create_evaluation",
-    description="آغاز پروندهٔ ارزیابی برای یک پرسنل. فقط مسئول واحدِ همان فرد (یا معاونت، برای پرسنلِ نشانِ «مدیر») می‌تواند آغاز کند؛ پرسنل باید فعال و دارای زنجیره باشد.",
+    description=(
+        "آغاز پروندهٔ ارزیابی برای یک پرسنل. فقط مسئول واحدِ همان فرد (یا معاونت، برای پرسنلِ نشانِ «مدیر») می‌تواند "
+        "آغاز کند؛ پرسنل باید فعال و دارای زنجیره باشد."
+    ),
     category="ارزیابی",
     risky=True,
     parameters={"type": "object", "properties": {"personnel_id": {"type": "integer"}}, "required": ["personnel_id"]},
@@ -170,7 +181,11 @@ def create_evaluation(ctx: ToolContext, personnel_id: int) -> ToolOutcome:
 
 @tool(
     name="advance_evaluation",
-    description="پیش‌بردن پرونده در زنجیرهٔ تأیید: submit (ارسال از نمره‌دهی)، hr_approve، deputy_approve، ceo_finalize، return (برگشت با دلیل الزامی)، cancel (لغو با دلیل، منابع انسانی)، hr_claim (تحویل‌گرفتن). مجوز هر گذار را ماشین حالت سامانه می‌سنجد.",
+    description=(
+        "پیش‌بردن پرونده در زنجیرهٔ تأیید: submit (ارسال از نمره‌دهی)، hr_approve، deputy_approve، ceo_finalize، return "
+        "(برگشت با دلیل الزامی)، cancel (لغو با دلیل، منابع انسانی)، hr_claim (تحویل‌گرفتن). مجوز هر گذار را ماشین حالت "
+        "سامانه می‌سنجد."
+    ),
     category="ارزیابی",
     risky=True,
     parameters={
@@ -204,14 +219,20 @@ def advance_evaluation(ctx: ToolContext, evaluation_id: int, action: str, reason
     db.refresh(record)
     subject = _subject_name(db, record)
     return ToolOutcome(
-        content=json_content({
-            "advanced": True,
-            "action": action,
-            "evaluation": _describe_record(db, record),
-            "subject_name": subject,
-            "previous_status": before_status,
-        }),
-        summary=f"پروندهٔ {record.evaluation_code} ({subject}) از «{_STATUS_LABELS.get(before_status, before_status)}» به «{_STATUS_LABELS.get(record.status.value)}» رفت",
+        content=json_content(
+            {
+                "advanced": True,
+                "action": action,
+                "evaluation": _describe_record(db, record),
+                "subject_name": subject,
+                "previous_status": before_status,
+            }
+        ),
+        summary=(
+            f"پروندهٔ {record.evaluation_code} ({subject}) "
+            f"از «{_STATUS_LABELS.get(before_status, before_status)}» "
+            f"به «{_STATUS_LABELS.get(record.status.value)}» رفت"
+        ),
     )
 
 
@@ -296,7 +317,10 @@ def invite_self_assessment(ctx: ToolContext, personnel_id: int) -> ToolOutcome:
 
 @tool(
     name="my_open_cases",
-    description="پرونده‌های بازِ روی میزِ خودتان بسته به نقش: نمره‌دهیِ در جریان، صف بررسی منابع انسانی، تأیید معاونت، تأیید نهایی.",
+    description=(
+        "پرونده‌های بازِ روی میزِ خودتان بسته به نقش: نمره‌دهیِ در جریان، صف بررسی منابع انسانی، تأیید معاونت، تأیید "
+        "نهایی."
+    ),
     category="ارزیابی",
     read_only=True,
     parameters={"type": "object", "properties": {"limit": {"type": "integer"}}},
@@ -339,7 +363,12 @@ def my_open_cases(ctx: ToolContext, limit: int = 15) -> ToolOutcome:
     else:
         raise HTTPException(status.HTTP_403_FORBIDDEN, "این نقش به پرونده‌های ارزیابی دسترسی ندارد")
 
-    stmt = select(EvaluationRecord).where(stage_condition).order_by(EvaluationRecord.stage_entered_at).limit(max(1, min(int(limit or 15), 50)))
+    stmt = (
+        select(EvaluationRecord)
+        .where(stage_condition)
+        .order_by(EvaluationRecord.stage_entered_at)
+        .limit(max(1, min(int(limit or 15), 50)))
+    )
     records = list(db.scalars(stmt))
     items = []
     for record in records:
@@ -356,7 +385,10 @@ def my_open_cases(ctx: ToolContext, limit: int = 15) -> ToolOutcome:
 
 @tool(
     name="explain_evaluation_rules",
-    description="خواندن طرح نمره‌دهیِ مؤثر یک پرونده (یا طرح فعال): وزن بخش‌ها، آستانه‌های برچسب، قانون شواهد، سقف امتیاز ویژه — به زبان ساده.",
+    description=(
+        "خواندن طرح نمره‌دهیِ مؤثر یک پرونده (یا طرح فعال): وزن بخش‌ها، آستانه‌های برچسب، قانون شواهد، سقف امتیاز ویژه "
+        "— به زبان ساده."
+    ),
     category="ارزیابی",
     read_only=True,
     parameters={
@@ -381,7 +413,9 @@ def explain_evaluation_rules(ctx: ToolContext, evaluation_id: int | None = None)
     else:
         scheme = active_scheme(db)
     if scheme is None:
-        return ToolOutcome(content=json_content({"note": "طرحی ثبت نشده؛ قواعد پیش‌فرض قدیمی اعمال می‌شود."}), summary="قواعد نمره‌دهی")
+        return ToolOutcome(
+            content=json_content({"note": "طرحی ثبت نشده؛ قواعد پیش‌فرض قدیمی اعمال می‌شود."}), summary="قواعد نمره‌دهی"
+        )
     payload = {
         "version": scheme.version,
         "name": scheme.name,

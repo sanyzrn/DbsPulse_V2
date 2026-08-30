@@ -41,7 +41,7 @@ class ToolSpec:
     description: str
     parameters: dict
     category: str
-    handler: Callable[..., "ToolOutcome"]
+    handler: Callable[..., ToolOutcome]
     #: خواندنی؟ خواندنی‌ها بلافاصله اجرا می‌شوند چون چیزی عوض نمی‌کنند.
     read_only: bool = False
     #: پرخطر؟ اجرایش فقط پس از تأییدِ صریح کاربر ممکن است — حتی اگر مجاز باشد.

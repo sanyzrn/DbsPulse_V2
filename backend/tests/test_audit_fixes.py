@@ -30,14 +30,12 @@ from app.models.ai import AiPendingAction, AiSettings, AiUserAccess
 from app.models.enums import Capability, EvaluationStatus, SchemeStatus
 from app.models.evaluation import EvaluationRecord
 from app.models.personnel import Personnel
-from app.models.user import User
 from app.schemas.auth import CurrentUser
 from app.services.ai import confirmations
 from app.services.ai.tools import base as tools_base
 from app.services.ai.tools.base import ToolContext, execute_tool
 from app.services.scoring_scheme import activate, next_version
 from tests.helpers import auth_header, make_access, make_personnel, make_user
-
 
 # ── ابزارهای کمکیِ همین فایل ────────────────────────────────────────────────
 

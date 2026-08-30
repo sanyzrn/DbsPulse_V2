@@ -111,7 +111,9 @@ def _attachments_note(db: Session, conversation_id: int) -> str:
     return "\n".join(lines)
 
 
-def _history_messages(db: Session, conversation_id: int, exclude_id: int | None = None, limit: int = 12) -> list[ChatMessage]:
+def _history_messages(
+    db: Session, conversation_id: int, exclude_id: int | None = None, limit: int = 12
+) -> list[ChatMessage]:
     stmt = select(AiMessage).where(AiMessage.conversation_id == conversation_id)
     if exclude_id is not None:
         stmt = stmt.where(AiMessage.id != exclude_id)
@@ -177,12 +179,22 @@ def _execute_call(
         db.add(pending)
         db.flush()
         created_pending.append(_pending_dict(pending))
-        steps.append(StepTrace(tool=spec.name, status="awaiting_confirmation", summary=pending.summary, detail={"pending_action_id": pending.id}))
+        steps.append(
+            StepTrace(
+                tool=spec.name,
+                status="awaiting_confirmation",
+                summary=pending.summary,
+                detail={"pending_action_id": pending.id},
+            )
+        )
         return json_content({
             "status": "awaiting_confirmation",
             "pending_action_id": pending.id,
             "summary": pending.summary,
-            "note": "این کنش اجرا نشده است. کاربر باید کارتِ تأیید را بپذیرد یا رد کند؛ تو در این باره توضیح بده و منتظر بمان.",
+            "note": (
+                "این کنش اجرا نشده است. کاربر باید کارتِ تأیید را بپذیرد یا رد کند؛"
+                " تو در این باره توضیح بده و منتظر بمان."
+            ),
         })
 
     outcome = execute_tool(ctx, spec, arguments)
@@ -341,7 +353,14 @@ async def run_turn(
                 )
             except HTTPException as err:
                 result_text = json_content({"error": err.detail})
-                steps.append(StepTrace(tool=spec.name, status="error", summary=str(err.detail), detail={"status": err.status_code}))
+                steps.append(
+                    StepTrace(
+                        tool=spec.name,
+                        status="error",
+                        summary=str(err.detail),
+                        detail={"status": err.status_code},
+                    )
+                )
             messages.append(ChatMessage("tool", result_text, tool_call_id=call.id))
             # هر پله سالم ماندگار می‌شود؛ شکستِ پلهٔ بعد پیشین‌ها را نمی‌بَرد.
             # کامیتِ نوبت‌به‌نوبتِ قبلی یعنی پله‌های همین دورِ حلقه تا آخرِ آن
@@ -358,7 +377,12 @@ async def run_turn(
     # کنش‌های در انتظارِ تأییدِ *همین نوبت* فقط وقتی معتبرند که مالکشان تصمیم نگرفته باشد
     live_pending = [
         p for p in created_pending
-        if db.scalar(select(AiPendingAction).where(AiPendingAction.id == p["id"], AiPendingAction.status == "pending")) is not None
+        if db.scalar(
+            select(AiPendingAction).where(
+                AiPendingAction.id == p["id"], AiPendingAction.status == "pending"
+            )
+        )
+        is not None
     ]
 
     return TurnResult(

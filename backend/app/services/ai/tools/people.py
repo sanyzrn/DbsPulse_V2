@@ -132,7 +132,10 @@ def _person_payload(db: Session, person: Personnel) -> dict:
 
 @tool(
     name="search_personnel",
-    description="جست‌وجوی پرسنل با نام، کد پرسنلی، واحد سازمانی، وضعیت یا تاریخ پایان قرارداد. برای یافتن شناسهٔ فرد پیش از هر تغییر لازم است.",
+    description=(
+        "جست‌وجوی پرسنل با نام، کد پرسنلی، واحد سازمانی، وضعیت یا تاریخ پایان قرارداد. برای یافتن شناسهٔ فرد پیش از هر "
+        "تغییر لازم است."
+    ),
     category="پرسنل",
     read_only=True,
     parameters={
@@ -141,7 +144,10 @@ def _person_payload(db: Session, person: Personnel) -> dict:
             "q": {"type": "string", "description": "بخشی از نام یا کد پرسنلی"},
             "org_unit": {"type": "string", "description": "نام دقیق واحد سازمانی"},
             "status": {"type": "string", "enum": ["active", "inactive"]},
-            "contract_ends_before": {"type": "string", "description": "تاریخ YYYY-MM-DD؛ فقط پرسنلی که قراردادش پیش از این تاریخ تمام می‌شود"},
+            "contract_ends_before": {
+                "type": "string",
+                "description": "تاریخ YYYY-MM-DD؛ فقط پرسنلی که قراردادش پیش از این تاریخ تمام می‌شود",
+            },
             "is_manager": {"type": "boolean"},
             "limit": {"type": "integer", "description": "پیش‌فرض ۱۵، حداکثر ۵۰"},
         },
@@ -286,7 +292,12 @@ def create_personnel(
         db,
         actor_user_id=ctx.user.id,
         event_type="personnel_created",
-        new_value={"id": person.id, "personnel_code": person.personnel_code, "full_name": person.full_name, "via": "ai_copilot"},
+        new_value={
+            "id": person.id,
+            "personnel_code": person.personnel_code,
+            "full_name": person.full_name,
+            "via": "ai_copilot",
+        },
     )
     db.commit()
     payload = _person_payload(db, person)
@@ -387,7 +398,9 @@ def update_personnel(
     )
 
 
-def _describe_update_personnel(personnel_id, job_title=None, org_unit=None, contract_end_date=None, is_manager=None, **_):
+def _describe_update_personnel(
+    personnel_id, job_title=None, org_unit=None, contract_end_date=None, is_manager=None, **_
+):
     bits = []
     if job_title:
         bits.append(f"عنوان شغلی به «{job_title}»")
@@ -405,7 +418,10 @@ update_personnel.describe = _describe_update_personnel
 
 @tool(
     name="separate_personnel",
-    description="ثبت خروج پرسنل از سازمان (استعفا، اخراج، پایان قرارداد، بازنشستگی، سایر). حسابش بسته و پروندهٔ بازش لغو می‌شود — کنشِ سنگین با تأیید.",
+    description=(
+        "ثبت خروج پرسنل از سازمان (استعفا، اخراج، پایان قرارداد، بازنشستگی، سایر). حسابش بسته و پروندهٔ بازش لغو می‌شود "
+        "— کنشِ سنگین با تأیید."
+    ),
     category="پرسنل",
     risky=True,
     capabilities=(Capability.manage_personnel,),
@@ -712,7 +728,13 @@ def update_user(
     )
     db.commit()
     return ToolOutcome(
-        content=json_content({"updated": True, "user": {"id": account.id, "username": account.username}, "changes": {k: str(v) for k, v in changes.items()}}),
+        content=json_content(
+            {
+                "updated": True,
+                "user": {"id": account.id, "username": account.username},
+                "changes": {k: str(v) for k, v in changes.items()},
+            }
+        ),
         summary=f"حساب «{account.username}» به‌روز شد",
     )
 
@@ -864,7 +886,10 @@ def get_evaluation_access(ctx: ToolContext, personnel_id: int) -> ToolOutcome:
 
 @tool(
     name="set_evaluation_access",
-    description="تعیین یا اصلاح زنجیرهٔ ارزیابی یک پرسنل (مسئول مستقیم، معاونت، مدیرعامل) با نام کاربری اعضا. قانون‌های تعارض و خودارزیابی همین‌جا اعمال می‌شود.",
+    description=(
+        "تعیین یا اصلاح زنجیرهٔ ارزیابی یک پرسنل (مسئول مستقیم، معاونت، مدیرعامل) با نام کاربری اعضا. قانون‌های تعارض و "
+        "خودارزیابی همین‌جا اعمال می‌شود."
+    ),
     category="سازمان",
     risky=True,
     capabilities=(Capability.manage_personnel,),
@@ -1047,7 +1072,9 @@ def grant_capabilities(ctx: ToolContext, user_id: int, capabilities: list) -> To
     )
     db.commit()
     return ToolOutcome(
-        content=json_content({"user_id": account.id, "username": account.username, "capabilities": sorted(c.value for c in set(after))}),
+        content=json_content(
+            {"user_id": account.id, "username": account.username, "capabilities": sorted(c.value for c in set(after))}
+        ),
         summary=f"مجوزهای «{account.username}» به‌روز شد",
     )
 

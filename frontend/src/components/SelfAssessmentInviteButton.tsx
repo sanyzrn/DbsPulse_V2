@@ -16,9 +16,9 @@ const LABEL: Record<SelfAssessmentState, { text: string; hint: string; action: b
     action: true,
   },
   invited: {
-    text: "دعوت فرستاده شد",
-    hint: "این فرد دعوت شده و هنوز ثبت نکرده است",
-    action: false,
+    text: "یادآوری مجدد",
+    hint: "این فرد دعوت شده و هنوز ثبت نکرده است؛ می‌توانید یادآوری بفرستید",
+    action: true,
   },
   submitted: {
     text: "خودارزیابی ثبت شد",
@@ -48,8 +48,8 @@ const LABEL: Record<SelfAssessmentState, { text: string; hint: string; action: b
  *  سامانه می‌شد و پروندهٔ بازش را پیدا می‌کرد می‌فهمید که می‌تواند نظرش را ثبت
  *  کند. این دکمه همان خبر را می‌رساند.
  *
- *  یک‌بار برای هر پرونده. سرور هم همین را می‌گوید (۴۰۹)، پس غیرفعال‌شدنِ دکمه
- *  یک راحتی است نه یک گارد.
+ *  دعوتِ دوم یادآوری است، نه خطا: اگر اعلان گم شود یا کارمند آن را ببندد،
+ *  پنجرهٔ خودارزیابی کوتاه است و بدون راهِ ارسالِ دوباره فرصت از دست می‌رود.
  */
 export function SelfAssessmentInviteButton({ personnel }: { personnel: Personnel }) {
   const { showSuccess, showError } = useToast();

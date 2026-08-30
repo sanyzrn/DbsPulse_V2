@@ -8,7 +8,6 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user, require_chain_stage, require_roles
-from app.core.config import settings
 from app.db.session import get_db
 from app.models.audit_log import AuditLog
 from app.models.enums import (
@@ -57,6 +56,7 @@ from app.services.indicator_framework import (
 from app.services.notifications import notify, notify_stage_owner_reassigned
 from app.services.pdf import weasyprint_available
 from app.services.scoring_scheme import active_scheme, rules_for_record
+from app.services.self_assessment import may_view as may_view_self_assessment
 from app.services.self_evaluation import (
     ensure_chain_stages_are_not_redundant,
     ensure_evaluators_are_not_the_subject,
@@ -185,13 +185,8 @@ def _self_assessment_of(db: Session, record: EvaluationRecord) -> SelfAssessment
     )
 
 
-def _may_view_self_assessment(role: UserRole) -> bool:
-    return {
-        UserRole.hr: settings.self_assessment_visible_to_hr,
-        UserRole.unit_supervisor: settings.self_assessment_visible_to_unit_supervisor,
-        UserRole.deputy: settings.self_assessment_visible_to_deputy,
-        UserRole.ceo: settings.self_assessment_visible_to_ceo,
-    }.get(role, False)
+#: قاعدهٔ نمایش یک جا زندگی می‌کند: `services/self_assessment.may_view`.
+#: این‌جا فقط صدا زده می‌شود تا سیاستِ محرمانگی و گاردِ ضدلنگر از هم جدا نیفتند.
 
 
 def _to_detail(
@@ -207,7 +202,7 @@ def _to_detail(
             "was_returned": _was_returned(db, record.id),
             "self_assessment": (
                 _self_assessment_of(db, record)
-                if _may_view_self_assessment(current_user.role)
+                if may_view_self_assessment(record, current_user.role)
                 else None
             ),
             "indicator_ids": sorted(indicator_ids_for_record(db, record)),

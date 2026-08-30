@@ -135,7 +135,12 @@ def confirm(
             db,
             actor_user_id=user.id,
             event_type="ai_action_failed",
-            new_value={"pending_action_id": row.id, "tool": row.tool_name, "error": str(err.detail)[:200], "via": "ai_copilot"},
+            new_value={
+                "pending_action_id": row.id,
+                "tool": row.tool_name,
+                "error": str(err.detail)[:200],
+                "via": "ai_copilot",
+            },
         )
         db.commit()
         raise
@@ -147,7 +152,10 @@ def confirm(
         row.decided_at = datetime.now(UTC)
         db.add(row)
         db.commit()
-        raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR, "اجرای این کنش شکست خورد؛ جزئیات در گزارش رویدادها ثبت شد") from err
+        raise HTTPException(
+            status.HTTP_500_INTERNAL_SERVER_ERROR,
+            "اجرای این کنش شکست خورد؛ جزئیات در گزارش رویدادها ثبت شد",
+        ) from err
 
     row.decided_at = datetime.now(UTC)
     db.add(row)

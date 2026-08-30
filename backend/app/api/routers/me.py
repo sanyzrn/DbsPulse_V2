@@ -17,6 +17,7 @@ from app.models.enums import EvaluationStatus, ImprovementPlanStatus, UserRole
 from app.models.evaluation import EvaluationRecord
 from app.models.improvement_plan import ImprovementPlan
 from app.models.self_assessment import SelfAssessmentScore
+from app.models.user import User
 from app.schemas.auth import CurrentUser
 from app.schemas.evaluation import (
     MyEvaluationPage,
@@ -32,6 +33,7 @@ from app.services.audit import log_event
 from app.services.indicator_framework import indicator_ids_for_record
 from app.services.notifications import notify
 from app.services.self_assessment import OPEN_STATUSES as SELF_ASSESSMENT_OPEN_STATUSES
+from app.services.self_assessment import policy_allows as self_assessment_policy_allows
 from app.services.workflow import IS_OPEN_RECORD
 
 router = APIRouter(prefix="/api/me", tags=["me"])
@@ -79,7 +81,10 @@ def my_open_evaluation(
     )
     return [
         MyOpenEvaluation.model_validate(r).model_copy(
-            update={"indicator_ids": sorted(indicator_ids_for_record(db, r))}
+            update={
+                "indicator_ids": sorted(indicator_ids_for_record(db, r)),
+                "self_assessment_open": r.status in SELF_ASSESSMENT_OPEN_STATUSES,
+            }
         )
         for r in records
     ]
@@ -189,19 +194,30 @@ def submit_self_assessment(
         new_value={"scored_indicators": len(payload.scores)},
     )
 
-    # نمره‌دهندهٔ اول باید بداند دیدگاه فرد رسیده، وگرنه بی‌آنکه ببیندش نمره می‌دهد
+    # اعلان به نمره‌دهندهٔ اول — ولی فقط اگر سیاستِ محرمانگی اجازهٔ دیدنش را
+    # بدهد.
+    #
+    # پیش از این بی‌قید فرستاده می‌شد، با این استدلال که «وگرنه بی‌آنکه ببیندش
+    # نمره می‌دهد». ولی پیش‌فرضِ سیاست، خودارزیابی را از نمره‌دهنده پنهان
+    # می‌کند؛ پس اعلان به پروند‌ه‌ای می‌رسید که در آن چیزی برای دیدن نبود —
+    # خبری از چیزی که گیرنده هیچ‌وقت به آن نمی‌رسید.
+    #
+    # حالا `may_view` عمداً هم آن را تا پایانِ نمره‌دهی پنهان می‌کند (گاردِ
+    # ضدلنگر)، پس متن هم همین را می‌گوید: هست، ولی بعد از ثبتِ نمرهٔ شما.
     evaluator_id = record.unit_supervisor_user_id or record.deputy_user_id
-    notify(
-        db,
-        [evaluator_id],
-        type_="self_assessment_submitted",
-        message=(
-            f"{record.subject.full_name} خودارزیابی‌اش را برای پروندهٔ "
-            f"{record.evaluation_code} ثبت کرد"
-        ),
-        evaluation_record_id=record.id,
-        link=f"/evaluations/{record.id}",
-    )
+    evaluator_role = db.scalar(select(User.role).where(User.id == evaluator_id))
+    if evaluator_role is not None and self_assessment_policy_allows(evaluator_role):
+        notify(
+            db,
+            [evaluator_id],
+            type_="self_assessment_submitted",
+            message=(
+                f"{record.subject.full_name} خودارزیابی‌اش را برای پروندهٔ "
+                f"{record.evaluation_code} ثبت کرد؛ پس از ثبتِ نمرهٔ شما قابل مشاهده است"
+            ),
+            evaluation_record_id=record.id,
+            link=f"/evaluations/{record.id}",
+        )
 
     db.commit()
     db.refresh(record)

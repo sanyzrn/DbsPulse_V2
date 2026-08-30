@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { AnimatePresence, motion } from "motion/react";
+import { useAnchoredPopover } from "./useAnchoredPopover";
 import {
   JALALI_MONTH_NAMES,
   JALALI_WEEKDAY_LABELS,
@@ -41,6 +43,14 @@ export function JalaliDatePicker({
   const [open, setOpen] = useState(false);
   const [mode, setMode] = useState<PickerMode>("days");
   const containerRef = useRef<HTMLDivElement>(null);
+  // پاپ‌آور روی body می‌رود تا `overflow-hidden`ِ نوارِ فیلتر نبُردش — توضیح کامل
+  // در `useAnchoredPopover`.
+  const {
+    anchorRef,
+    popoverRef,
+    style: popoverStyle,
+    containsNode: popoverContains,
+  } = useAnchoredPopover<HTMLButtonElement, HTMLDivElement>(open);
 
   const selectedJalali = useMemo(() => isoToJalali(value), [value]);
   const [viewYear, setViewYear] = useState(() => (selectedJalali ?? todayJalali()).jy);
@@ -58,9 +68,12 @@ export function JalaliDatePicker({
   useEffect(() => {
     if (!open) return;
     function onClickOutside(e: MouseEvent) {
-      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
-        setOpen(false);
-      }
+      const t = e.target as Node;
+      // پاپ‌آور دیگر فرزندِ `containerRef` نیست (پورتال است)، پس باید جداگانه
+      // سنجیده شود؛ وگرنه هر کلیک داخلِ تقویم «کلیکِ بیرون» حساب می‌شد و
+      // تقویم پیش از رسیدنِ کلیک به روزها بسته می‌شد.
+      if (containerRef.current?.contains(t) || popoverContains(t)) return;
+      setOpen(false);
     }
     function onKeyDown(e: KeyboardEvent) {
       if (e.key === "Escape") setOpen(false);
@@ -71,7 +84,7 @@ export function JalaliDatePicker({
       document.removeEventListener("mousedown", onClickOutside);
       document.removeEventListener("keydown", onKeyDown);
     };
-  }, [open]);
+  }, [open, popoverContains]);
 
   // با هر بار بازشدن، از حالت روز شروع کن
   function toggleOpen() {
@@ -131,6 +144,7 @@ export function JalaliDatePicker({
   return (
     <div ref={containerRef} className="relative">
       <button
+        ref={anchorRef}
         type="button"
         disabled={disabled}
         onClick={toggleOpen}
@@ -148,12 +162,17 @@ export function JalaliDatePicker({
         <input tabIndex={-1} aria-hidden="true" className="sr-only" required value={value} onChange={() => {}} />
       )}
 
+      {createPortal(
       <AnimatePresence>
         {open && (
           <motion.div
+            ref={popoverRef}
+            style={popoverStyle}
             role="dialog"
             aria-label="انتخاب تاریخ"
-            className="absolute z-40 mt-1.5 w-72 overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-float ring-1 ring-black/5"
+            // z-[60]: بالای پوششِ مودال (z-50) چون این انتخابگر داخلِ مودال هم
+            // به‌کار می‌رود، و پایینِ تولتیپ (z-[70]).
+            className="z-[60] w-72 overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-float ring-1 ring-black/5"
             initial={{ opacity: 0, y: -6, scale: 0.97 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: -6, scale: 0.97 }}
@@ -346,7 +365,9 @@ export function JalaliDatePicker({
             </div>
           </motion.div>
         )}
-      </AnimatePresence>
+      </AnimatePresence>,
+      document.body
+      )}
     </div>
   );
 }

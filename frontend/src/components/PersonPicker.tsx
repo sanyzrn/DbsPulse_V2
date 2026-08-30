@@ -13,6 +13,8 @@
  * هم‌نامی در سازمان عادی است و نام تنها برای تشخیص کافی نیست.
  */
 import { useEffect, useId, useRef, useState } from "react";
+import { createPortal } from "react-dom";
+import { useAnchoredPopover } from "../ui/useAnchoredPopover";
 import { useDebouncedValue, usePersonnelDetail, usePersonnelList } from "../api/queries";
 import type { Personnel } from "../types";
 
@@ -43,6 +45,14 @@ export function PersonPicker({
   const [active, setActive] = useState(0);
   const debounced = useDebouncedValue(query);
   const rootRef = useRef<HTMLDivElement>(null);
+  // همان مشکلِ انتخابگر تاریخ: این فهرست هم داخلِ نوارِ فیلترِ `overflow-hidden`
+  // باز می‌شود و بریده می‌شد. توضیح در `ui/useAnchoredPopover`.
+  const {
+    anchorRef,
+    popoverRef,
+    style: popoverStyle,
+    containsNode: popoverContains,
+  } = useAnchoredPopover<HTMLDivElement, HTMLDivElement>(open, { matchAnchorWidth: true });
   const inputRef = useRef<HTMLInputElement>(null);
   const listId = useId();
 
@@ -62,11 +72,14 @@ export function PersonPicker({
   useEffect(() => {
     if (!open) return;
     function onPointerDown(event: PointerEvent) {
-      if (!rootRef.current?.contains(event.target as Node)) setOpen(false);
+      const t = event.target as Node;
+      // فهرست دیگر فرزندِ ریشه نیست (پورتال است) و باید جداگانه سنجیده شود.
+      if (rootRef.current?.contains(t) || popoverContains(t)) return;
+      setOpen(false);
     }
     document.addEventListener("pointerdown", onPointerDown);
     return () => document.removeEventListener("pointerdown", onPointerDown);
-  }, [open]);
+  }, [open, popoverContains]);
 
   useEffect(() => {
     if (open) inputRef.current?.focus();
@@ -102,7 +115,7 @@ export function PersonPicker({
 
   return (
     <div ref={rootRef} className={`relative ${className}`}>
-      <div className="flex items-center gap-1.5">
+      <div ref={anchorRef} className="flex items-center gap-1.5">
         <button
           type="button"
           role="combobox"
@@ -143,8 +156,12 @@ export function PersonPicker({
         )}
       </div>
 
-      {open && (
-        <div className="absolute z-30 mt-1 w-full overflow-hidden rounded-xl border border-gray-200 bg-white shadow-xl">
+      {open && createPortal(
+        <div
+          ref={popoverRef}
+          style={popoverStyle}
+          className="z-[60] overflow-hidden rounded-xl border border-gray-200 bg-white shadow-xl"
+        >
           <div className="border-b border-gray-100 p-2">
             <input
               ref={inputRef}
@@ -196,7 +213,8 @@ export function PersonPicker({
               {page.total.toLocaleString("fa-IR")} — برای باریک‌کردن، بیشتر تایپ کنید.
             </p>
           )}
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );

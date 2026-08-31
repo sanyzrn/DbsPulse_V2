@@ -400,10 +400,21 @@ def test_the_employee_can_submit_a_self_assessment_while_the_case_is_open(client
 
 
 def test_every_role_except_deputy_and_ceo_can_self_assess_its_own_record(client, db_session):
+    """قاعده زنجیره‌محور است نه نقش‌محور: هر کسی که *موضوعِ* پرونده است.
+
+    `_case` پرونده را در `submitted` می‌گذارد و پنجرهٔ خودارزیابی آن‌جا بسته است،
+    پس اول باید به مرحلهٔ ثبت برگردد — وگرنه این تست به‌جای نقش، پنجره را می‌سنجد
+    و برای همهٔ نقش‌ها یکسان رد می‌شود.
+    """
     for role in (UserRole.hr, UserRole.unit_supervisor, UserRole.support):
         case = _case(client, db_session, finalize=False)
         case["employee"].role = role
         db_session.commit()
+        client.post(
+            f"/api/evaluations/{case['id']}/return",
+            json={"reason": "بازگشت"},
+            headers=auth_header(case["hr"]),
+        )
 
         response = client.post(
             f"/api/me/evaluations/{case['id']}/self-assessment",
@@ -465,9 +476,13 @@ def test_the_self_assessment_never_enters_the_result(client, db_session):
     assert final["final_weighted_pct"] == 60.0, "خودارزیابی نباید در میانگین اثر بگذارد"
 
 
-def test_comparison_is_hr_only_and_appears_after_both_forms_are_submitted(
-    client, db_session
-):
+def test_only_hr_ever_sees_a_self_assessment(client, db_session):
+    """قاعده، نه تنظیم: مسئول مستقیم هیچ‌وقت نمی‌بیند — نه پیش از ثبتِ نمره‌اش، نه بعدش.
+
+    و منابع انسانی از همان لحظهٔ ثبت می‌بیند. شرطِ «فقط پس از ثبتِ نمرهٔ مدیر»
+    منابع انسانی را کور می‌کرد: دعوت می‌فرستاد و هیچ راهی نداشت بفهمد جواب گرفته
+    یا نه. کاملِ *شدنِ جدولِ مقایسه* چیزِ دیگری است و خودِ جدول نشانش می‌دهد.
+    """
     case = _case(client, db_session, finalize=False)
     client.post(
         f"/api/evaluations/{case['id']}/return",
@@ -480,24 +495,24 @@ def test_comparison_is_hr_only_and_appears_after_both_forms_are_submitted(
         headers=auth_header(case["employee"]),
     )
 
-    before_manager_submit = client.get(
-        f"/api/evaluations/{case['id']}", headers=auth_header(case["hr"])
-    ).json()
-    assert before_manager_submit["self_assessment"] is None
-
-    client.post(f"/api/evaluations/{case['id']}/submit", headers=auth_header(case["sup"]))
-    hr_detail = client.get(
-        f"/api/evaluations/{case['id']}", headers=auth_header(case["hr"])
-    ).json()
-    assert hr_detail["self_assessment"] is not None
-    assert len(hr_detail["self_assessment"]["scores"]) == 20
-    assert hr_detail["scores"][0]["score"] == 3
-
-    for actor in ("sup", "dep", "ceo"):
-        detail = client.get(
+    def detail(actor):
+        return client.get(
             f"/api/evaluations/{case['id']}", headers=auth_header(case[actor])
         ).json()
-        assert detail["self_assessment"] is None, actor
+
+    # پیش از ثبتِ نمرهٔ ارزیاب
+    hr_view = detail("hr")
+    assert hr_view["self_assessment"] is not None
+    assert len(hr_view["self_assessment"]["scores"]) == 20
+    for actor in ("sup", "dep", "ceo"):
+        assert detail(actor)["self_assessment"] is None, actor
+
+    # و پس از آن هم — این همان چیزی است که گاردِ زمانیِ قدیمی باز می‌کرد.
+    # نمره‌ها از پیش ثبت شده‌اند و `return` پاکشان نمی‌کند، پس فقط ثبتِ دوباره.
+    client.post(f"/api/evaluations/{case['id']}/submit", headers=auth_header(case["sup"]))
+    assert detail("hr")["scores"][0]["score"] == 3
+    for actor in ("sup", "dep", "ceo"):
+        assert detail(actor)["self_assessment"] is None, actor
 
 
 def test_a_case_without_a_self_assessment_is_perfectly_normal(client, db_session):
@@ -534,7 +549,12 @@ def test_the_self_assessment_is_locked_after_submission(client, db_session):
     assert "قابل تغییر نیست" in again.json()["detail"]
 
 
-def test_the_window_stays_open_after_the_evaluator_has_scored(client, db_session):
+def test_the_window_closes_once_the_evaluator_has_scored(client, db_session):
+    """خودارزیابی فقط تا پیش از قطعی‌شدنِ نمرهٔ ارزیاب معنا دارد.
+
+    بعد از آن دیگر «دیدگاه مستقل» نیست، واکنش به نمره است — و همین است که
+    مقایسهٔ دو دیدگاه را بی‌معنا می‌کند.
+    """
     case = _case(client, db_session, finalize=False)  # وضعیت: submitted
 
     r = client.post(
@@ -543,7 +563,8 @@ def test_the_window_stays_open_after_the_evaluator_has_scored(client, db_session
         headers=auth_header(case["employee"]),
     )
 
-    assert r.status_code == 200
+    assert r.status_code == 400
+    assert "پنجرهٔ خودارزیابی بسته است" in r.json()["detail"]
 
 
 def _self_assessment_notes(client, user):
@@ -587,9 +608,14 @@ def test_an_employee_cannot_self_assess_someone_elses_record(client, db_session)
 # ───────────────────────── پنجرهٔ خودارزیابی: پیوسته و یک‌جا تعریف‌شده
 
 
-def test_the_window_remains_open_during_approval_and_closes_at_finalization(
-    client, db_session
-):
+def test_the_window_does_not_reopen_after_hr_approval(client, db_session):
+    """پنجره ناپیوسته نیست.
+
+    `hr_approved` زمانی در فهرستِ بازها بود، چون مسیر «مدیر» مستقیماً از همان
+    وضعیت شروع می‌شد. آن رفتار برداشته شد ولی عضو ماند، و نتیجه‌اش پنجره‌ای بود
+    که بعد از ثبتِ نمرهٔ ارزیاب *و* تأیید منابع انسانی دوباره باز می‌شد — دقیقاً
+    همان چیزی که قرار بود ممکن نباشد.
+    """
     case = _case(client, db_session, finalize=False)  # وضعیت: submitted
     client.post(f"/api/evaluations/{case['id']}/hr-approve", headers=auth_header(case["hr"]))
 
@@ -599,26 +625,16 @@ def test_the_window_remains_open_during_approval_and_closes_at_finalization(
         headers=auth_header(case["employee"]),
     )
 
-    assert r.status_code == 200
-
-    finalized = _case(client, db_session, finalize=True)
-    closed = client.post(
-        f"/api/me/evaluations/{finalized['id']}/self-assessment",
-        json=_indicator_payload(db_session, 5),
-        headers=auth_header(finalized["employee"]),
-    )
-    assert closed.status_code == 400
-    assert "نهایی شده" in closed.json()["detail"]
+    assert r.status_code == 400
+    assert "پنجرهٔ خودارزیابی بسته است" in r.json()["detail"]
 
 
 def test_the_open_case_says_whether_the_window_is_open(client, db_session):
     """تعریفِ پنجره یک جا بیشتر نیست؛ فرانت آن را از سرور می‌گیرد نه از کپیِ دستی."""
     case = _case(client, db_session, finalize=False)  # وضعیت: submitted
 
-    open_after_scoring = client.get(
-        "/api/me/evaluations/open", headers=auth_header(case["employee"])
-    ).json()
-    assert open_after_scoring[0]["self_assessment_open"] is True
+    closed = client.get("/api/me/evaluations/open", headers=auth_header(case["employee"])).json()
+    assert closed[0]["self_assessment_open"] is False
 
     client.post(
         f"/api/evaluations/{case['id']}/return",

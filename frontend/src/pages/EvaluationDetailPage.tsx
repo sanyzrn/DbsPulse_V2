@@ -15,6 +15,7 @@ import { PdfDownloadButton } from "../components/PdfDownloadButton";
 import { HrOwnerBar, HrRecoveryBox } from "../components/HrRecoveryBox";
 import { ObjectionPanel } from "../components/ObjectionPanel";
 import { SelfAssessmentPanel } from "../components/SelfAssessmentPanel";
+import { SubmissionDeadlineBar } from "../components/SubmissionDeadlineBar";
 import { ScoreFormTable, computePreview, scoredRows, useScoreForm } from "../components/ScoreForm";
 import { StatusBadge } from "../components/StatusBadge";
 import { WorkflowStepper } from "../components/WorkflowStepper";
@@ -491,7 +492,16 @@ export function EvaluationDetailPage() {
         <ReturnBox evaluationId={evaluation.id} onReturned={load} />
       )}
 
-      {/* دیدگاه خودِ فرد، کنار امتیاز ارزیاب — برای دیدن اختلاف‌ها، نه میانگین‌گیری */}
+      {/* مهلتِ ثبت — و تمدیدش، اگر گذشته باشد و منابع انسانی صلاح بداند */}
+      <SubmissionDeadlineBar
+        evaluation={evaluation}
+        isHr={user.role === "hr"}
+        onChanged={load}
+      />
+
+      {/* دیدگاه خودِ فرد، کنار امتیاز ارزیاب.
+          سرور آن را فقط برای منابع انسانی می‌فرستد؛ برای بقیه `null` است و این
+          پنل خودش را نشان نمی‌دهد. محرمانگی سمت سرور است، نه این‌جا. */}
       <SelfAssessmentPanel evaluation={evaluation} indicators={indicators} />
 
       {/* اعتراض ثبت‌شدهٔ کارمند + پاسخ منابع انسانی */}

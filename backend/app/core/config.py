@@ -1,15 +1,19 @@
 from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+_INSECURE_DEFAULT_JWT_SECRET = "change-this-to-a-long-random-string"
+
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
 
     environment: str = "development"
-    # اطلاعات اتصال و کلید امضا نباید حتی به‌عنوان مقدار توسعه داخل سورس باشند.
-    # توسعه، تست و production همگی باید آن‌ها را از محیط یا فایل .env بگیرند.
-    database_url: str
-    jwt_secret_key: str
+    # پیش‌فرضِ توسعه، عمداً برگشت. نبودنش یعنی هیچ ابزاری بدونِ متغیرِ محیطی بالا
+    # نمی‌آید — نه `alembic`، نه راه‌انداز، نه یک اجرای ساده برای دیدنِ خطا. گاردِ
+    # واقعی پایین‌تر است: در `production` هم کلیدِ پیش‌فرض و هم کلیدِ کوتاه رد
+    # می‌شوند، که همان چیزی را می‌گیرد که این تغییر می‌خواست بگیرد.
+    database_url: str = "postgresql+psycopg://dbspulse:dbspulse_dev_password@localhost:5432/dbspulse"
+    jwt_secret_key: str = _INSECURE_DEFAULT_JWT_SECRET
     jwt_algorithm: str = "HS256"
     access_token_expire_minutes: int = 30
     refresh_token_expire_days: int = 7
@@ -145,10 +149,13 @@ class Settings(BaseSettings):
 
     @model_validator(mode="after")
     def _forbid_insecure_secret_in_production(self) -> "Settings":
-        if self.environment == "production" and len(self.jwt_secret_key.strip()) < 32:
+        if self.environment == "production" and (
+            self.jwt_secret_key == _INSECURE_DEFAULT_JWT_SECRET
+            or len(self.jwt_secret_key.strip()) < 32
+        ):
             raise RuntimeError(
-                "JWT_SECRET_KEY برای محیط production کوتاه و ناامن است؛ یک مقدار تصادفی "
-                "با حداقل ۳۲ نویسه در متغیر محیطی تنظیم کنید."
+                "JWT_SECRET_KEY برای محیط production امن نیست (مقدار پیش‌فرض یا کوتاه‌تر از "
+                "۳۲ نویسه). یک مقدار تصادفی و طولانی در متغیر محیطی تنظیم کنید."
             )
         return self
 

@@ -1,8 +1,46 @@
-"""قواعد ارزیابی ۱۸۰ درجه: خودارزیابی مستقل در کنار ارزیابی مدیر.
+"""خودارزیابی (ارزیابی ۱۸۰ درجه): چه کسی دارد، چه کسی می‌بیند، و دعوت به انجامش.
 
-هر دو فرم هم‌زمان باز می‌شوند و هرکدام پس از ثبت قفل می‌شود. خودارزیابی
-اختیاری و غیرمسدودکننده است، مدیران آن را نمی‌بینند و جدول مقایسه تنها پس از
-ثبت هر دو دیدگاه در اختیار منابع انسانی قرار می‌گیرد.
+سه قاعده که منابع انسانی تعیین کرده و این ماژول تنها جای اعمالشان است.
+
+۱. چه کسی خودارزیابی دارد — قاعده‌ای زنجیره‌محور، نه نقش‌محور
+--------------------------------------------------------------
+هر کسی که *موضوعِ* یک پروندهٔ ارزیابی است، مگر مدیرعامل و معاونت‌ها.
+
+فهرستِ *منفی* است و نه مثبت، و این عمدی است: با فهرستِ مثبت، هر نقشِ تازه‌ای که
+روزی اضافه شود بی‌صدا خودارزیابی‌اش را از دست می‌دهد و کسی خبردار نمی‌شود.
+
+۲. چه کسی می‌بیند — فقط خودِ فرد و منابع انسانی
+-----------------------------------------------
+مدیر مستقیم، معاونت و مدیرعامل هیچ‌وقت. نه پیش از ثبتِ نمره‌شان، نه پس از آن.
+
+پیش از این سه سوییچِ پنل مدیریت بود (پیش‌فرض خاموش) به‌علاوهٔ یک گاردِ زمانی.
+هر دو برداشته شدند: به کارمند گفته می‌شود «فقط شما و منابع انسانی»، و سوییچی که
+یک نفر می‌تواند بی‌سروصدا روشنش کند، آن جمله را به یک تنظیم تبدیل می‌کند نه یک
+تضمین.
+
+بهایش را می‌دانیم و پذیرفته‌ایم: گفت‌وگو دربارهٔ فاصلهٔ دو دیدگاه — که در ادبیاتِ
+ارزیابیِ ۱۸۰ درجه فایدهٔ اصلی روش است — از مسیرِ مدیر مستقیم حذف می‌شود.
+
+۳. پنجره: فقط `draft`، به‌علاوهٔ مهلتِ دوره
+--------------------------------------------
+خودارزیابی تا پیش از قطعی‌شدنِ نمرهٔ ارزیاب معنا دارد. بعد از آن دیگر «دیدگاهِ
+مستقل» نیست، واکنش به نمره است — و کلِ ارزشِ جدولِ مقایسه به همین استقلال بند
+است. مهلتِ تاریخیِ دوره یک شرطِ *دوم* است که به این اضافه می‌شود، نه جایگزینش
+(`services/evaluation_window.py`).
+
+دعوت، و اینکه چرا مسدودکننده نیست
+---------------------------------
+خودارزیابی از قبل کار می‌کرد ولی هیچ‌کس خبر نداشت؛ «اختیاری» با «کسی خبرش نکرده»
+یکی نیست. پس منابع انسانی از فهرست پرسنل دعوت می‌فرستد و می‌تواند تکرارش کند.
+
+مسدودکننده نشد چون یک کارمندِ در مرخصی کلِ چرخهٔ ارزیابی سازمان را متوقف می‌کرد
+— همان بن‌بستی که یک بار از گردش‌کار حذف شد. به‌جایش مهلتِ واقعی گذاشته شد.
+
+اعلانِ خودکار عمداً نیست
+------------------------
+هنگام باز شدنِ پرونده هیچ اعلانی نمی‌رود. تصمیمِ صریحِ منابع انسانی است: هیچ
+پیامی نباید به فرد بگوید پرونده‌اش در حال بررسی است. تنها اعلان، همین دعوتِ
+دستیِ خودارزیابی است و متنش هم فقط دربارهٔ خودِ خودارزیابی حرف می‌زند.
 """
 from __future__ import annotations
 
@@ -17,23 +55,42 @@ from app.models.evaluation import EvaluationRecord
 from app.models.personnel import Personnel
 from app.models.user import User
 from app.services.audit import log_event
-from app.services.evaluation_window import record_accepts_entries, require_record_window
+from app.services.evaluation_window import ensure_open as ensure_submission_window_open
+from app.services.evaluation_window import record_accepts_entries
 from app.services.notifications import notify
 
-OPEN_STATUSES = frozenset(
-    {
-        EvaluationStatus.draft,
-        EvaluationStatus.submitted,
-        EvaluationStatus.hr_approved,
-        EvaluationStatus.deputy_approved,
-    }
-)
+#: پنجرهٔ وضعیتیِ خودارزیابی — فقط `draft`.
+#:
+#: بازکردنش تا مرحله‌های بعد وسوسه‌انگیز است («چرا فرصت را کوتاه کنیم؟») ولی
+#: استقلالِ دو دیدگاه را از بین می‌برد: پس از `submit` نمرهٔ ارزیاب قفل شده و هر
+#: چیزی که فرد بعد از آن ثبت کند، دیگر دیدگاهِ مستقل نیست.
+#:
+#: `hr_approved` یک بار به‌اشتباه این‌جا بود و پنجره را ناپیوسته می‌کرد: باز در
+#: `draft`، بسته در `submitted`، و دوباره باز در `hr_approved` — یعنی درست بعد
+#: از آن‌که نمرهٔ ارزیاب ثبت *و* تأیید شده بود.
+OPEN_STATUSES = frozenset({EvaluationStatus.draft})
 
-# مطابق سیاست این سازمان فقط مدیرعامل و معاونت‌ها مشمول نیستند.
-ELIGIBLE_ROLES = frozenset(
-    {UserRole.employee, UserRole.unit_supervisor, UserRole.hr, UserRole.support}
-)
+#: نقش‌هایی که خودارزیابی ندارند — قاعدهٔ منابع انسانی: «همه، به‌جز مدیرعامل و
+#: معاونت‌ها». فهرستِ منفی، تا نقشِ تازه بی‌صدا از قلم نیفتد.
+EXCLUDED_ROLES = frozenset({UserRole.ceo, UserRole.deputy})
 
+#: نقش‌هایی که خودارزیابیِ *دیگران* را می‌بینند. خودِ فرد از مسیرِ `/api/me` به
+#: خودارزیابیِ خودش می‌رسد و این مجموعه دربارهٔ او حرف نمی‌زند.
+VIEWER_ROLES = frozenset({UserRole.hr})
+
+
+def may_self_assess(role: UserRole) -> bool:
+    """آیا این نقش اصلاً خودارزیابی دارد؟
+
+    شرطِ لازم است نه کافی: فرد باید موضوعِ همان پرونده هم باشد، که مسیرهای
+    `/api/me` جداگانه می‌سنجند.
+    """
+    return role not in EXCLUDED_ROLES
+
+
+#: حالت‌هایی که رابط باید از هم جدا نشان بدهد. رشته و نه بولین: «دعوت نشده» و
+#: «دعوت شده ولی انجام نداده» و «پرونده‌ای نیست» سه چیز متفاوت‌اند و هر سه به
+#: کنشِ متفاوتی می‌رسند.
 STATE_NO_CASE = "no_case"
 STATE_NO_ACCOUNT = "no_account"
 STATE_NOT_ELIGIBLE = "not_eligible"
@@ -44,12 +101,20 @@ STATE_SUBMITTED = "submitted"
 
 
 def may_view(record: EvaluationRecord, role: UserRole) -> bool:
-    """مقایسه فقط برای HR و پس از قفل‌شدن ارزیابی مدیر قابل مشاهده است."""
-    return (
-        role == UserRole.hr
-        and record.self_assessment_submitted_at is not None
-        and record.status != EvaluationStatus.draft
-    )
+    """آیا این نقش می‌تواند خودارزیابیِ این پرونده را ببیند؟
+
+    فقط منابع انسانی. نه مدیر مستقیم، نه معاونت، نه مدیرعامل — و نه پیش از ثبتِ
+    نمره‌شان و نه پس از آن.
+
+    شرطِ «فقط پس از خروج از `draft`» عمداً این‌جا نیست. منابع انسانی باید بتواند
+    همان لحظه ببیند که خودارزیابی رسیده — وگرنه دعوت می‌فرستد و هیچ راهی ندارد
+    بفهمد جواب گرفته یا نه. کاملِ *شدنِ جدولِ مقایسه* به ثبتِ هر دو طرف بند است،
+    که خودِ جدول نشانش می‌دهد؛ آن یک چیزِ دیگر است.
+
+    `record` در امضا مانده چون قاعده ممکن است دوباره پرونده‌محور شود؛ حذفش یعنی
+    همهٔ فراخوان‌ها باید عوض شوند تا برگردد.
+    """
+    return role in VIEWER_ROLES
 
 
 def open_record_for(db: Session, personnel_id: int) -> EvaluationRecord | None:
@@ -72,7 +137,7 @@ def state_of(
         return STATE_NO_CASE
     if account_role is None:
         return STATE_NO_ACCOUNT
-    if account_role not in ELIGIBLE_ROLES:
+    if not may_self_assess(account_role):
         return STATE_NOT_ELIGIBLE
     if record.self_assessment_submitted_at is not None:
         return STATE_SUBMITTED
@@ -125,7 +190,7 @@ def invite(db: Session, personnel: Personnel, actor_user_id: int) -> EvaluationR
                 "ابتدا از همین صفحه برایش حساب بسازید."
             ),
         )
-    if account.role not in ELIGIBLE_ROLES:
+    if not may_self_assess(account.role):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="مدیرعامل و معاونت‌ها در این دوره مشمول خودارزیابی نیستند",
@@ -145,7 +210,8 @@ def invite(db: Session, personnel: Personnel, actor_user_id: int) -> EvaluationR
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="این فرد خودارزیابی‌اش را قبلاً ثبت کرده است",
         )
-    require_record_window(db, record)
+    # دعوت‌کردن به کاری که مهلتش گذشته، فقط کاربر را سرِ دواندن است.
+    ensure_submission_window_open(db, record, "خودارزیابی")
 
     _deliver_invitation(
         db,

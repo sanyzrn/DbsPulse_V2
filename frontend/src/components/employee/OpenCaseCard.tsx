@@ -67,9 +67,12 @@ export function OpenCaseCard({
           امتیازها تا پیش از تأیید نهایی قطعی نیستند و نمایش داده نمی‌شوند.
         </p>
 
-        {item.period_ends_on && (
+        {/* مهلتِ واقعی، نه `period_ends_on`: ممکن است منابع انسانی برای همین
+            پرونده تمدید کرده باشد و آن‌وقت تاریخِ دوره حرفِ درستی نمی‌زند. */}
+        {item.submission_deadline && (
           <p className="mt-2 text-xs text-gray-500">
-            مهلت ثبت این دوره: {formatDate(item.period_ends_on)}
+            مهلت ثبت این دوره: {formatDate(item.submission_deadline)}
+            {item.submission_deadline_extended ? " (تمدیدشده)" : ""}
           </p>
         )}
 
@@ -77,21 +80,28 @@ export function OpenCaseCard({
           <ReadonlySelfAssessment evaluationId={item.id} fallback={submitted} />
         ) : canSelfAssess && !showForm ? (
           <div className="mt-3 rounded-xl border border-dashed border-gray-300 bg-gray-50/60 p-3">
+            {/* «تا پیش از نهایی‌شدن پرونده» وعده‌ای بود که سرور نگهش نمی‌داشت:
+                پنجره با ثبتِ نمرهٔ ارزیاب بسته می‌شود، نه در تأیید نهایی. */}
             <p className="text-sm text-gray-700">
-              می‌توانید تا پیش از نهایی‌شدن پرونده، دیدگاه مستقل خودتان را ثبت کنید.
+              می‌توانید تا پیش از ثبتِ نمرهٔ ارزیاب، دیدگاه مستقل خودتان را ثبت کنید.
             </p>
             <p className="mt-1 text-xs text-gray-500">
-              در محاسبهٔ امتیاز نهایی وارد نمی‌شود و مدیران آن را نمی‌بینند. فقط منابع
-              انسانی پس از ثبت هر دو ارزیابی، جدول مقایسه را می‌بیند. ثبت برای همان دوره
-              یک‌بار انجام می‌شود و قابل ویرایش نیست.
+              در محاسبهٔ امتیاز نهایی وارد نمی‌شود. آن را فقط خودتان و منابع انسانی
+              می‌بینید — مسئول مستقیم، معاونت و مدیرعامل به آن دسترسی ندارند. یک‌بار
+              ثبت می‌شود و قابل ویرایش نیست.
             </p>
             <Button className="mt-3" onClick={() => setShowForm(true)}>
               ثبت خودارزیابی
             </Button>
           </div>
         ) : selfAssessmentEnabled ? (
+          /* گفتنِ خودِ تاریخ لازم است: «مهلت پایان یافته» بی‌تاریخ، به فرد
+             نمی‌گوید چقدر دیر کرده یا اصلاً مهلت کِی بوده. */
           <p className="mt-3 rounded-xl bg-amber-50 px-3 py-2 text-sm text-amber-800">
-            مهلت خودارزیابی پایان یافته است. در صورت نیاز، منابع انسانی می‌تواند بازه را تمدید کند.
+            {item.submission_deadline
+              ? `مهلت ثبت خودارزیابی این دوره (${formatDate(item.submission_deadline)}) گذشته است.`
+              : "پنجرهٔ ثبت خودارزیابی این پرونده بسته است."}{" "}
+            اگر دلیل موجهی دارید، منابع انسانی می‌تواند مهلت این پرونده را تمدید کند.
           </p>
         ) : null}
 

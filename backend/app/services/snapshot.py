@@ -14,7 +14,7 @@ from app.models.self_assessment import SelfAssessmentScore
 from app.models.user import User
 from app.services.workflow import is_manager_path
 
-# ۴: افزودن خودارزیابی و جدول مقایسهٔ مدیر/فرد.
+# ۴: افزودن `self_assessment` — برگهٔ مقایسهٔ «خود فرد / مسئول مستقیم» داخل سند.
 # ۳: افزودن `single_decider` — نمره‌دهندهٔ اول و تأییدکنندهٔ نهایی یک نفر بوده‌اند.
 # ۲: افزودن امتیاز ویژه (`bonus_points` / `bonus_reason` / `base_weighted_pct`).
 # افزودنی است، پس قالب PDF هر دو نسخه را رندر می‌کند: در snapshot نسخهٔ ۱ این
@@ -40,27 +40,6 @@ def build_final_snapshot(db: Session, record: EvaluationRecord) -> dict:
         select(EvaluationComment).where(EvaluationComment.evaluation_record_id == record.id)
     ).all()
     indicators_by_id = {i.id: i for i in db.scalars(select(Indicator))}
-    self_by_indicator = {row.indicator_id: row for row in self_scores}
-
-    def indicator_data(indicator_id: int) -> tuple[str, str, str]:
-        indicator = indicators_by_id.get(indicator_id)
-        if indicator is None:
-            return "—", "(شاخص حذف‌شده)", "general"
-        return indicator.category, indicator.description, indicator.section.value
-
-    def comparison_row(score: EvaluationScore) -> dict:
-        self_row = self_by_indicator.get(score.indicator_id)
-        category, description, section = indicator_data(score.indicator_id)
-        return {
-            "indicator_id": score.indicator_id,
-            "category": category,
-            "description": description,
-            "section": section,
-            "manager_score": score.score,
-            "self_score": self_row.score if self_row else None,
-            "gap": score.score - self_row.score if self_row else None,
-            "self_note": self_row.note if self_row else None,
-        }
 
     manager_path = is_manager_path(record)
     evaluator_user_id = record.deputy_user_id if manager_path else record.unit_supervisor_user_id
@@ -81,6 +60,13 @@ def build_final_snapshot(db: Session, record: EvaluationRecord) -> dict:
         # اگر نمره‌دهندهٔ اول و تأییدکنندهٔ نهایی یک نفر بوده‌اند، سند باید همین
         # را بگوید. دو تأیید در لاگ، بدون این جمله، دو بررسی مستقل به‌نظر می‌رسد.
         "single_decider": record.single_decider,
+        # برگهٔ مقایسه — دیدگاه خودِ فرد کنار نمرهٔ ارزیاب، در همان سندی که
+        # قطعی می‌شود. `None` یعنی خودارزیابی ثبت نشده، که کاملاً مجاز است؛
+        # قالب در آن حالت اصلاً این بخش را چاپ نمی‌کند.
+        #
+        # عمداً در snapshot می‌نشیند و نه به‌صورت query در لحظهٔ چاپ: سند نهایی
+        # باید همان چیزی را نشان بدهد که در لحظهٔ نهایی‌شدن بوده.
+        "self_assessment": _self_assessment_block(record, self_scores, scores, indicators_by_id),
         "evaluation_started_at": record.created_at.isoformat(),
         "evaluation_code": record.evaluation_code,
         "general_score_pct": float(record.general_score_pct)
@@ -114,26 +100,6 @@ def build_final_snapshot(db: Session, record: EvaluationRecord) -> dict:
             }
             for s in scores
         ],
-        "self_assessment": (
-            {
-                "submitted_at": record.self_assessment_submitted_at.isoformat(),
-                "note": record.self_assessment_note,
-                "scores": [
-                    {
-                        "indicator_id": row.indicator_id,
-                        "category": indicator_data(row.indicator_id)[0],
-                        "description": indicator_data(row.indicator_id)[1],
-                        "section": indicator_data(row.indicator_id)[2],
-                        "score": row.score,
-                        "note": row.note,
-                    }
-                    for row in self_scores
-                ],
-            }
-            if record.self_assessment_submitted_at is not None
-            else None
-        ),
-        "score_comparison": [comparison_row(score) for score in scores],
         "comments": [
             {
                 "stage": c.stage.value,
@@ -143,4 +109,47 @@ def build_final_snapshot(db: Session, record: EvaluationRecord) -> dict:
             for c in comments
         ],
         "finalized_at": record.finalized_at.isoformat() if record.finalized_at else None,
+    }
+
+
+def _self_assessment_block(
+    record: EvaluationRecord,
+    self_scores: list[SelfAssessmentScore],
+    evaluator_scores: list[EvaluationScore],
+    indicators_by_id: dict[int, Indicator],
+) -> dict | None:
+    """دیدگاه خودِ فرد، به شکلی که کنار نمرهٔ ارزیاب چاپ شود.
+
+    ردیف‌ها بر اساس *بزرگیِ اختلاف* مرتب می‌شوند، نه شمارهٔ شاخص: جایی که فرد ۵
+    داده و ارزیاب ۲، همان جایی است که خواندنش ارزش دارد. `gap` از پیش حساب
+    می‌شود تا قالب هیچ محاسبه‌ای نکند.
+
+    مبنا *خودارزیابی* است و نه نمره‌های ارزیاب: شاخصی که فرد به آن نمره داده و
+    ارزیاب هنوز نداده، باید در برگه بماند — حذفش یعنی سند، حرفِ خودِ فرد را
+    بی‌صدا انداخته است.
+    """
+    if record.self_assessment_submitted_at is None:
+        return None
+
+    evaluator_by_indicator = {row.indicator_id: row.score for row in evaluator_scores}
+    rows = []
+    for entry in self_scores:
+        indicator = indicators_by_id.get(entry.indicator_id)
+        evaluator_score = evaluator_by_indicator.get(entry.indicator_id)
+        rows.append(
+            {
+                "indicator_id": entry.indicator_id,
+                "category": indicator.category if indicator else "—",
+                "description": indicator.description if indicator else "(شاخص حذف‌شده)",
+                "self_score": entry.score,
+                "evaluator_score": evaluator_score,
+                "gap": None if evaluator_score is None else entry.score - evaluator_score,
+                "note": entry.note,
+            }
+        )
+    rows.sort(key=lambda row: abs(row["gap"] or 0), reverse=True)
+    return {
+        "submitted_at": record.self_assessment_submitted_at.isoformat(),
+        "note": record.self_assessment_note,
+        "rows": rows,
     }

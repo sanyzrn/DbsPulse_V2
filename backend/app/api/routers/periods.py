@@ -26,7 +26,6 @@ from app.schemas.period import (
 )
 from app.services.audit import log_event
 from app.services.bulk_evaluation import BulkOutcome, CohortFilter, execute, plan, summarise
-from app.services.evaluation_window import require_active_period
 from app.services.notifications import notify
 from app.services.workflow import IS_OPEN_RECORD
 
@@ -369,7 +368,6 @@ def preview_bulk_create(
     نفر کاری است که برگرداندنش دستی و پرزحمت است، پس باید بشود پیش از انجامش
     دیدش.
     """
-    require_active_period(db)
     return _to_result(plan(db, _to_cohort(payload)), dry_run=True)
 
 

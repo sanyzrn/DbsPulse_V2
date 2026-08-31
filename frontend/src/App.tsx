@@ -265,7 +265,7 @@ function App() {
               <Route path="/executive" element={<ExecutivePage />} />
             </Route>
 
-            <Route element={<ProtectedRoute allowedRoles={["employee"]} />}>
+            <Route element={<ProtectedRoute allowedRoles={["employee", "unit_supervisor", "hr", "support"]} />}>
               <Route path="/me" element={<MyEvaluationsPage />} />
             </Route>
           </Route>

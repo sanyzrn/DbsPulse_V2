@@ -2,7 +2,8 @@ import { useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { motion } from "motion/react";
 import { apiClient, extractErrorMessage } from "../../api/client";
-import { useMyEvaluations, useMyImprovementPlans, useMyOpenEvaluations } from "../../api/queries";
+import { useIndicators, useMyEvaluations, useMyImprovementPlans, useMyOpenEvaluations, useMySelfAssessments } from "../../api/queries";
+import { useAuth } from "../../auth/AuthContext";
 import { usePermissions } from "../../auth/PermissionsContext";
 import { OpenCaseCard } from "../../components/employee/OpenCaseCard";
 import { useConfirm } from "../../components/ConfirmDialog";
@@ -13,7 +14,7 @@ import { Button } from "../../ui/Button";
 import { Card, EmptyState, PageHeader } from "../../ui/Card";
 import { PctBadge, PctBar, ScoreRing } from "../../ui/Meters";
 import { formatDate, formatDateTime } from "../../utils/dates";
-import type { ImprovementPlanDetail, MyEvaluation } from "../../types";
+import type { ImprovementPlanDetail, MyEvaluation, MySelfAssessment } from "../../types";
 
 function MyEvaluationCard({
   item,
@@ -306,46 +307,113 @@ function MyPlanCard({ plan, index }: { plan: ImprovementPlanDetail; index: numbe
   );
 }
 
+function SelfAssessmentHistoryCard({ item }: { item: MySelfAssessment }) {
+  const { data: indicators = [] } = useIndicators({ includeInactive: true });
+  const byId = new Map(indicators.map((indicator) => [indicator.id, indicator]));
+  return (
+    <Card
+      title={item.period_name ?? `پرونده ${item.evaluation_code}`}
+      actions={
+        <span className="rounded-full bg-green-50 px-3 py-1 text-xs font-medium text-green-700">
+          ثبت نهایی — {formatDateTime(item.submitted_at)}
+        </span>
+      }
+    >
+      {item.note && <p className="mb-3 text-sm text-gray-700">{item.note}</p>}
+      <div className="space-y-2">
+        {item.scores.map((row) => (
+          <div key={row.indicator_id} className="flex items-start justify-between gap-3 rounded-xl bg-gray-50 px-3 py-2 text-sm">
+            <div>
+              <p className="text-gray-800">{byId.get(row.indicator_id)?.description ?? `شاخص ${row.indicator_id}`}</p>
+              {row.note && <p className="mt-0.5 text-xs text-gray-500">{row.note}</p>}
+            </div>
+            <span className="shrink-0 font-bold text-pulse-700">{row.score.toLocaleString("fa-IR")} از ۵</span>
+          </div>
+        ))}
+      </div>
+      <p className="mt-3 text-xs text-gray-500">این خودارزیابی قفل شده و قابل ویرایش نیست.</p>
+    </Card>
+  );
+}
+
 export function MyEvaluationsPage() {
+  const { user } = useAuth();
   const { moduleEnabled, loading: permissionsLoading } = usePermissions();
   // تا قبل از رسیدن تنظیمات، هیچ بخش اختیاری چشمک نمی‌زند. پیش‌فرض ماژول‌ها
   // برای این صفحه عمداً خاموش است، پس «نامعلوم» نباید به‌اشتباه «روشن» دیده شود.
   const showOverview = !permissionsLoading && moduleEnabled("employee_overview_cards");
-  const showEvaluationDetails =
-    !permissionsLoading && moduleEnabled("employee_evaluation_visibility");
+  const showEvaluationDetails = !permissionsLoading && (
+    moduleEnabled("employee_evaluation_visibility") || user?.role === "unit_supervisor"
+  );
+  const showSelfAssessment = !permissionsLoading && moduleEnabled("self_assessment");
+  const showOpenCases = showEvaluationDetails || showSelfAssessment;
   const showAcknowledgement =
     showEvaluationDetails && moduleEnabled("employee_result_acknowledgement");
   const showObjections = showEvaluationDetails && moduleEnabled("objections");
   const { data, isPending, error } = useMyEvaluations(showEvaluationDetails);
   const { data: plans = [], error: plansError } = useMyImprovementPlans();
-  const { data: openCases = [] } = useMyOpenEvaluations(showEvaluationDetails);
+  const { data: openCases = [] } = useMyOpenEvaluations(showOpenCases);
+  const { data: selfAssessments = [], error: selfAssessmentsError } = useMySelfAssessments(showSelfAssessment);
+  const [tab, setTab] = useState<"self" | "results">("self");
+  const openIds = new Set(openCases.map((item) => item.id));
+  const selfHistory = selfAssessments.filter((item) => !openIds.has(item.evaluation_id));
 
   return (
     <div className="space-y-4">
       <PageHeader
-        title="کارنامه من"
-        subtitle="نتایج نهایی‌شدهٔ ارزیابی عملکرد شما. ثبت مشاهده یعنی نتیجه را دیده‌اید — نه اینکه آن را پذیرفته‌اید."
+        title="خودارزیابی و کارنامه من"
+        subtitle="دیدگاه خودتان را برای دورهٔ جاری ثبت کنید و نتایج نهایی‌شدهٔ دوره‌های گذشته را ببینید."
       />
       {showOverview && <RoleOverviewCards />}
 
-      {/* پروندهٔ در جریان بالاتر از نتایج گذشته می‌آید: مهم‌ترین چیزی که فرد
-          همین حالا باید بداند، این است که تصمیمی دربارهٔ او در راه است. */}
-      {showEvaluationDetails && openCases.map((item, i) => (
-        <OpenCaseCard key={item.id} item={item} index={i} />
-      ))}
+      <div className="inline-flex rounded-xl border border-gray-200 bg-gray-100 p-1" role="tablist" aria-label="بخش‌های شخصی ارزیابی">
+        <button
+          type="button"
+          role="tab"
+          aria-selected={tab === "self"}
+          onClick={() => setTab("self")}
+          className={`rounded-lg px-5 py-2 text-sm font-medium ${tab === "self" ? "bg-white text-gray-900 shadow-sm" : "text-gray-500"}`}
+        >
+          خودارزیابی
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={tab === "results"}
+          onClick={() => setTab("results")}
+          className={`rounded-lg px-5 py-2 text-sm font-medium ${tab === "results" ? "bg-white text-gray-900 shadow-sm" : "text-gray-500"}`}
+        >
+          کارنامه من
+        </button>
+      </div>
 
-      {plansError != null && (
+      {tab === "self" && (
+        <div className="space-y-4" role="tabpanel">
+          {showOpenCases && openCases.map((item, i) => (
+            <OpenCaseCard key={item.id} item={item} index={i} selfAssessmentEnabled={showSelfAssessment} />
+          ))}
+          {selfAssessmentsError != null && (
+            <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">{extractErrorMessage(selfAssessmentsError)}</p>
+          )}
+          {selfHistory.map((item) => <SelfAssessmentHistoryCard key={item.evaluation_id} item={item} />)}
+          {!permissionsLoading && openCases.length === 0 && selfHistory.length === 0 && (
+            <Card><EmptyState>هنوز خودارزیابی‌ای برای شما فعال یا ثبت نشده است.</EmptyState></Card>
+          )}
+        </div>
+      )}
+
+      {tab === "results" && plansError != null && (
         <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">
           {extractErrorMessage(plansError)}
         </p>
       )}
-      {plans.map((plan, i) => (
+      {tab === "results" && plans.map((plan, i) => (
         <MyPlanCard key={plan.id} plan={plan} index={i} />
       ))}
       {/* همهٔ بخش‌های این صفحه به ماژول‌های اختیاری گره خورده‌اند؛ وقتی هیچ‌کدام
           روشن نیست و برنامهٔ بهبودی هم وجود ندارد، صفحهٔ کاملاً خالی چیزی شبیه
           خرابیِ سامانه خوانده می‌شود — یک جملهٔ آرام بهتر از سکوت است. */}
-      {!permissionsLoading && !showEvaluationDetails && plans.length === 0 && plansError == null && (
+      {tab === "results" && !permissionsLoading && !showEvaluationDetails && plans.length === 0 && plansError == null && (
         <Card>
           <EmptyState>
             نمایش جزئیات کارنامه در این سازمان فعال نشده است. اگر فکر می‌کنید باید نتیجهٔ
@@ -353,22 +421,22 @@ export function MyEvaluationsPage() {
           </EmptyState>
         </Card>
       )}
-      {showEvaluationDetails && error != null && (
+      {tab === "results" && showEvaluationDetails && error != null && (
         <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">{extractErrorMessage(error)}</p>
       )}
-      {showEvaluationDetails && isPending && (
+      {tab === "results" && showEvaluationDetails && isPending && (
         <div className="space-y-4">
           {[0, 1].map((i) => (
             <div key={i} className="skeleton h-32" />
           ))}
         </div>
       )}
-      {showEvaluationDetails && data && data.items.length === 0 && (
+      {tab === "results" && showEvaluationDetails && data && data.items.length === 0 && (
         <Card>
           <EmptyState>هنوز ارزیابی نهایی‌شده‌ای برای شما ثبت نشده است.</EmptyState>
         </Card>
       )}
-      {showEvaluationDetails && data?.items.map((item, i) => (
+      {tab === "results" && showEvaluationDetails && data?.items.map((item, i) => (
         <MyEvaluationCard
           key={item.id}
           item={item}

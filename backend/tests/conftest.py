@@ -13,6 +13,7 @@ os.environ.setdefault("ENABLE_SCHEDULER", "false")
 os.environ.setdefault("BOOTSTRAP_ADMIN", "false")
 
 import subprocess
+from datetime import date, timedelta
 from pathlib import Path
 
 import pytest
@@ -44,6 +45,33 @@ def db_session():
     outer_transaction.rollback()
     connection.close()
     engine.dispose()
+
+
+@pytest.fixture(autouse=True)
+def _active_evaluation_period(request):
+    """پیش‌فرض تست‌ها همان محیط عملیاتی است: یک بازهٔ فعال HR وجود دارد.
+
+    تست‌های خودِ دوره این fixture را نمی‌گیرند تا ساخت/نبودن دوره را مستقل بسنجند.
+    """
+    if request.path.name == "test_periods.py" or "db_session" not in request.fixturenames:
+        yield
+        return
+
+    from app.models.enums import PeriodStatus
+    from app.models.evaluation_period import EvaluationPeriod
+
+    db_session = request.getfixturevalue("db_session")
+    today = date.today()
+    db_session.add(
+        EvaluationPeriod(
+            name=f"دوره پیش‌فرض تست {request.node.name}",
+            starts_on=today - timedelta(days=30),
+            ends_on=today + timedelta(days=30),
+            status=PeriodStatus.open,
+        )
+    )
+    db_session.flush()
+    yield
 
 
 @pytest.fixture(autouse=True)

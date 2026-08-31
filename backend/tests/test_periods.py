@@ -1,11 +1,18 @@
 """تست‌های دوره‌های (کمپین) ارزیابی: تک‌دوره باز، برچسب خودکار، پیشرفت و بستن."""
+from datetime import date, timedelta
+
 from tests.helpers import auth_header, make_access, make_personnel, make_user
 
 
 def _create_period(client, hr, name="دوره آزمون") -> dict:
+    today = date.today()
     r = client.post(
         "/api/periods",
-        json={"name": name, "starts_on": "2026-07-01", "ends_on": "2026-09-30"},
+        json={
+            "name": name,
+            "starts_on": str(today - timedelta(days=30)),
+            "ends_on": str(today + timedelta(days=30)),
+        },
         headers=auth_header(hr),
     )
     assert r.status_code == 201, r.text
@@ -70,7 +77,7 @@ def test_new_evaluations_are_tagged_with_open_period(client, db_session):
     assert r.json()["period_id"] == period["id"]
 
 
-def test_evaluation_without_open_period_has_no_tag(client, db_session):
+def test_evaluation_without_open_period_is_rejected(client, db_session):
     sup = make_user(db_session, "unit_supervisor")
     dep = make_user(db_session, "deputy")
     ceo = make_user(db_session, "ceo")
@@ -81,8 +88,53 @@ def test_evaluation_without_open_period_has_no_tag(client, db_session):
     r = client.post(
         "/api/evaluations", json={"subject_personnel_id": personnel.id}, headers=auth_header(sup)
     )
-    assert r.status_code == 201
-    assert r.json()["period_id"] is None
+    assert r.status_code == 400
+    assert "دورهٔ ارزیابی بازی" in r.json()["detail"]
+
+
+def test_hr_can_extend_an_expired_window_and_restore_entry(client, db_session):
+    hr = make_user(db_session, "hr")
+    sup = make_user(db_session, "unit_supervisor")
+    dep = make_user(db_session, "deputy")
+    ceo = make_user(db_session, "ceo")
+    personnel = make_personnel(db_session)
+    make_access(db_session, personnel, sup, dep, ceo)
+    db_session.commit()
+    period = _create_period(client, hr)
+    today = date.today()
+
+    expired = client.patch(
+        f"/api/periods/{period['id']}",
+        json={
+            "starts_on": str(today - timedelta(days=10)),
+            "ends_on": str(today - timedelta(days=1)),
+        },
+        headers=auth_header(hr),
+    )
+    assert expired.status_code == 200
+    assert expired.json()["window_state"] == "expired"
+
+    blocked = client.post(
+        "/api/evaluations",
+        json={"subject_personnel_id": personnel.id},
+        headers=auth_header(sup),
+    )
+    assert blocked.status_code == 400
+    assert "مهلت ثبت" in blocked.json()["detail"]
+
+    extended = client.patch(
+        f"/api/periods/{period['id']}",
+        json={"ends_on": str(today + timedelta(days=10))},
+        headers=auth_header(hr),
+    )
+    assert extended.status_code == 200
+    assert extended.json()["accepting_entries"] is True
+    restored = client.post(
+        "/api/evaluations",
+        json={"subject_personnel_id": personnel.id},
+        headers=auth_header(sup),
+    )
+    assert restored.status_code == 201
 
 
 def test_period_progress_tracks_cohort(client, db_session):

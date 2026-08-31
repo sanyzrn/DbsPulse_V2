@@ -71,30 +71,6 @@ SECRET_KEYS: tuple[tuple[str, str], ...] = (
 #: استقرارند و جایشان همان `.env` است.
 POLICY: tuple[IntegrationField, ...] = (
     IntegrationField(
-        "self_assessment_visible_to_hr",
-        "نمایش خودارزیابی برای منابع انسانی",
-        "bool",
-        "پیش‌فرض روشن است؛ منابع انسانی دیدگاه ثبت‌شدهٔ کارمند را در پرونده می‌بیند",
-    ),
-    IntegrationField(
-        "self_assessment_visible_to_unit_supervisor",
-        "نمایش خودارزیابی برای مسئول واحد",
-        "bool",
-        "پیش‌فرض خاموش است؛ در صورت نیاز سازمانی صریحاً روشن کنید",
-    ),
-    IntegrationField(
-        "self_assessment_visible_to_deputy",
-        "نمایش خودارزیابی برای معاونت",
-        "bool",
-        "پیش‌فرض خاموش است؛ در صورت نیاز سازمانی صریحاً روشن کنید",
-    ),
-    IntegrationField(
-        "self_assessment_visible_to_ceo",
-        "نمایش خودارزیابی برای مدیرعامل",
-        "bool",
-        "پیش‌فرض خاموش است؛ در صورت نیاز سازمانی صریحاً روشن کنید",
-    ),
-    IntegrationField(
         "objection_window_days",
         "مهلت اعتراض کارمند (روز)",
         "number",

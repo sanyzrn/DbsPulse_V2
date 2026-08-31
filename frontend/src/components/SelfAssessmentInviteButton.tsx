@@ -11,13 +11,13 @@ import type { Personnel, SelfAssessmentState } from "../types";
  */
 const LABEL: Record<SelfAssessmentState, { text: string; hint: string; action: boolean }> = {
   pending: {
-    text: "دعوت به خودارزیابی",
-    hint: "اعلان داخلی (و در صورت تنظیم، ایمیل/پیامک) برای این فرد فرستاده می‌شود",
+    text: "ارسال یادآوری",
+    hint: "یک یادآوری ساده برای ثبت خودارزیابی این دوره فرستاده می‌شود",
     action: true,
   },
   invited: {
-    text: "یادآوری مجدد",
-    hint: "این فرد دعوت شده و هنوز ثبت نکرده است؛ می‌توانید یادآوری بفرستید",
+    text: "ارسال مجدد یادآوری",
+    hint: "این فرد هنوز ثبت نکرده است؛ می‌توانید یادآوری ساده دیگری بفرستید",
     action: true,
   },
   submitted: {
@@ -35,9 +35,14 @@ const LABEL: Record<SelfAssessmentState, { text: string; hint: string; action: b
     hint: "این فرد حساب کاربری فعالی ندارد، پس اعلانی دریافت نمی‌کند",
     action: false,
   },
+  not_eligible: {
+    text: "مشمول نیست",
+    hint: "مدیرعامل و معاونت‌ها در این دوره خودارزیابی ندارند",
+    action: false,
+  },
   closed: {
     text: "مهلت گذشته",
-    hint: "نمرهٔ ارزیاب قطعی شده؛ خودارزیابی دیگر دیدگاه مستقل نیست",
+    hint: "پرونده نهایی شده و مهلت خودارزیابی به پایان رسیده است",
     action: false,
   },
 };
@@ -62,7 +67,7 @@ export function SelfAssessmentInviteButton({ personnel }: { personnel: Personnel
     try {
       await apiClient.post(`/personnel/${personnel.id}/invite-self-assessment`);
       await queryClient.invalidateQueries({ queryKey: ["personnel"], refetchType: "all" });
-      showSuccess("دعوت به خودارزیابی فرستاده شد");
+      showSuccess("یادآوری خودارزیابی فرستاده شد");
     } catch (err) {
       showError(extractErrorMessage(err));
     } finally {

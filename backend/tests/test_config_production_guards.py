@@ -30,6 +30,11 @@ def test_production_with_real_https_domain_is_accepted():
     assert settings.cors_origins_list == ["https://app.example.com"]
 
 
+def test_production_rejects_a_short_jwt_secret():
+    with pytest.raises(RuntimeError, match="JWT_SECRET_KEY"):
+        _settings(jwt_secret_key="too-short")
+
+
 def test_development_environment_allows_localhost_defaults():
     settings = Settings(environment="development")
     assert "localhost" in settings.cors_origins

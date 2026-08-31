@@ -13,13 +13,11 @@ from app.models.audit_log import AuditLog
 from app.models.enums import (
     CommentStage,
     EvaluationStatus,
-    PeriodStatus,
     PersonnelStatus,
     UserRole,
 )
 from app.models.evaluation import EvaluationComment, EvaluationRecord, EvaluationScore
 from app.models.evaluation_access import EvaluationAccess
-from app.models.evaluation_period import EvaluationPeriod
 from app.models.indicator_framework import IndicatorFramework
 from app.models.personnel import Personnel
 from app.models.self_assessment import SelfAssessmentScore
@@ -47,6 +45,7 @@ from app.schemas.evaluation import (
 from app.services.audit import log_event
 from app.services.documents import archive_final_pdf, archive_final_pdf_detached
 from app.services.evaluation import inactive_seat_labels, next_evaluation_code, validate_bonus
+from app.services.evaluation_window import require_active_period, require_record_window
 from app.services.excel import build_evaluations_workbook
 from app.services.indicator_framework import (
     ensure_framework,
@@ -262,6 +261,9 @@ def create_evaluation(
         require_chain_stage(UserRole.unit_supervisor)
     ),
 ) -> EvaluationRecord:
+    # همهٔ ارزیابی‌ها باید داخل بازه‌ای باشند که HR تعیین کرده است. تاریخِ دوره
+    # فقط برچسب گزارش نیست؛ منبع قطعیِ اجازهٔ ثبت است.
+    active_period = require_active_period(db)
     personnel = db.get(Personnel, payload.subject_personnel_id)
     if personnel is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="پرسنل یافت نشد")
@@ -352,11 +354,6 @@ def create_evaluation(
             },
         )
 
-    # اگر دوره ارزیابی بازی وجود دارد، پرونده به همان دوره برچسب می‌خورد
-    open_period = db.scalar(
-        select(EvaluationPeriod).where(EvaluationPeriod.status == PeriodStatus.open)
-    )
-
     # پرونده به طرح نمره‌دهیِ فعالِ همین لحظه مهر می‌خورد (P1-04). از این پس
     # محاسبه‌اش همیشه از همین نسخه می‌خواند، حتی اگر HR فردا وزن‌ها را عوض کند.
     scheme = active_scheme(db)
@@ -369,7 +366,7 @@ def create_evaluation(
         unit_supervisor_user_id=unit_supervisor_user_id,
         deputy_user_id=access.deputy_user_id,
         ceo_user_id=access.ceo_user_id,
-        period_id=open_period.id if open_period else None,
+        period_id=active_period.id,
         scoring_scheme_id=scheme.id if scheme else None,
         indicator_framework_id=framework.id,
         status=record_status,
@@ -647,6 +644,7 @@ def upsert_scores(
     # ذخیره‌شده نخوانند. فرانت هم پیش‌نویس امتیاز را حین تایپ auto-save می‌کند،
     # پس این پنجره در عمل باز است، نه تئوریک.
     record = _get_record_or_404_for_update(db, evaluation_id)
+    require_record_window(db, record)
 
     if not _is_the_scorer(record, current_user):
         raise HTTPException(
@@ -677,6 +675,7 @@ def set_evaluator_comment(
     # همان دلیل upsert_scores: نظر ارزیاب هم روی رکوردی نوشته می‌شود که یک گذار
     # هم‌زمان ممکن است داشته از زیرش عوضش کند.
     record = _get_record_or_404_for_update(db, evaluation_id)
+    require_record_window(db, record)
     # نمره‌دهندهٔ اول این نظر را ثبت می‌کند — در هر دو مسیر، در مرحلهٔ نمره‌دهی.
     if not _is_the_scorer(record, current_user):
         raise HTTPException(
@@ -704,6 +703,7 @@ def set_special_score(
     برمی‌گرداند — همان مسیری که برای هر مخالفتِ دیگری هست.
     """
     record = _get_record_or_404_for_update(db, evaluation_id)
+    require_record_window(db, record)
     if not _is_the_scorer(record, current_user):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -754,6 +754,7 @@ def submit_evaluation(
     مالکیت واقعی را خودِ گذار می‌سنجد.
     """
     record = _get_record_or_404_for_update(db, evaluation_id)
+    require_record_window(db, record)
     # در مسیر «مدیر» نمره‌دهنده معاونت است، پس گذارِ دیگری با همان مقصد لازم
     # است. محاسبهٔ نتیجه در هر دو مسیر همین‌جا انجام می‌شود — جایی که نمره‌دهی
     # تمام می‌شود — نه در تأیید معاونت.

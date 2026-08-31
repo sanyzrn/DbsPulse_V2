@@ -5,7 +5,7 @@
  * دیدنِ وضعیت (بدون هیچ نمره‌ای، چون نمرهٔ پیش‌نویس هنوز تصمیم نیست) و امکان ثبت
  * دیدگاه خودش پیش از آن‌که ارزیاب نمره را قطعی کند.
  */
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { motion } from "motion/react";
 import { apiClient, extractErrorMessage } from "../../api/client";
@@ -16,12 +16,20 @@ import { WorkflowStepper } from "../WorkflowStepper";
 import { Button } from "../../ui/Button";
 import { Card } from "../../ui/Card";
 import { useLocalDraft } from "../../ui/useLocalDraft";
-import { formatDateTime } from "../../utils/dates";
+import { formatDate, formatDateTime } from "../../utils/dates";
 import type { MyOpenEvaluation, SelfAssessment } from "../../types";
 
 const SCORE_OPTIONS = [1, 2, 3, 4, 5];
 
-export function OpenCaseCard({ item, index }: { item: MyOpenEvaluation; index: number }) {
+export function OpenCaseCard({
+  item,
+  index,
+  selfAssessmentEnabled,
+}: {
+  item: MyOpenEvaluation;
+  index: number;
+  selfAssessmentEnabled: boolean;
+}) {
   const [showForm, setShowForm] = useState(false);
   const [submitted, setSubmitted] = useState<SelfAssessment | null>(
     item.self_assessment_submitted_at
@@ -30,7 +38,7 @@ export function OpenCaseCard({ item, index }: { item: MyOpenEvaluation; index: n
   );
   // پنجره را سرور تعیین می‌کند. پیش از این همین‌جا فهرستِ وضعیت‌ها دستی کپی شده
   // بود و می‌توانست بی‌سروصدا از بک‌اند جدا بیفتد — که افتاده بود.
-  const canSelfAssess = item.self_assessment_open;
+  const canSelfAssess = selfAssessmentEnabled && item.self_assessment_open;
 
   return (
     <motion.div
@@ -59,23 +67,32 @@ export function OpenCaseCard({ item, index }: { item: MyOpenEvaluation; index: n
           امتیازها تا پیش از تأیید نهایی قطعی نیستند و نمایش داده نمی‌شوند.
         </p>
 
-        {submitted?.submitted_at ? (
-          <p className="mt-3 rounded-xl bg-green-50 px-3 py-2 text-sm text-green-800">
-            خودارزیابی شما ثبت شد و برای ارزیاب ارسال گردید.
+        {item.period_ends_on && (
+          <p className="mt-2 text-xs text-gray-500">
+            مهلت ثبت این دوره: {formatDate(item.period_ends_on)}
           </p>
+        )}
+
+        {submitted?.submitted_at ? (
+          <ReadonlySelfAssessment evaluationId={item.id} fallback={submitted} />
         ) : canSelfAssess && !showForm ? (
           <div className="mt-3 rounded-xl border border-dashed border-gray-300 bg-gray-50/60 p-3">
             <p className="text-sm text-gray-700">
-              می‌توانید پیش از ثبت نمرهٔ ارزیاب، دیدگاه خودتان را ثبت کنید.
+              می‌توانید تا پیش از نهایی‌شدن پرونده، دیدگاه مستقل خودتان را ثبت کنید.
             </p>
             <p className="mt-1 text-xs text-gray-500">
-              اختیاری است و در محاسبهٔ امتیاز نهایی وارد نمی‌شود؛ کنار نظر ارزیاب دیده
-              می‌شود تا تفاوت‌ها موضوع گفت‌وگو باشد. یک‌بار ثبت می‌شود و قابل ویرایش نیست.
+              در محاسبهٔ امتیاز نهایی وارد نمی‌شود و مدیران آن را نمی‌بینند. فقط منابع
+              انسانی پس از ثبت هر دو ارزیابی، جدول مقایسه را می‌بیند. ثبت برای همان دوره
+              یک‌بار انجام می‌شود و قابل ویرایش نیست.
             </p>
             <Button className="mt-3" onClick={() => setShowForm(true)}>
               ثبت خودارزیابی
             </Button>
           </div>
+        ) : selfAssessmentEnabled ? (
+          <p className="mt-3 rounded-xl bg-amber-50 px-3 py-2 text-sm text-amber-800">
+            مهلت خودارزیابی پایان یافته است. در صورت نیاز، منابع انسانی می‌تواند بازه را تمدید کند.
+          </p>
         ) : null}
 
         {showForm && !submitted?.submitted_at && (
@@ -91,6 +108,49 @@ export function OpenCaseCard({ item, index }: { item: MyOpenEvaluation; index: n
         )}
       </Card>
     </motion.div>
+  );
+}
+
+function ReadonlySelfAssessment({
+  evaluationId,
+  fallback,
+}: {
+  evaluationId: number;
+  fallback: SelfAssessment;
+}) {
+  const { data: allIndicators = [] } = useIndicators({ includeInactive: true });
+  const [assessment, setAssessment] = useState(fallback);
+
+  useEffect(() => {
+    apiClient
+      .get<SelfAssessment>(`/me/evaluations/${evaluationId}/self-assessment`)
+      .then(({ data }) => setAssessment(data))
+      .catch(() => undefined);
+  }, [evaluationId]);
+
+  const byId = new Map(allIndicators.map((indicator) => [indicator.id, indicator]));
+  return (
+    <div className="mt-3 rounded-xl border border-green-200 bg-green-50/60 p-3">
+      <p className="text-sm font-semibold text-green-900">
+        خودارزیابی شما ثبت نهایی شد و برای این دوره قابل ویرایش نیست.
+      </p>
+      {assessment.note && <p className="mt-2 text-sm text-gray-700">{assessment.note}</p>}
+      {assessment.scores.length > 0 && (
+        <div className="mt-3 space-y-2">
+          {assessment.scores.map((row) => (
+            <div key={row.indicator_id} className="flex items-start justify-between gap-3 rounded-lg bg-white px-3 py-2 text-sm">
+              <div>
+                <p className="text-gray-800">{byId.get(row.indicator_id)?.description ?? `شاخص ${row.indicator_id}`}</p>
+                {row.note && <p className="mt-0.5 text-xs text-gray-500">{row.note}</p>}
+              </div>
+              <span className="shrink-0 rounded-lg bg-green-100 px-2 py-1 font-bold text-green-800">
+                {row.score.toLocaleString("fa-IR")} از ۵
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -123,7 +183,7 @@ function SelfAssessmentForm({
   // فرم ارزیاب از قبل ذخیرهٔ خودکار داشت؛ فرمِ کارمند نداشت — یعنی کم‌قدرت‌ترین
   // آدمِ این فرایند، نابخشنده‌ترین فرم را داشت: بیست شاخص با یادداشت، که با یک
   // کلید Back از بین می‌رفت.
-  const draftKey = `dbspulse:self-assessment:${evaluationId}`;
+  const draftKey = `nafas-hr:self-assessment:${evaluationId}`;
   const [draft, setDraft] = useLocalDraft(draftKey);
   const scores = draft.scores;
   const notes = draft.notes;
@@ -137,13 +197,13 @@ function SelfAssessmentForm({
   const allScored = indicators.length > 0 && indicators.every((i) => scores[i.id]);
 
   async function submit() {
-    // ثبت یک‌طرفه است و برای ارزیاب دیده می‌شود. «ثبت نهایی» را می‌شود سرسری
+    // ثبت یک‌طرفه است و فقط برای منابع انسانی دیده می‌شود. «ثبت نهایی» را می‌شود سرسری
     // خواند؛ یک پرسش صریح، پشیمانی روی کاری که برنمی‌گردد را کم می‌کند.
     const ok = await confirm({
       title: "خودارزیابی ثبت شود؟",
       danger: true,
       description:
-        "دیدگاه شما برای ارزیاب ارسال می‌شود و پس از ثبت قابل ویرایش نیست. اگر بعداً نظرتان عوض شد، می‌توانید آن را در گفت‌وگو با ارزیاب مطرح کنید.",
+        "دیدگاه شما فقط برای منابع انسانی ارسال می‌شود و پس از ثبت، برای این دوره قابل ویرایش نیست.",
       confirmLabel: "ثبت نهایی",
     });
     if (!ok) return;

@@ -1,7 +1,14 @@
 """تست‌های دوره‌های (کمپین) ارزیابی: تک‌دوره باز، برچسب خودکار، پیشرفت و بستن."""
 from datetime import date, timedelta
 
-from tests.helpers import auth_header, make_access, make_personnel, make_user
+from tests.helpers import (
+    active_indicators,
+    auth_header,
+    full_valid_scores,
+    make_access,
+    make_personnel,
+    make_user,
+)
 
 
 def _create_period(client, hr, name="دوره آزمون") -> dict:
@@ -77,7 +84,16 @@ def test_new_evaluations_are_tagged_with_open_period(client, db_session):
     assert r.json()["period_id"] == period["id"]
 
 
-def test_evaluation_without_open_period_is_rejected(client, db_session):
+def test_an_evaluation_without_an_open_period_is_created_without_a_deadline(client, db_session):
+    """نبودِ دورهٔ باز، ساختِ پرونده را متوقف نمی‌کند.
+
+    شرطِ «دورهٔ باز لازم است» دو چیز را می‌شکند: سازمانی که ماژول دوره‌ها را
+    به‌کار نمی‌گیرد اصلاً نمی‌تواند ارزیابی کند، و در فاصلهٔ بستنِ یک دوره تا
+    باز کردنِ دورهٔ بعد هیچ پرونده‌ای باز نمی‌شود.
+
+    پروندهٔ بی‌دوره مهلتی هم ندارد — قاعده‌اش در `services/evaluation_window.py`
+    است و همان‌جا تست می‌شود.
+    """
     sup = make_user(db_session, "unit_supervisor")
     dep = make_user(db_session, "deputy")
     ceo = make_user(db_session, "ceo")
@@ -88,11 +104,23 @@ def test_evaluation_without_open_period_is_rejected(client, db_session):
     r = client.post(
         "/api/evaluations", json={"subject_personnel_id": personnel.id}, headers=auth_header(sup)
     )
-    assert r.status_code == 400
-    assert "دورهٔ ارزیابی بازی" in r.json()["detail"]
+
+    assert r.status_code == 201, r.text
+    assert r.json()["period_id"] is None
+    assert r.json()["submission_deadline"] is None
 
 
-def test_hr_can_extend_an_expired_window_and_restore_entry(client, db_session):
+def test_moving_the_period_end_closes_and_reopens_score_entry(client, db_session):
+    """مهلت روی *ثبت* می‌نشیند، نه روی ساختِ پرونده.
+
+    بستنِ ساختِ پرونده چیزی را نجات نمی‌دهد و یک بن‌بست می‌سازد: پرونده‌ای که
+    باز نشده، بعداً هم نمی‌شود بازش کرد. آن‌چه باید بسته شود ثبتِ نمره است، و
+    همان است که این‌جا با جابه‌جایی `ends_on` بسته و دوباره باز می‌شود.
+
+    تمدیدِ *یک پرونده* راهِ دیگری دارد (`POST /evaluations/{id}/extend-submission`)
+    که در test_self_assessment_rules.py تست می‌شود؛ عقب انداختنِ `ends_on` در را
+    برای همه باز می‌کند و این تست همان را می‌سنجد.
+    """
     hr = make_user(db_session, "hr")
     sup = make_user(db_session, "unit_supervisor")
     dep = make_user(db_session, "deputy")
@@ -100,11 +128,27 @@ def test_hr_can_extend_an_expired_window_and_restore_entry(client, db_session):
     personnel = make_personnel(db_session)
     make_access(db_session, personnel, sup, dep, ceo)
     db_session.commit()
-    period = _create_period(client, hr)
+    _create_period(client, hr)
     today = date.today()
 
+    created = client.post(
+        "/api/evaluations",
+        json={"subject_personnel_id": personnel.id},
+        headers=auth_header(sup),
+    )
+    assert created.status_code == 201, created.text
+    evaluation_id = created.json()["id"]
+    period_id = created.json()["period_id"]
+    assert period_id is not None, "پروندهٔ تازه باید به دورهٔ باز بچسبد"
+
+    client.put(
+        f"/api/evaluations/{evaluation_id}/scores",
+        json={"scores": full_valid_scores(active_indicators(db_session))},
+        headers=auth_header(sup),
+    )
+
     expired = client.patch(
-        f"/api/periods/{period['id']}",
+        f"/api/periods/{period_id}",
         json={
             "starts_on": str(today - timedelta(days=10)),
             "ends_on": str(today - timedelta(days=1)),
@@ -115,26 +159,23 @@ def test_hr_can_extend_an_expired_window_and_restore_entry(client, db_session):
     assert expired.json()["window_state"] == "expired"
 
     blocked = client.post(
-        "/api/evaluations",
-        json={"subject_personnel_id": personnel.id},
-        headers=auth_header(sup),
+        f"/api/evaluations/{evaluation_id}/submit", headers=auth_header(sup)
     )
     assert blocked.status_code == 400
     assert "مهلت ثبت" in blocked.json()["detail"]
 
     extended = client.patch(
-        f"/api/periods/{period['id']}",
+        f"/api/periods/{period_id}",
         json={"ends_on": str(today + timedelta(days=10))},
         headers=auth_header(hr),
     )
     assert extended.status_code == 200
     assert extended.json()["accepting_entries"] is True
+
     restored = client.post(
-        "/api/evaluations",
-        json={"subject_personnel_id": personnel.id},
-        headers=auth_header(sup),
+        f"/api/evaluations/{evaluation_id}/submit", headers=auth_header(sup)
     )
-    assert restored.status_code == 201
+    assert restored.status_code == 200, restored.text
 
 
 def test_period_progress_tracks_cohort(client, db_session):

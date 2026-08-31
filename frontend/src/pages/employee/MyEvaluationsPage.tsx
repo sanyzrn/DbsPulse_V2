@@ -336,7 +336,15 @@ function SelfAssessmentHistoryCard({ item }: { item: MySelfAssessment }) {
   );
 }
 
-export function MyEvaluationsPage() {
+/** خودارزیابی و کارنامهٔ خودِ فرد، بدون سربرگِ صفحه.
+ *
+ * جدا از `MyEvaluationsPage` است چون دو جا نشان داده می‌شود: صفحهٔ «خودارزیابی و
+ * کارنامه من» برای کارمند، و تبِ «خودارزیابی من» در صفحهٔ مسئول واحد — که خودش
+ * هم ارزیابی می‌شود و تا امروز هیچ راهی به این محتوا نداشت.
+ *
+ * سربرگ بیرون ماند چون داخلِ تب، عنوانِ دوم اضافی است.
+ */
+export function MyEvaluationsPanel() {
   const { user } = useAuth();
   const { moduleEnabled, loading: permissionsLoading } = usePermissions();
   // تا قبل از رسیدن تنظیمات، هیچ بخش اختیاری چشمک نمی‌زند. پیش‌فرض ماژول‌ها
@@ -360,10 +368,6 @@ export function MyEvaluationsPage() {
 
   return (
     <div className="space-y-4">
-      <PageHeader
-        title="خودارزیابی و کارنامه من"
-        subtitle="دیدگاه خودتان را برای دورهٔ جاری ثبت کنید و نتایج نهایی‌شدهٔ دوره‌های گذشته را ببینید."
-      />
       {showOverview && <RoleOverviewCards />}
 
       <div className="inline-flex rounded-xl border border-gray-200 bg-gray-100 p-1" role="tablist" aria-label="بخش‌های شخصی ارزیابی">
@@ -445,6 +449,19 @@ export function MyEvaluationsPage() {
           showAcknowledgement={showAcknowledgement}
         />
       ))}
+    </div>
+  );
+}
+
+
+export function MyEvaluationsPage() {
+  return (
+    <div className="space-y-4">
+      <PageHeader
+        title="خودارزیابی و کارنامه من"
+        subtitle="دیدگاه خودتان را برای دورهٔ جاری ثبت کنید و نتایج نهایی‌شدهٔ دوره‌های گذشته را ببینید."
+      />
+      <MyEvaluationsPanel />
     </div>
   );
 }

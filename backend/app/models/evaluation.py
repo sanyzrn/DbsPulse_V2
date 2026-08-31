@@ -1,7 +1,8 @@
-from datetime import datetime
+from datetime import date, datetime
 
 from sqlalchemy import (
     CheckConstraint,
+    Date,
     DateTime,
     Enum,
     ForeignKey,
@@ -23,6 +24,7 @@ from app.core.text_limits import (
     EVALUATOR_COMMENT_MAX,
     EVIDENCE_MAX,
     OBJECTION_MAX,
+    REASON_MAX,
     SELF_ASSESSMENT_SUMMARY_MAX,
 )
 from app.db.base import Base
@@ -142,6 +144,29 @@ class EvaluationRecord(Base):
     self_assessment_invited_by_user_id: Mapped[int | None] = mapped_column(
         ForeignKey("users.id"), nullable=True
     )
+
+    #: تمدیدِ مهلتِ ثبت برای همین یک پرونده — استثنایی که منابع انسانی می‌دهد.
+    #:
+    #: مهلتِ عادی از `evaluation_periods.ends_on` می‌آید و برای همه یکی است. ولی
+    #: همیشه پرونده‌ای هست که دلیلِ موجه دارد: فرد در مرخصی بوده، پرونده دیر باز
+    #: شده، ارزیاب عوض شده. بدونِ این ستون، تنها راهِ کمک به آن یک نفر، عقب
+    #: انداختنِ مهلتِ کلِ دوره بود — یعنی باز کردنِ در برای همه.
+    #:
+    #: *تاریخ* است و نه یک پرچمِ «باز شد»، چون پرچم خودش را نمی‌بندد: پرونده‌ای
+    #: که یک بار باز شود تا ابد باز می‌ماند و مهلت را از اول بی‌معنا می‌کند.
+    #:
+    #: قاعدهٔ ترکیبش با مهلتِ دوره در `services/evaluation_window.py` است — یک جا،
+    #: چون هم خودارزیابی و هم ثبتِ نمرهٔ ارزیاب به آن بند هستند.
+    submission_extended_until: Mapped[date | None] = mapped_column(Date, nullable=True)
+    submission_extended_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    submission_extended_by_user_id: Mapped[int | None] = mapped_column(
+        ForeignKey("users.id"), nullable=True
+    )
+    #: چرا تمدید شد. اجباری است — تمدیدِ بی‌دلیل، در بازبینی از تمدیدِ خودسرانه
+    #: قابل تشخیص نیست.
+    submission_extension_reason: Mapped[str | None] = mapped_column(String(REASON_MAX), nullable=True)
 
     # اعتراض رسمی کارمند به نتیجه. «رؤیت» فقط ثبت می‌کند که فرد نتیجه را *دید*، نه
     # این‌که با آن موافق است — بدون مسیر اعتراض، سامانه هیچ جایی برای مخالفت او ندارد

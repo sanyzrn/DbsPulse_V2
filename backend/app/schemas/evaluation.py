@@ -112,6 +112,20 @@ class StageOwnerReassign(BaseModel):
     reason: str = Field(min_length=1, max_length=REASON_MAX)
 
 
+class SubmissionExtension(BaseModel):
+    """تمدیدِ مهلتِ ثبت برای یک پرونده.
+
+    دلیل اجباری است: تمدیدِ بی‌دلیل، در بازبینی از تمدیدِ خودسرانه قابل تشخیص
+    نیست. تاریخ هم اجباری است و نه یک «باز کن» — پرچمی که خودش را نمی‌بندد،
+    مهلت را از اول بی‌معنا می‌کند.
+    """
+
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+    until: date
+    reason: str = Field(min_length=1, max_length=REASON_MAX)
+
+
 class EvaluationRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -153,6 +167,14 @@ class EvaluationRead(BaseModel):
     # نمره‌دهندهٔ اول و تأییدکنندهٔ نهایی یک نفرند (کسی که مستقیم زیر نظر
     # مدیرعامل است). حالتی مجاز، ولی نه حالتی که باید پنهان بماند.
     single_decider: bool = False
+
+    #: مهلتِ ثبت — تاریخِ پایانِ دوره، یا تمدیدی که منابع انسانی داده.
+    #:
+    #: روی نمای کامل هم هست چون ارزیاب باید *پیش از* رسیدن به دکمهٔ ثبت بداند تا
+    #: کِی وقت دارد؛ فهمیدنش از پیامِ خطا یعنی مهلت را از دست داده.
+    submission_deadline: date | None = None
+    submission_deadline_extended: bool = False
+    submission_extension_reason: str | None = None
 
     @computed_field  # type: ignore[prop-decorator]
     @property
@@ -259,9 +281,15 @@ class MyOpenEvaluation(BaseModel):
     #: سرور محاسبه‌اش می‌کند چون تعریفِ پنجره یک جا بیشتر نیست
     #: (`services/self_assessment.OPEN_STATUSES`). پیش از این فرانت فهرستِ
     #: وضعیت‌ها را دستی کپی کرده بود و می‌توانست از بک‌اند جدا بیفتد.
+    #: سه شرط را با هم می‌سنجد: نقش خودارزیابی داشته باشد، پرونده در مرحلهٔ ثبت
+    #: باشد، و مهلت نگذشته باشد.
     self_assessment_open: bool = False
     period_name: str | None = None
     period_ends_on: date | None = None
+    #: مهلتِ *واقعیِ* ثبت. با `period_ends_on` یکی نیست: اگر منابع انسانی برای
+    #: همین پرونده تمدید کرده باشد، این جلوتر است.
+    submission_deadline: date | None = None
+    submission_deadline_extended: bool = False
 
     @computed_field  # type: ignore[prop-decorator]
     @property

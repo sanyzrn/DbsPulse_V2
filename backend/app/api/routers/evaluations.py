@@ -41,11 +41,13 @@ from app.schemas.evaluation import (
     SelfAssessmentScoreRead,
     SpecialScoreUpdate,
     StageOwnerReassign,
+    SubmissionExtension,
 )
 from app.services.audit import log_event
 from app.services.documents import archive_final_pdf, archive_final_pdf_detached
 from app.services.evaluation import inactive_seat_labels, next_evaluation_code, validate_bonus
-from app.services.evaluation_window import require_active_period, require_record_window
+from app.services.evaluation_window import ensure_open as ensure_submission_window_open
+from app.services.evaluation_window import open_period, window_for
 from app.services.excel import build_evaluations_workbook
 from app.services.indicator_framework import (
     ensure_framework,
@@ -72,6 +74,13 @@ from app.services.workflow import (
 )
 
 router = APIRouter(prefix="/api/evaluations", tags=["evaluations"])
+
+#: تمدیدِ مهلت فقط وقتی معنا دارد که پرونده هنوز در مرحلهٔ ثبت باشد.
+#:
+#: `draft` تنها وضعیتی است که در آن هم خودارزیابی و هم نمرهٔ ارزیاب ثبت می‌شوند.
+#: تمدید برای پرونده‌ای که از این مرحله گذشته، چیزی را باز نمی‌کند — فقط یک
+#: تاریخِ گمراه‌کننده در پرونده می‌گذارد.
+_EXTENDABLE_STATUSES = frozenset({EvaluationStatus.draft})
 
 
 def _get_record_or_404(db: Session, evaluation_id: int) -> EvaluationRecord:
@@ -158,9 +167,23 @@ def _was_returned(db: Session, evaluation_id: int) -> bool:
     )
 
 
+def _deadline_fields(db: Session, record: EvaluationRecord) -> dict:
+    """مهلتِ ثبت، به همان شکلی که رابط باید نشانش بدهد.
+
+    محاسبه‌اش سمت سرور است چون قاعده‌اش یک جاست
+    (`services/evaluation_window.py`) و ترکیبِ «پایانِ دوره یا تمدید» چیزی نیست
+    که فرانت بتواند بدونِ کپیِ همان منطق بسازد.
+    """
+    window = window_for(db, record)
+    return {
+        "submission_deadline": window.closes_on,
+        "submission_deadline_extended": window.extended,
+    }
+
+
 def _to_read(db: Session, record: EvaluationRecord) -> EvaluationRead:
     return EvaluationRead.model_validate(record).model_copy(
-        update={"was_returned": _was_returned(db, record.id)}
+        update={"was_returned": _was_returned(db, record.id), **_deadline_fields(db, record)}
     )
 
 
@@ -206,6 +229,7 @@ def _to_detail(
             ),
             "indicator_ids": sorted(indicator_ids_for_record(db, record)),
             "indicator_framework_version": framework.version if framework else None,
+            **_deadline_fields(db, record),
         }
     )
 
@@ -261,9 +285,16 @@ def create_evaluation(
         require_chain_stage(UserRole.unit_supervisor)
     ),
 ) -> EvaluationRecord:
-    # همهٔ ارزیابی‌ها باید داخل بازه‌ای باشند که HR تعیین کرده است. تاریخِ دوره
-    # فقط برچسب گزارش نیست؛ منبع قطعیِ اجازهٔ ثبت است.
-    active_period = require_active_period(db)
+    # پرونده به دورهٔ بازِ امروز برچسب می‌خورد، اگر دوره‌ای باز باشد.
+    #
+    # عمداً *پیش‌شرط* نیست. یک نسخه این را الزامی کرد و نتیجه‌اش دو دام بود:
+    # سازمانی که ماژول «دوره‌ها» را خاموش کرده، دیگر هیچ ارزیابی‌ای نمی‌توانست
+    # شروع کند و پیامِ خطا او را به صفحه‌ای می‌فرستاد که خودش پنهانش کرده بود؛ و
+    # فاصلهٔ بینِ دو دوره به یک وقفهٔ اجباری در کلِ سازمان تبدیل می‌شد.
+    #
+    # مهلت همچنان کارِ خودش را می‌کند: پرونده‌ای که دوره دارد مهلت دارد، و
+    # پرونده‌ای که ندارد مهلتی هم ندارد — که همان رفتارِ پیش از دوره‌هاست.
+    active_period = open_period(db)
     personnel = db.get(Personnel, payload.subject_personnel_id)
     if personnel is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="پرسنل یافت نشد")
@@ -366,7 +397,7 @@ def create_evaluation(
         unit_supervisor_user_id=unit_supervisor_user_id,
         deputy_user_id=access.deputy_user_id,
         ceo_user_id=access.ceo_user_id,
-        period_id=active_period.id,
+        period_id=active_period.id if active_period else None,
         scoring_scheme_id=scheme.id if scheme else None,
         indicator_framework_id=framework.id,
         status=record_status,
@@ -644,7 +675,7 @@ def upsert_scores(
     # ذخیره‌شده نخوانند. فرانت هم پیش‌نویس امتیاز را حین تایپ auto-save می‌کند،
     # پس این پنجره در عمل باز است، نه تئوریک.
     record = _get_record_or_404_for_update(db, evaluation_id)
-    require_record_window(db, record)
+    ensure_submission_window_open(db, record, "ثبت ارزیابی")
 
     if not _is_the_scorer(record, current_user):
         raise HTTPException(
@@ -675,7 +706,7 @@ def set_evaluator_comment(
     # همان دلیل upsert_scores: نظر ارزیاب هم روی رکوردی نوشته می‌شود که یک گذار
     # هم‌زمان ممکن است داشته از زیرش عوضش کند.
     record = _get_record_or_404_for_update(db, evaluation_id)
-    require_record_window(db, record)
+    ensure_submission_window_open(db, record, "ثبت ارزیابی")
     # نمره‌دهندهٔ اول این نظر را ثبت می‌کند — در هر دو مسیر، در مرحلهٔ نمره‌دهی.
     if not _is_the_scorer(record, current_user):
         raise HTTPException(
@@ -703,7 +734,7 @@ def set_special_score(
     برمی‌گرداند — همان مسیری که برای هر مخالفتِ دیگری هست.
     """
     record = _get_record_or_404_for_update(db, evaluation_id)
-    require_record_window(db, record)
+    ensure_submission_window_open(db, record, "ثبت ارزیابی")
     if not _is_the_scorer(record, current_user):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -754,7 +785,7 @@ def submit_evaluation(
     مالکیت واقعی را خودِ گذار می‌سنجد.
     """
     record = _get_record_or_404_for_update(db, evaluation_id)
-    require_record_window(db, record)
+    ensure_submission_window_open(db, record, "ثبت ارزیابی")
     # در مسیر «مدیر» نمره‌دهنده معاونت است، پس گذارِ دیگری با همان مقصد لازم
     # است. محاسبهٔ نتیجه در هر دو مسیر همین‌جا انجام می‌شود — جایی که نمره‌دهی
     # تمام می‌شود — نه در تأیید معاونت.
@@ -923,6 +954,77 @@ def cancel_evaluation(
         )
 
     apply_transition(db, record, "cancel", current_user, before=_before)
+    db.commit()
+    db.refresh(record)
+    return _to_read(db, record)
+
+
+@router.post("/{evaluation_id}/extend-submission", response_model=EvaluationRead)
+def extend_submission_window(
+    evaluation_id: int,
+    payload: SubmissionExtension,
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(require_roles(UserRole.hr)),
+) -> EvaluationRead:
+    """تمدیدِ مهلتِ ثبت برای همین یک پرونده.
+
+    مهلت برای همه یکی است (`evaluation_periods.ends_on`)، ولی همیشه پرونده‌ای
+    هست که دلیلِ موجه دارد: فرد در مرخصی بوده، پرونده دیر باز شده، ارزیاب عوض
+    شده. بدونِ این مسیر، تنها راهِ کمک به آن یک نفر، عقب انداختنِ مهلتِ کلِ دوره
+    بود — یعنی باز کردنِ در برای همه.
+
+    دلیل اجباری است و در پرونده و در audit هر دو می‌ماند: تمدیدِ بی‌دلیل، در
+    بازبینی از تمدیدِ خودسرانه قابل تشخیص نیست.
+    """
+    record = _get_record_or_404_for_update(db, evaluation_id)
+    # همان قاعدهٔ همیشگی: منابع انسانی دربارهٔ پروندهٔ خودش تصمیم نمی‌گیرد.
+    ensure_not_deciding_about_oneself(record, current_user)
+
+    if record.status not in _EXTENDABLE_STATUSES:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="این پرونده دیگر در مرحلهٔ ثبت نیست، پس تمدیدِ مهلت چیزی را باز نمی‌کند.",
+        )
+
+    previous = record.submission_extended_until
+    record.submission_extended_until = payload.until
+    record.submission_extended_at = datetime.now(UTC)
+    record.submission_extended_by_user_id = current_user.id
+    record.submission_extension_reason = payload.reason
+
+    db.add(
+        EvaluationComment(
+            evaluation_record_id=record.id,
+            commenter_user_id=current_user.id,
+            stage=CommentStage.hr_review,
+            comment_text=f"تمدید مهلت ثبت تا {payload.until:%Y-%m-%d} — دلیل: {payload.reason}",
+        )
+    )
+    log_event(
+        db,
+        actor_user_id=current_user.id,
+        event_type="submission_window_extended",
+        evaluation_record_id=record.id,
+        old_value={"until": previous.isoformat() if previous else None},
+        new_value={"until": payload.until.isoformat(), "reason": payload.reason},
+    )
+
+    # به کسی که باید ثبت کند خبر می‌رود — وگرنه تمدید فقط یک ستون در دیتابیس
+    # است و کسی که برایش تمدید شده هیچ‌وقت نمی‌فهمد.
+    scorer_id = record.unit_supervisor_user_id or record.deputy_user_id
+    if scorer_id is not None:
+        notify(
+            db,
+            [scorer_id],
+            type_="submission_window_extended",
+            message=(
+                f"مهلت ثبت پروندهٔ {record.evaluation_code} تا "
+                f"{payload.until:%Y-%m-%d} تمدید شد"
+            ),
+            evaluation_record_id=record.id,
+            link=f"/evaluations/{record.id}",
+        )
+
     db.commit()
     db.refresh(record)
     return _to_read(db, record)

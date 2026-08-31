@@ -5,6 +5,7 @@ import { useDebouncedValue, useEvaluations, usePersonnelList } from "../../api/q
 import { EmployeeProfileModal } from "../../components/EmployeeProfileModal";
 import { EvaluationActionButton, type OpenEvaluation } from "../../components/EvaluationActionButton";
 import { EvaluationList } from "../../components/EvaluationList";
+import { MyEvaluationsPanel } from "../employee/MyEvaluationsPage";
 import { RoleOverviewCards } from "../../components/RoleOverviewCards";
 import { StatusBadge } from "../../components/StatusBadge";
 import { PageHeader, TableSkeleton } from "../../ui/Card";
@@ -17,6 +18,11 @@ export function SupervisorHomePage() {
   const [starting, setStarting] = useState(false);
   const [startingId, setStartingId] = useState<number | null>(null);
   const [profilePerson, setProfilePerson] = useState<Personnel | null>(null);
+  // مسئول واحد دو کارِ جدا دارد و تا امروز فقط یکی‌شان را داشت: ارزیابیِ
+  // زیرمجموعه‌ها. خودش هم ارزیابی می‌شود، ولی صفحهٔ «کارنامه من» پشتِ گاردِ نقشِ
+  // «کارمند» بود و او روی آن ۴۰۳ می‌گرفت — نه خودارزیابی می‌توانست بکند و نه
+  // نتیجهٔ خودش را می‌دید.
+  const [tab, setTab] = useState<"team" | "mine">("team");
   const navigate = useNavigate();
   // مسئول واحدی که شصت نفر زیرمجموعه دارد، تا امروز باید در یک جدولِ بی‌فیلتر
   // اسکرول می‌کرد تا اسم را پیدا کند — در حالی که فهرست ارزیابی‌ها درست پایین‌تر
@@ -72,7 +78,37 @@ export function SupervisorHomePage() {
 
   return (
     <div className="space-y-4">
-      <PageHeader title="افراد زیرمجموعه" subtitle="شروع ارزیابی جدید برای افراد زیرمجموعه شما" />
+      <PageHeader title="ارزیابی عملکرد" subtitle="ارزیابی افراد زیرمجموعه، و خودارزیابی خودتان" />
+
+      <div
+        className="flex gap-1 rounded-2xl border border-gray-200 bg-white p-1"
+        role="tablist"
+        aria-label="بخش‌های ارزیابی مسئول واحد"
+      >
+        {([
+          { key: "team", label: "ارزیابی زیرمجموعه‌ها" },
+          { key: "mine", label: "خودارزیابی من" },
+        ] as const).map((item) => (
+          <button
+            key={item.key}
+            type="button"
+            role="tab"
+            aria-selected={tab === item.key}
+            onClick={() => setTab(item.key)}
+            className={`flex-1 rounded-xl px-4 py-2 text-sm font-semibold transition ${
+              tab === item.key
+                ? "bg-pulse-600 text-white"
+                : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
+            }`}
+          >
+            {item.label}
+          </button>
+        ))}
+      </div>
+
+      {tab === "mine" && <MyEvaluationsPanel />}
+
+      <div hidden={tab !== "team"} className="space-y-4">
       <RoleOverviewCards />
       <div className="rounded-2xl border border-gray-200 bg-white p-4">
         <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
@@ -146,6 +182,7 @@ export function SupervisorHomePage() {
           { key: "finalized", label: "نهایی‌شده", status: "finalized" },
         ]}
       />
+      </div>
 
       {profilePerson && (
         <EmployeeProfileModal

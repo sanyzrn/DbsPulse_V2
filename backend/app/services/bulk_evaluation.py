@@ -34,7 +34,7 @@ from app.models.evaluation import EvaluationRecord
 from app.models.evaluation_access import EvaluationAccess
 from app.models.personnel import Personnel
 from app.services.evaluation import inactive_seat_labels, next_evaluation_code
-from app.services.evaluation_window import require_active_period
+from app.services.evaluation_window import open_period
 from app.services.indicator_framework import ensure_framework
 from app.services.scoring_scheme import active_scheme
 from app.services.workflow import IS_OPEN_RECORD
@@ -220,7 +220,10 @@ def execute(db: Session, cohort: CohortFilter) -> list[PersonPlan]:
     بنشیند.
     """
     plans = plan(db, cohort)
-    active_period = require_active_period(db)
+    # دورهٔ باز اختیاری است: سازمانی که ماژول دوره‌ها را به‌کار نمی‌گیرد باید
+    # بتواند دسته‌ای ارزیابی باز کند، و فاصلهٔ بینِ دو دوره نباید کار را بخواباند.
+    # پروندهٔ بی‌دوره مهلتی ندارد — قاعده‌اش در `evaluation_window` است.
+    active_period = open_period(db)
     # همان مهرهایی که مسیر تک‌رکوردی می‌زند (P1-04 و P1-05) — یک‌بار برای کل
     # دسته خوانده می‌شوند، پس همهٔ پرونده‌های یک اجرا زیر یک نسخه‌اند.
     scheme = active_scheme(db)
@@ -248,7 +251,7 @@ def execute(db: Session, cohort: CohortFilter) -> list[PersonPlan]:
             ),
             deputy_user_id=access.deputy_user_id,
             ceo_user_id=access.ceo_user_id,
-            period_id=active_period.id,
+            period_id=active_period.id if active_period else None,
             scoring_scheme_id=scheme.id if scheme else None,
             indicator_framework_id=framework.id,
             # هر دو مسیر از `draft` شروع می‌شوند — همان رفتار create_evaluation.

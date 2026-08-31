@@ -40,6 +40,7 @@
   .scores { display: flex; gap: 10px; margin: 10px 0; }
   .scores div { flex: 1; text-align: center; border: 1px solid #ddd; border-radius: 6px; padding: 8px; }
   .scores b { display: block; font-size: 16px; }
+  .hint { font-size: 10px; color: #666; margin: -4px 0 8px; line-height: 1.7; }
   .recommendation { background: #fdf4e3; border: 1px solid #f0dca0; padding: 8px; border-radius: 6px; margin-bottom: 10px; }
   .signatures { display: flex; justify-content: space-between; margin-top: 40px; }
   .signatures div { width: 22%; text-align: center; border-top: 1px solid #333; padding-top: 6px; font-size: 11px; }
@@ -133,35 +134,48 @@
   <p>{{ snapshot.evaluator_comment }}</p>
   {% endif %}
 
-  <h2>مقایسه ارزیابی مدیر و خودارزیابی</h2>
+  {# برگهٔ مقایسه — دیدگاه خودِ فرد کنار نمرهٔ ارزیاب.
+
+     فقط وقتی چاپ می‌شود که خودارزیابی ثبت شده باشد (snapshot نسخهٔ ۴ به بالا).
+     در snapshot های قدیمی‌تر این کلید اصلاً نیست و بخش بی‌صدا کنار می‌رود —
+     همان قاعده‌ای که برای امتیاز ویژه هم رعایت شده.
+
+     ردیف‌ها از پیش بر اساس بزرگیِ اختلاف مرتب شده‌اند: جایی که فرد ۵ داده و
+     ارزیاب ۲، همان جایی است که خواندنش ارزش دارد. #}
   {% if snapshot.self_assessment %}
-    {% if snapshot.self_assessment.note %}
-    <p><b>توضیح کلی فرد:</b> {{ snapshot.self_assessment.note }}</p>
-    {% endif %}
-    <table>
-      <colgroup>
-        <col style="width: 17%" />
-        <col style="width: 38%" />
-        <col style="width: 9%" />
-        <col style="width: 9%" />
-        <col style="width: 9%" />
-        <col style="width: 18%" />
-      </colgroup>
-      <thead>
-        <tr><th>دسته</th><th>شرح</th><th>مدیر</th><th>خودارزیابی</th><th>اختلاف</th><th>توضیح فرد</th></tr>
-      </thead>
-      <tbody>
-        {% for row in snapshot.score_comparison %}
-        <tr>
-          <td>{{ row.category }}</td><td>{{ row.description }}</td>
-          <td>{{ row.manager_score }}</td><td>{{ row.self_score }}</td>
-          <td>{{ row.gap }}</td><td>{{ row.self_note or '—' }}</td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
-  {% else %}
-    <p>خودارزیابی این دوره ثبت نشده است.</p>
+  <h2>مقایسهٔ خودارزیابی و ارزیابی مسئول مستقیم</h2>
+  <p class="hint">
+    امتیازهای ستون «خود فرد» در محاسبهٔ نتیجه نقشی ندارند؛ فقط برای دیدن تفاوت
+    دیدگاه‌ها آمده‌اند. ردیف‌ها با بیشترین اختلاف در بالا.
+  </p>
+  <table>
+    <colgroup>
+      <col style="width: 20%" />
+      <col style="width: 44%" />
+      <col style="width: 10%" />
+      <col style="width: 12%" />
+      <col style="width: 14%" />
+    </colgroup>
+    <thead>
+      <tr>
+        <th>دسته</th><th>شرح</th><th>خود فرد</th><th>مسئول مستقیم</th><th>اختلاف</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for row in snapshot.self_assessment.rows %}
+      <tr>
+        <td>{{ row.category }}</td>
+        <td>{{ row.description }}</td>
+        <td>{{ row.self_score }}</td>
+        <td>{{ row.evaluator_score if row.evaluator_score is not none else 'ثبت نشده' }}</td>
+        <td>{{ '%+d'|format(row.gap) if row.gap is not none else '—' }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% if snapshot.self_assessment.note %}
+  <div class="recommendation">دستاورد کلی از نگاه خود فرد: {{ snapshot.self_assessment.note }}</div>
+  {% endif %}
   {% endif %}
 
   {% if snapshot.comments %}

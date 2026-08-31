@@ -29,12 +29,12 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app.models.enums import EvaluationStatus, PeriodStatus, PersonnelStatus
+from app.models.enums import EvaluationStatus, PersonnelStatus
 from app.models.evaluation import EvaluationRecord
 from app.models.evaluation_access import EvaluationAccess
-from app.models.evaluation_period import EvaluationPeriod
 from app.models.personnel import Personnel
 from app.services.evaluation import inactive_seat_labels, next_evaluation_code
+from app.services.evaluation_window import require_active_period
 from app.services.indicator_framework import ensure_framework
 from app.services.scoring_scheme import active_scheme
 from app.services.workflow import IS_OPEN_RECORD
@@ -220,9 +220,7 @@ def execute(db: Session, cohort: CohortFilter) -> list[PersonPlan]:
     بنشیند.
     """
     plans = plan(db, cohort)
-    open_period = db.scalar(
-        select(EvaluationPeriod).where(EvaluationPeriod.status == PeriodStatus.open)
-    )
+    active_period = require_active_period(db)
     # همان مهرهایی که مسیر تک‌رکوردی می‌زند (P1-04 و P1-05) — یک‌بار برای کل
     # دسته خوانده می‌شوند، پس همهٔ پرونده‌های یک اجرا زیر یک نسخه‌اند.
     scheme = active_scheme(db)
@@ -250,7 +248,7 @@ def execute(db: Session, cohort: CohortFilter) -> list[PersonPlan]:
             ),
             deputy_user_id=access.deputy_user_id,
             ceo_user_id=access.ceo_user_id,
-            period_id=open_period.id if open_period else None,
+            period_id=active_period.id,
             scoring_scheme_id=scheme.id if scheme else None,
             indicator_framework_id=framework.id,
             # هر دو مسیر از `draft` شروع می‌شوند — همان رفتار create_evaluation.

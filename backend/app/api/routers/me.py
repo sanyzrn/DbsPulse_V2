@@ -10,11 +10,12 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from app.api.deps import require_roles
+from app.api.deps import require_module, require_roles
 from app.core.config import settings
 from app.db.session import get_db
 from app.models.enums import EvaluationStatus, ImprovementPlanStatus, UserRole
 from app.models.evaluation import EvaluationRecord
+from app.models.evaluation_period import EvaluationPeriod
 from app.models.improvement_plan import ImprovementPlan
 from app.models.self_assessment import SelfAssessmentScore
 from app.models.user import User
@@ -23,6 +24,7 @@ from app.schemas.evaluation import (
     MyEvaluationPage,
     MyEvaluationRead,
     MyOpenEvaluation,
+    MySelfAssessmentRead,
     ObjectionRequest,
     SelfAssessmentRead,
     SelfAssessmentScoreRead,
@@ -30,19 +32,26 @@ from app.schemas.evaluation import (
 )
 from app.schemas.improvement_plan import ImprovementPlanDetail
 from app.services.audit import log_event
+from app.services.evaluation_window import record_accepts_entries, require_record_window
 from app.services.indicator_framework import indicator_ids_for_record
 from app.services.notifications import notify
 from app.services.self_assessment import OPEN_STATUSES as SELF_ASSESSMENT_OPEN_STATUSES
-from app.services.self_assessment import policy_allows as self_assessment_policy_allows
 from app.services.workflow import IS_OPEN_RECORD
 
 router = APIRouter(prefix="/api/me", tags=["me"])
+
+_PERSONAL_PORTAL_ROLES = (
+    UserRole.employee,
+    UserRole.unit_supervisor,
+    UserRole.hr,
+    UserRole.support,
+)
 
 
 @router.get("/evaluations", response_model=MyEvaluationPage)
 def my_evaluations(
     db: Session = Depends(get_db),
-    current_user: CurrentUser = Depends(require_roles(UserRole.employee)),
+    current_user: CurrentUser = Depends(require_roles(*_PERSONAL_PORTAL_ROLES)),
 ) -> MyEvaluationPage:
     if current_user.personnel_id is None:
         return MyEvaluationPage(total=0, items=[])
@@ -60,7 +69,7 @@ def my_evaluations(
 @router.get("/evaluations/open", response_model=list[MyOpenEvaluation])
 def my_open_evaluation(
     db: Session = Depends(get_db),
-    current_user: CurrentUser = Depends(require_roles(UserRole.employee)),
+    current_user: CurrentUser = Depends(require_roles(*_PERSONAL_PORTAL_ROLES)),
 ) -> list[MyOpenEvaluation]:
     """پروندهٔ در جریانِ خود کارمند — فقط وضعیت، بدون هیچ امتیاز یا کامنتی.
 
@@ -79,21 +88,61 @@ def my_open_evaluation(
         )
         .order_by(EvaluationRecord.created_at.desc())
     )
-    return [
-        MyOpenEvaluation.model_validate(r).model_copy(
-            update={
-                "indicator_ids": sorted(indicator_ids_for_record(db, r)),
-                "self_assessment_open": r.status in SELF_ASSESSMENT_OPEN_STATUSES,
-            }
+    result = []
+    for record in records:
+        period = db.get(EvaluationPeriod, record.period_id) if record.period_id else None
+        result.append(
+            MyOpenEvaluation.model_validate(record).model_copy(
+                update={
+                    "indicator_ids": sorted(indicator_ids_for_record(db, record)),
+                    "self_assessment_open": (
+                        record.status in SELF_ASSESSMENT_OPEN_STATUSES
+                        and record_accepts_entries(db, record)
+                    ),
+                    "period_name": period.name if period else None,
+                    "period_ends_on": period.ends_on if period else None,
+                }
+            )
         )
-        for r in records
-    ]
+    return result
+
+
+@router.get("/self-assessments", response_model=list[MySelfAssessmentRead])
+def my_self_assessments(
+    db: Session = Depends(get_db),
+    current_user: CurrentUser = Depends(require_roles(*_PERSONAL_PORTAL_ROLES)),
+) -> list[MySelfAssessmentRead]:
+    """تمام خودارزیابی‌های ثبت‌شدهٔ خود فرد، حتی پس از بسته‌شدن پرونده."""
+    if current_user.personnel_id is None:
+        return []
+    records = db.scalars(
+        select(EvaluationRecord)
+        .where(
+            EvaluationRecord.subject_personnel_id == current_user.personnel_id,
+            EvaluationRecord.self_assessment_submitted_at.is_not(None),
+        )
+        .order_by(EvaluationRecord.self_assessment_submitted_at.desc())
+    )
+    result = []
+    for record in records:
+        period = db.get(EvaluationPeriod, record.period_id) if record.period_id else None
+        self_assessment = _self_assessment_of(db, record)
+        result.append(
+            MySelfAssessmentRead(
+                evaluation_id=record.id,
+                evaluation_code=record.evaluation_code,
+                period_name=period.name if period else None,
+                period_ends_on=period.ends_on if period else None,
+                **self_assessment.model_dump(),
+            )
+        )
+    return result
 
 
 @router.get("/improvement-plans", response_model=list[ImprovementPlanDetail])
 def my_improvement_plans(
     db: Session = Depends(get_db),
-    current_user: CurrentUser = Depends(require_roles(UserRole.employee)),
+    current_user: CurrentUser = Depends(require_roles(*_PERSONAL_PORTAL_ROLES)),
 ) -> list[ImprovementPlan]:
     """برنامه‌های بهبودِ بازِ خود کارمند (فقط خواندنی) — تا بداند چه انتظاری از او می‌رود."""
     if current_user.personnel_id is None:
@@ -119,7 +168,7 @@ _SELF_ASSESSMENT_OPEN_STATUSES = SELF_ASSESSMENT_OPEN_STATUSES
 def get_my_self_assessment(
     evaluation_id: int,
     db: Session = Depends(get_db),
-    current_user: CurrentUser = Depends(require_roles(UserRole.employee)),
+    current_user: CurrentUser = Depends(require_roles(*_PERSONAL_PORTAL_ROLES)),
 ) -> SelfAssessmentRead:
     record = _my_record_or_404(db, evaluation_id, current_user)
     return _self_assessment_of(db, record)
@@ -130,24 +179,26 @@ def submit_self_assessment(
     evaluation_id: int,
     payload: SelfAssessmentSubmit,
     db: Session = Depends(get_db),
-    current_user: CurrentUser = Depends(require_roles(UserRole.employee)),
+    current_user: CurrentUser = Depends(require_roles(*_PERSONAL_PORTAL_ROLES)),
+    _module: None = Depends(require_module("self_assessment")),
 ) -> SelfAssessmentRead:
-    """ثبت خودارزیابی — نظر خودِ فرد پیش از آن‌که نمرهٔ ارزیاب قطعی شود.
+    """ثبت خودارزیابی مستقلِ فرد تا پیش از نهایی‌شدن پرونده.
 
     اختیاری و غیرمسدودکننده است: اگر کارمند چیزی ثبت نکند، گردش‌کار مثل قبل جلو
     می‌رود. مرحلهٔ مسدودکننده یعنی یک کارمندِ بی‌پاسخ کل پرونده را متوقف می‌کند —
     همان بن‌بستی که تازه از گردش‌کار حذف شد.
 
-    یک‌بار ثبت می‌شود و قفل می‌ماند: اگر بعد از دیدن نمرهٔ ارزیاب قابل ویرایش بود،
-    دیگر دیدگاه مستقلی نبود.
+    یک‌بار ثبت می‌شود و برای همان دوره قفل می‌ماند. نتیجهٔ ارزیاب تا نهایی‌شدن
+    پرونده به فرد نشان داده نمی‌شود و مقایسه فقط در اختیار منابع انسانی است.
     """
     record = _my_record_or_404(db, evaluation_id, current_user)
 
     if record.status not in _SELF_ASSESSMENT_OPEN_STATUSES:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="مهلت خودارزیابی گذشته است؛ نمرهٔ ارزیاب قبلاً ثبت شده",
+            detail="مهلت خودارزیابی گذشته است؛ پرونده قبلاً نهایی شده",
         )
+    require_record_window(db, record)
     if record.self_assessment_submitted_at is not None:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -175,6 +226,14 @@ def submit_self_assessment(
                 detail="هر شاخص فقط یک‌بار می‌تواند امتیاز بگیرد",
             )
         seen.add(item.indicator_id)
+
+    if not allowed or seen != allowed:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="برای ثبت نهایی باید به همهٔ شاخص‌های این دوره امتیاز بدهید",
+        )
+
+    for item in payload.scores:
         db.add(
             SelfAssessmentScore(
                 evaluation_record_id=record.id,
@@ -194,30 +253,30 @@ def submit_self_assessment(
         new_value={"scored_indicators": len(payload.scores)},
     )
 
-    # اعلان به نمره‌دهندهٔ اول — ولی فقط اگر سیاستِ محرمانگی اجازهٔ دیدنش را
-    # بدهد.
-    #
-    # پیش از این بی‌قید فرستاده می‌شد، با این استدلال که «وگرنه بی‌آنکه ببیندش
-    # نمره می‌دهد». ولی پیش‌فرضِ سیاست، خودارزیابی را از نمره‌دهنده پنهان
-    # می‌کند؛ پس اعلان به پروند‌ه‌ای می‌رسید که در آن چیزی برای دیدن نبود —
-    # خبری از چیزی که گیرنده هیچ‌وقت به آن نمی‌رسید.
-    #
-    # حالا `may_view` عمداً هم آن را تا پایانِ نمره‌دهی پنهان می‌کند (گاردِ
-    # ضدلنگر)، پس متن هم همین را می‌گوید: هست، ولی بعد از ثبتِ نمرهٔ شما.
-    evaluator_id = record.unit_supervisor_user_id or record.deputy_user_id
-    evaluator_role = db.scalar(select(User.role).where(User.id == evaluator_id))
-    if evaluator_role is not None and self_assessment_policy_allows(evaluator_role):
-        notify(
-            db,
-            [evaluator_id],
-            type_="self_assessment_submitted",
-            message=(
-                f"{record.subject.full_name} خودارزیابی‌اش را برای پروندهٔ "
-                f"{record.evaluation_code} ثبت کرد؛ پس از ثبتِ نمرهٔ شما قابل مشاهده است"
-            ),
-            evaluation_record_id=record.id,
-            link=f"/evaluations/{record.id}",
+    hr_ids = list(
+        db.scalars(
+            select(User.id).where(
+                User.role == UserRole.hr,
+                User.is_active.is_(True),
+                User.id != current_user.id,
+            )
         )
+    )
+    notify(
+        db,
+        hr_ids,
+        type_="self_assessment_submitted",
+        message=(
+            f"{record.subject.full_name} خودارزیابی پروندهٔ {record.evaluation_code} را ثبت کرد؛ "
+            + (
+                "جدول مقایسه اکنون آماده است"
+                if record.status != EvaluationStatus.draft
+                else "جدول مقایسه پس از ثبت ارزیابی مدیر آماده می‌شود"
+            )
+        ),
+        evaluation_record_id=record.id,
+        link=f"/evaluations/{record.id}",
+    )
 
     db.commit()
     db.refresh(record)
@@ -259,7 +318,7 @@ def file_objection(
     evaluation_id: int,
     payload: ObjectionRequest,
     db: Session = Depends(get_db),
-    current_user: CurrentUser = Depends(require_roles(UserRole.employee)),
+    current_user: CurrentUser = Depends(require_roles(*_PERSONAL_PORTAL_ROLES)),
 ) -> EvaluationRecord:
     """ثبت اعتراض رسمی به نتیجهٔ نهایی.
 
@@ -334,7 +393,7 @@ def file_objection(
 def acknowledge_evaluation(
     evaluation_id: int,
     db: Session = Depends(get_db),
-    current_user: CurrentUser = Depends(require_roles(UserRole.employee)),
+    current_user: CurrentUser = Depends(require_roles(*_PERSONAL_PORTAL_ROLES)),
 ) -> EvaluationRecord:
     record = _my_record_or_404(db, evaluation_id, current_user)
     if record.status != EvaluationStatus.finalized:

@@ -28,6 +28,8 @@ export function PeriodsPage() {
   const [error, setError] = useState<string | null>(null);
   const [showAddPeriod, setShowAddPeriod] = useState(false);
   const [showBulkCreate, setShowBulkCreate] = useState(false);
+  const [editingPeriod, setEditingPeriod] = useState<EvaluationPeriod | null>(null);
+  const [editForm, setEditForm] = useState(emptyForm);
 
   const { data: periods = [], error: loadError } = usePeriods();
   const openPeriod = periods.find((p) => p.status === "open") ?? null;
@@ -94,6 +96,27 @@ export function PeriodsPage() {
     }
   }
 
+  function beginEdit(period: EvaluationPeriod) {
+    setError(null);
+    setEditForm({ name: period.name, starts_on: period.starts_on, ends_on: period.ends_on });
+    setEditingPeriod(period);
+  }
+
+  async function updatePeriod() {
+    if (!editingPeriod) return;
+    setError(null);
+    try {
+      await apiClient.patch(`/periods/${editingPeriod.id}`, editForm);
+      await invalidate();
+      setEditingPeriod(null);
+      showSuccess(editingPeriod.window_state === "expired" ? "مهلت دوره تمدید شد" : "بازه دوره ویرایش شد");
+    } catch (err) {
+      const message = extractErrorMessage(err);
+      setError(message);
+      showError(message);
+    }
+  }
+
   return (
     <div className="space-y-4">
       <PageHeader title="دوره‌های ارزیابی" subtitle="آغاز، پایش پیشرفت و بستن دوره‌های ارزیابی سازمان" />
@@ -150,7 +173,45 @@ export function PeriodsPage() {
         </Modal>
       )}
 
-      {openPeriod && <OpenPeriodCard period={openPeriod} onClose={() => closePeriod(openPeriod)} />}
+      {openPeriod && (
+        <OpenPeriodCard period={openPeriod} onClose={() => closePeriod(openPeriod)} onEdit={() => beginEdit(openPeriod)} />
+      )}
+
+      {editingPeriod && (
+        <Modal
+          title={editingPeriod.window_state === "expired" ? "تمدید مهلت دوره" : "ویرایش بازه دوره"}
+          onClose={() => setEditingPeriod(null)}
+          footer={
+            <>
+              <Button variant="secondary" onClick={() => setEditingPeriod(null)}>انصراف</Button>
+              <Button type="submit" form="edit-period-form">
+                {editingPeriod.window_state === "expired" ? "تمدید مهلت" : "ذخیره تغییرات"}
+              </Button>
+            </>
+          }
+        >
+          <form id="edit-period-form" onSubmit={(event) => { event.preventDefault(); updatePeriod(); }} className="space-y-3 py-2 text-sm">
+            <label className="block text-xs font-medium text-gray-600">
+              نام دوره
+              <input required className={`${inputClass} mt-1`} value={editForm.name} onChange={(event) => setEditForm({ ...editForm, name: event.target.value })} />
+            </label>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <label className="block text-xs font-medium text-gray-600">
+                تاریخ شروع
+                <JalaliDatePicker required className={`${inputClass} mt-1`} value={editForm.starts_on} onChange={(iso) => setEditForm({ ...editForm, starts_on: iso })} />
+              </label>
+              <label className="block text-xs font-medium text-gray-600">
+                تاریخ پایان
+                <JalaliDatePicker required className={`${inputClass} mt-1`} value={editForm.ends_on} onChange={(iso) => setEditForm({ ...editForm, ends_on: iso })} />
+              </label>
+            </div>
+            <p className="text-xs text-gray-500">
+              پس از پایان این تاریخ، ثبت امتیاز مدیر و خودارزیابی متوقف می‌شود. با انتخاب تاریخ پایان جدید، دسترسی دوباره فعال خواهد شد.
+            </p>
+          </form>
+          {error && <p className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p>}
+        </Modal>
+      )}
 
       <div className="rounded-2xl border border-gray-200 bg-white p-4">
         <h2 className="mb-4 text-base font-bold text-gray-900">تاریخچه دوره‌ها</h2>
@@ -187,7 +248,7 @@ export function PeriodsPage() {
   );
 }
 
-function OpenPeriodCard({ period, onClose }: { period: EvaluationPeriod; onClose: () => void }) {
+function OpenPeriodCard({ period, onClose, onEdit }: { period: EvaluationPeriod; onClose: () => void; onEdit: () => void }) {
   const { data: progress } = usePeriodProgress(period.id);
 
   const eligible = progress?.eligible ?? 0;
@@ -196,6 +257,16 @@ function OpenPeriodCard({ period, onClose }: { period: EvaluationPeriod; onClose
   const inProgress = progress?.in_progress ?? 0;
   const notStartedTotal = progress?.not_started_total ?? 0;
   const pct = (value: number) => (eligible ? Math.round((value / eligible) * 100) : 0);
+  const stateLabel = period.window_state === "active"
+    ? "در جریان"
+    : period.window_state === "upcoming"
+      ? "هنوز آغاز نشده"
+      : "مهلت پایان یافته";
+  const stateClass = period.window_state === "active"
+    ? "bg-green-50 text-green-700"
+    : period.window_state === "upcoming"
+      ? "bg-blue-50 text-blue-700"
+      : "bg-amber-50 text-amber-700";
 
   return (
     <motion.div
@@ -208,21 +279,23 @@ function OpenPeriodCard({ period, onClose }: { period: EvaluationPeriod; onClose
         <div>
           <h2 className="flex items-center gap-2 text-base font-bold text-gray-900">
             دوره باز: {period.name}
-            <span className="inline-flex items-center gap-1.5 rounded-full bg-green-50 px-2.5 py-0.5 text-xs font-medium text-green-700">
-              <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-green-500" style={{ animation: "var(--animate-pulse-slow)" }} />
-              در جریان
+            <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium ${stateClass}`}>
+              <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-current" />
+              {stateLabel}
             </span>
           </h2>
           <p className="mt-1 text-xs text-gray-400">
             {formatDate(period.starts_on)} تا {formatDate(period.ends_on)}
           </p>
         </div>
-        <button
-          onClick={onClose}
-          className="rounded-xl border border-gray-200 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 shadow-sm transition-all duration-200 hover:bg-gray-50 hover:shadow-md"
-        >
-          بستن دوره
-        </button>
+        <div className="flex gap-2">
+          <button onClick={onEdit} className="rounded-xl border border-gray-200 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 shadow-sm transition-all duration-200 hover:bg-gray-50 hover:shadow-md">
+            {period.window_state === "expired" ? "تمدید مهلت" : "ویرایش بازه"}
+          </button>
+          <button onClick={onClose} className="rounded-xl border border-gray-200 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 shadow-sm transition-all duration-200 hover:bg-gray-50 hover:shadow-md">
+            بستن دوره
+          </button>
+        </div>
       </div>
 
       {progress && (

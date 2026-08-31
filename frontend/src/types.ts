@@ -73,6 +73,7 @@ export interface Personnel {
 export type SelfAssessmentState =
   | "no_case"
   | "no_account"
+  | "not_eligible"
   | "closed"
   | "pending"
   | "invited"
@@ -231,6 +232,8 @@ export interface MyOpenEvaluation {
   indicator_ids: number[];
   /** آیا پنجرهٔ خودارزیابی هنوز باز است — سرور تصمیم می‌گیرد، نه فرانت. */
   self_assessment_open: boolean;
+  period_name: string | null;
+  period_ends_on: string | null;
 }
 
 export interface SelfAssessmentScoreRow {
@@ -243,6 +246,13 @@ export interface SelfAssessment {
   submitted_at: string | null;
   note: string | null;
   scores: SelfAssessmentScoreRow[];
+}
+
+export interface MySelfAssessment extends SelfAssessment {
+  evaluation_id: number;
+  evaluation_code: string;
+  period_name: string | null;
+  period_ends_on: string | null;
 }
 
 export interface EvaluationScoreRow {
@@ -619,6 +629,8 @@ export interface EvaluationPeriod {
   status: PeriodStatus;
   created_at: string;
   closed_at: string | null;
+  window_state: "active" | "upcoming" | "expired" | "closed";
+  accepting_entries: boolean;
 }
 
 export interface NotStartedPersonnel {

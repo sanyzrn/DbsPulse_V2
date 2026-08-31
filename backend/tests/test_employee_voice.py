@@ -8,7 +8,7 @@
 from datetime import UTC, datetime, timedelta
 
 from app.core.config import settings
-from app.models.enums import Capability
+from app.models.enums import Capability, UserRole
 from app.models.evaluation import EvaluationRecord
 from tests.helpers import (
     active_indicators,
@@ -399,6 +399,43 @@ def test_the_employee_can_submit_a_self_assessment_while_the_case_is_open(client
     assert open_row["self_assessment_submitted_at"] is not None
 
 
+def test_every_role_except_deputy_and_ceo_can_self_assess_its_own_record(client, db_session):
+    for role in (UserRole.hr, UserRole.unit_supervisor, UserRole.support):
+        case = _case(client, db_session, finalize=False)
+        case["employee"].role = role
+        db_session.commit()
+
+        response = client.post(
+            f"/api/me/evaluations/{case['id']}/self-assessment",
+            json=_indicator_payload(db_session, 4),
+            headers=auth_header(case["employee"]),
+        )
+        assert response.status_code == 200, role
+
+
+def test_deputy_and_ceo_have_no_self_assessment_access(client, db_session):
+    case = _case(client, db_session, finalize=False)
+    for actor in ("dep", "ceo"):
+        response = client.get(
+            "/api/me/evaluations/open", headers=auth_header(case[actor])
+        )
+        assert response.status_code == 403, actor
+
+
+def test_hr_cannot_invite_a_deputy_or_ceo_to_self_assess(client, db_session):
+    for role in (UserRole.deputy, UserRole.ceo):
+        case = _case(client, db_session, finalize=False)
+        case["employee"].role = role
+        db_session.commit()
+
+        response = client.post(
+            f"/api/personnel/{case['personnel'].id}/invite-self-assessment",
+            headers=auth_header(case["hr"]),
+        )
+        assert response.status_code == 400, role
+        assert "مشمول خودارزیابی نیستند" in response.json()["detail"]
+
+
 def test_the_self_assessment_never_enters_the_result(client, db_session):
     """قلب این بخش: نظر فرد یک دیدگاه دوم است، نه یک رأی.
 
@@ -428,7 +465,7 @@ def test_the_self_assessment_never_enters_the_result(client, db_session):
     assert final["final_weighted_pct"] == 60.0, "خودارزیابی نباید در میانگین اثر بگذارد"
 
 
-def test_self_assessment_visibility_defaults_to_hr_only_and_can_enable_the_evaluator(
+def test_comparison_is_hr_only_and_appears_after_both_forms_are_submitted(
     client, db_session
 ):
     case = _case(client, db_session, finalize=False)
@@ -443,39 +480,24 @@ def test_self_assessment_visibility_defaults_to_hr_only_and_can_enable_the_evalu
         headers=auth_header(case["employee"]),
     )
 
-    supervisor_detail = client.get(
-        f"/api/evaluations/{case['id']}", headers=auth_header(case["sup"])
+    before_manager_submit = client.get(
+        f"/api/evaluations/{case['id']}", headers=auth_header(case["hr"])
     ).json()
+    assert before_manager_submit["self_assessment"] is None
+
+    client.post(f"/api/evaluations/{case['id']}/submit", headers=auth_header(case["sup"]))
     hr_detail = client.get(
         f"/api/evaluations/{case['id']}", headers=auth_header(case["hr"])
     ).json()
-
-    assert supervisor_detail["self_assessment"] is None
     assert hr_detail["self_assessment"] is not None
     assert len(hr_detail["self_assessment"]["scores"]) == 20
+    assert hr_detail["scores"][0]["score"] == 3
 
-    original = settings.self_assessment_visible_to_unit_supervisor
-    try:
-        settings.self_assessment_visible_to_unit_supervisor = True
-
-        # روشن‌بودنِ سوییچ کافی نیست: پرونده هنوز در `draft` است، یعنی سرِ میزِ
-        # نمره‌دهی. دیدنِ نمرهٔ خودِ فرد در این لحظه دیدگاهِ دوم نیست، لنگر است.
-        still_hidden = client.get(
-            f"/api/evaluations/{case['id']}", headers=auth_header(case["sup"])
+    for actor in ("sup", "dep", "ceo"):
+        detail = client.get(
+            f"/api/evaluations/{case['id']}", headers=auth_header(case[actor])
         ).json()
-        assert still_hidden["self_assessment"] is None
-
-        # پس از ثبتِ نمره، نمره قفل است و دیدنش دیگر لنگر نیست — همان‌جا که
-        # گفت‌وگو دربارهٔ فاصله‌ها ممکن می‌شود.
-        client.post(f"/api/evaluations/{case['id']}/submit", headers=auth_header(case["sup"]))
-        enabled_detail = client.get(
-            f"/api/evaluations/{case['id']}", headers=auth_header(case["sup"])
-        ).json()
-        assert enabled_detail["self_assessment"]["scores"][0]["score"] == 5
-        # و امتیاز خود ارزیاب جداگانه سر جایش است
-        assert enabled_detail["scores"][0]["score"] == 3
-    finally:
-        settings.self_assessment_visible_to_unit_supervisor = original
+        assert detail["self_assessment"] is None, actor
 
 
 def test_a_case_without_a_self_assessment_is_perfectly_normal(client, db_session):
@@ -512,7 +534,7 @@ def test_the_self_assessment_is_locked_after_submission(client, db_session):
     assert "قابل تغییر نیست" in again.json()["detail"]
 
 
-def test_the_window_closes_once_the_evaluator_has_scored(client, db_session):
+def test_the_window_stays_open_after_the_evaluator_has_scored(client, db_session):
     case = _case(client, db_session, finalize=False)  # وضعیت: submitted
 
     r = client.post(
@@ -521,8 +543,7 @@ def test_the_window_closes_once_the_evaluator_has_scored(client, db_session):
         headers=auth_header(case["employee"]),
     )
 
-    assert r.status_code == 400
-    assert "مهلت خودارزیابی" in r.json()["detail"]
+    assert r.status_code == 200
 
 
 def _self_assessment_notes(client, user):
@@ -531,12 +552,7 @@ def _self_assessment_notes(client, user):
     return [n for n in rows if "خودارزیابی" in n["message"]]
 
 
-def test_no_notification_when_the_scorer_is_not_allowed_to_see_it(client, db_session):
-    """خبردادن از چیزی که گیرنده هرگز به آن نمی‌رسد، فقط نوفه است.
-
-    پیش‌فرضِ سیاست، خودارزیابی را از مسئول واحد پنهان می‌کند؛ پس اعلان هم
-    نباید برود.
-    """
+def test_submission_notifies_hr_and_never_the_scorer(client, db_session):
     case = _case(client, db_session, finalize=False)
     client.post(
         f"/api/evaluations/{case['id']}/return",
@@ -550,31 +566,9 @@ def test_no_notification_when_the_scorer_is_not_allowed_to_see_it(client, db_ses
     )
 
     assert _self_assessment_notes(client, case["sup"]) == []
-
-
-def test_submitting_notifies_the_first_scorer_when_they_may_see_it(client, db_session):
-    case = _case(client, db_session, finalize=False)
-    client.post(
-        f"/api/evaluations/{case['id']}/return",
-        json={"reason": "بازگشت"},
-        headers=auth_header(case["hr"]),
-    )
-
-    original = settings.self_assessment_visible_to_unit_supervisor
-    try:
-        settings.self_assessment_visible_to_unit_supervisor = True
-        client.post(
-            f"/api/me/evaluations/{case['id']}/self-assessment",
-            json=_indicator_payload(db_session, 4),
-            headers=auth_header(case["employee"]),
-        )
-    finally:
-        settings.self_assessment_visible_to_unit_supervisor = original
-
-    rows = _self_assessment_notes(client, case["sup"])
-    assert rows, "نمره‌دهنده باید خبردار شود"
-    # متن باید زمانِ دیدن را هم بگوید، وگرنه دنبالِ چیزی می‌گردد که هنوز پنهان است
-    assert "پس از ثبتِ نمرهٔ شما" in rows[0]["message"]
+    rows = _self_assessment_notes(client, case["hr"])
+    assert rows, "منابع انسانی باید خبردار شود"
+    assert "جدول مقایسه" in rows[0]["message"]
 
 
 def test_an_employee_cannot_self_assess_someone_elses_record(client, db_session):
@@ -593,14 +587,9 @@ def test_an_employee_cannot_self_assess_someone_elses_record(client, db_session)
 # ───────────────────────── پنجرهٔ خودارزیابی: پیوسته و یک‌جا تعریف‌شده
 
 
-def test_the_window_does_not_reopen_after_hr_approval(client, db_session):
-    """پنجره ناپیوسته نیست.
-
-    `hr_approved` زمانی در فهرستِ بازها بود، چون مسیر «مدیر» مستقیماً از همان
-    وضعیت شروع می‌شد. آن رفتار برداشته شد ولی عضو ماند، و نتیجه‌اش پنجره‌ای بود
-    که بعد از ثبتِ نمرهٔ ارزیاب *و* تأیید منابع انسانی دوباره باز می‌شد — دقیقاً
-    همان چیزی که قرار بود ممکن نباشد.
-    """
+def test_the_window_remains_open_during_approval_and_closes_at_finalization(
+    client, db_session
+):
     case = _case(client, db_session, finalize=False)  # وضعیت: submitted
     client.post(f"/api/evaluations/{case['id']}/hr-approve", headers=auth_header(case["hr"]))
 
@@ -610,16 +599,26 @@ def test_the_window_does_not_reopen_after_hr_approval(client, db_session):
         headers=auth_header(case["employee"]),
     )
 
-    assert r.status_code == 400
-    assert "مهلت خودارزیابی" in r.json()["detail"]
+    assert r.status_code == 200
+
+    finalized = _case(client, db_session, finalize=True)
+    closed = client.post(
+        f"/api/me/evaluations/{finalized['id']}/self-assessment",
+        json=_indicator_payload(db_session, 5),
+        headers=auth_header(finalized["employee"]),
+    )
+    assert closed.status_code == 400
+    assert "نهایی شده" in closed.json()["detail"]
 
 
 def test_the_open_case_says_whether_the_window_is_open(client, db_session):
     """تعریفِ پنجره یک جا بیشتر نیست؛ فرانت آن را از سرور می‌گیرد نه از کپیِ دستی."""
     case = _case(client, db_session, finalize=False)  # وضعیت: submitted
 
-    closed = client.get("/api/me/evaluations/open", headers=auth_header(case["employee"])).json()
-    assert closed[0]["self_assessment_open"] is False
+    open_after_scoring = client.get(
+        "/api/me/evaluations/open", headers=auth_header(case["employee"])
+    ).json()
+    assert open_after_scoring[0]["self_assessment_open"] is True
 
     client.post(
         f"/api/evaluations/{case['id']}/return",
@@ -631,6 +630,17 @@ def test_the_open_case_says_whether_the_window_is_open(client, db_session):
 
 
 # ───────────────────────── دعوت: یادآوری، نه بن‌بست
+
+
+def test_opening_an_evaluation_does_not_notify_the_employee(client, db_session):
+    case = _case(client, db_session, finalize=False)
+    notes = client.get(
+        "/api/notifications", headers=auth_header(case["employee"])
+    ).json()
+    rows = notes["items"] if isinstance(notes, dict) else notes
+    invites = [n for n in rows if n["type"] == "self_assessment_invited"]
+
+    assert invites == []
 
 
 def test_the_invitation_can_be_sent_again_as_a_reminder(client, db_session):
@@ -656,8 +666,8 @@ def test_the_invitation_can_be_sent_again_as_a_reminder(client, db_session):
     notes = client.get("/api/notifications", headers=auth_header(case["employee"])).json()
     rows = notes["items"] if isinstance(notes, dict) else notes
     invites = [n for n in rows if n["type"] == "self_assessment_invited"]
-    assert len(invites) == 2, "هر دو بار باید اعلان بسازد"
-    assert any("یادآوری" in n["message"] for n in invites), "دومی باید یادآوری باشد"
+    assert len(invites) == 2, "هر درخواست HR باید یک یادآوری ساده بسازد"
+    assert sum("یادآوری" in n["message"] for n in invites) == 2
 
 
 def test_a_reminder_is_refused_once_the_person_has_answered(client, db_session):

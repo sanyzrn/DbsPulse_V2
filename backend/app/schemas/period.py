@@ -1,6 +1,6 @@
 from datetime import date, datetime
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, computed_field, model_validator
 
 from app.models.enums import PeriodStatus
 
@@ -44,6 +44,23 @@ class PeriodRead(BaseModel):
     status: PeriodStatus
     created_at: datetime
     closed_at: datetime | None
+
+    @computed_field  # type: ignore[prop-decorator]
+    @property
+    def window_state(self) -> str:
+        if self.status == PeriodStatus.closed:
+            return "closed"
+        current = date.today()
+        if current < self.starts_on:
+            return "upcoming"
+        if current > self.ends_on:
+            return "expired"
+        return "active"
+
+    @computed_field  # type: ignore[prop-decorator]
+    @property
+    def accepting_entries(self) -> bool:
+        return self.window_state == "active"
 
 
 class NotStartedPersonnel(BaseModel):

@@ -133,6 +133,37 @@
   <p>{{ snapshot.evaluator_comment }}</p>
   {% endif %}
 
+  <h2>مقایسه ارزیابی مدیر و خودارزیابی</h2>
+  {% if snapshot.self_assessment %}
+    {% if snapshot.self_assessment.note %}
+    <p><b>توضیح کلی فرد:</b> {{ snapshot.self_assessment.note }}</p>
+    {% endif %}
+    <table>
+      <colgroup>
+        <col style="width: 17%" />
+        <col style="width: 38%" />
+        <col style="width: 9%" />
+        <col style="width: 9%" />
+        <col style="width: 9%" />
+        <col style="width: 18%" />
+      </colgroup>
+      <thead>
+        <tr><th>دسته</th><th>شرح</th><th>مدیر</th><th>خودارزیابی</th><th>اختلاف</th><th>توضیح فرد</th></tr>
+      </thead>
+      <tbody>
+        {% for row in snapshot.score_comparison %}
+        <tr>
+          <td>{{ row.category }}</td><td>{{ row.description }}</td>
+          <td>{{ row.manager_score }}</td><td>{{ row.self_score }}</td>
+          <td>{{ row.gap }}</td><td>{{ row.self_note or '—' }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  {% else %}
+    <p>خودارزیابی این دوره ثبت نشده است.</p>
+  {% endif %}
+
   {% if snapshot.comments %}
   <h2>کامنت‌های مراحل بررسی</h2>
   <table>

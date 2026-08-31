@@ -1,15 +1,15 @@
 from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-_INSECURE_DEFAULT_JWT_SECRET = "change-this-to-a-long-random-string"
-
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
 
     environment: str = "development"
-    database_url: str = "postgresql+psycopg://dbspulse:dbspulse_dev_password@localhost:5432/dbspulse"
-    jwt_secret_key: str = _INSECURE_DEFAULT_JWT_SECRET
+    # اطلاعات اتصال و کلید امضا نباید حتی به‌عنوان مقدار توسعه داخل سورس باشند.
+    # توسعه، تست و production همگی باید آن‌ها را از محیط یا فایل .env بگیرند.
+    database_url: str
+    jwt_secret_key: str
     jwt_algorithm: str = "HS256"
     access_token_expire_minutes: int = 30
     refresh_token_expire_days: int = 7
@@ -92,12 +92,6 @@ class Settings(BaseSettings):
     sla_reminder_days: int = 3
     # چند روز مانده به تاریخ بازنگری برنامه بهبود، به HR و مسئول پیگیری یادآوری شود
     improvement_review_alert_days: int = 7
-    # دیدنِ خودارزیابی یک سیاست محرمانگیِ نقش‌محور است. پیش‌فرض فقط HR است؛
-    # نقش‌های تصمیم‌گیر صرفاً وقتی می‌بینند که مدیر سامانه صریحاً روشن کند.
-    self_assessment_visible_to_hr: bool = True
-    self_assessment_visible_to_unit_supervisor: bool = False
-    self_assessment_visible_to_deputy: bool = False
-    self_assessment_visible_to_ceo: bool = False
     # پنجره‌ای که در آن یک اعلانِ تکراری (همان کلید) دوباره ساخته نمی‌شود
     notification_dedup_days: int = 7
 
@@ -151,10 +145,10 @@ class Settings(BaseSettings):
 
     @model_validator(mode="after")
     def _forbid_insecure_secret_in_production(self) -> "Settings":
-        if self.environment == "production" and self.jwt_secret_key == _INSECURE_DEFAULT_JWT_SECRET:
+        if self.environment == "production" and len(self.jwt_secret_key.strip()) < 32:
             raise RuntimeError(
-                "JWT_SECRET_KEY هنوز مقدار پیش‌فرض دمو است. پیش از اجرا در محیط production "
-                "یک مقدار تصادفی و طولانی برای JWT_SECRET_KEY در .env تنظیم کنید."
+                "JWT_SECRET_KEY برای محیط production کوتاه و ناامن است؛ یک مقدار تصادفی "
+                "با حداقل ۳۲ نویسه در متغیر محیطی تنظیم کنید."
             )
         return self
 

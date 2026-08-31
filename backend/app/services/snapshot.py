@@ -10,14 +10,16 @@ from sqlalchemy.orm import Session
 from app.models.evaluation import EvaluationComment, EvaluationRecord, EvaluationScore
 from app.models.indicator import Indicator
 from app.models.personnel import Personnel
+from app.models.self_assessment import SelfAssessmentScore
 from app.models.user import User
 from app.services.workflow import is_manager_path
 
+# ۴: افزودن خودارزیابی و جدول مقایسهٔ مدیر/فرد.
 # ۳: افزودن `single_decider` — نمره‌دهندهٔ اول و تأییدکنندهٔ نهایی یک نفر بوده‌اند.
 # ۲: افزودن امتیاز ویژه (`bonus_points` / `bonus_reason` / `base_weighted_pct`).
 # افزودنی است، پس قالب PDF هر دو نسخه را رندر می‌کند: در snapshot نسخهٔ ۱ این
 # کلیدها نیستند و بخشِ مربوطه اصلاً چاپ نمی‌شود.
-SNAPSHOT_VERSION = 3
+SNAPSHOT_VERSION = 4
 
 
 def build_final_snapshot(db: Session, record: EvaluationRecord) -> dict:
@@ -29,10 +31,36 @@ def build_final_snapshot(db: Session, record: EvaluationRecord) -> dict:
     scores = db.scalars(
         select(EvaluationScore).where(EvaluationScore.evaluation_record_id == record.id)
     ).all()
+    self_scores = db.scalars(
+        select(SelfAssessmentScore).where(
+            SelfAssessmentScore.evaluation_record_id == record.id
+        )
+    ).all()
     comments = db.scalars(
         select(EvaluationComment).where(EvaluationComment.evaluation_record_id == record.id)
     ).all()
     indicators_by_id = {i.id: i for i in db.scalars(select(Indicator))}
+    self_by_indicator = {row.indicator_id: row for row in self_scores}
+
+    def indicator_data(indicator_id: int) -> tuple[str, str, str]:
+        indicator = indicators_by_id.get(indicator_id)
+        if indicator is None:
+            return "—", "(شاخص حذف‌شده)", "general"
+        return indicator.category, indicator.description, indicator.section.value
+
+    def comparison_row(score: EvaluationScore) -> dict:
+        self_row = self_by_indicator.get(score.indicator_id)
+        category, description, section = indicator_data(score.indicator_id)
+        return {
+            "indicator_id": score.indicator_id,
+            "category": category,
+            "description": description,
+            "section": section,
+            "manager_score": score.score,
+            "self_score": self_row.score if self_row else None,
+            "gap": score.score - self_row.score if self_row else None,
+            "self_note": self_row.note if self_row else None,
+        }
 
     manager_path = is_manager_path(record)
     evaluator_user_id = record.deputy_user_id if manager_path else record.unit_supervisor_user_id
@@ -86,6 +114,26 @@ def build_final_snapshot(db: Session, record: EvaluationRecord) -> dict:
             }
             for s in scores
         ],
+        "self_assessment": (
+            {
+                "submitted_at": record.self_assessment_submitted_at.isoformat(),
+                "note": record.self_assessment_note,
+                "scores": [
+                    {
+                        "indicator_id": row.indicator_id,
+                        "category": indicator_data(row.indicator_id)[0],
+                        "description": indicator_data(row.indicator_id)[1],
+                        "section": indicator_data(row.indicator_id)[2],
+                        "score": row.score,
+                        "note": row.note,
+                    }
+                    for row in self_scores
+                ],
+            }
+            if record.self_assessment_submitted_at is not None
+            else None
+        ),
+        "score_comparison": [comparison_row(score) for score in scores],
         "comments": [
             {
                 "stage": c.stage.value,

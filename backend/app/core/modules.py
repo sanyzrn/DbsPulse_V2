@@ -36,7 +36,10 @@ MODULES: tuple[ModuleDef, ...] = (
     ModuleDef(
         key="self_assessment",
         label="خودارزیابی کارمند",
-        description="کارمند پیش از دیدن نمرهٔ ارزیاب، دیدگاه خودش را ثبت می‌کند.",
+        description=(
+            "فرد تا پیش از نهایی‌شدن پرونده، دیدگاه مستقل خودش را یک‌بار ثبت می‌کند؛ "
+            "مقایسه فقط برای منابع انسانی است."
+        ),
         default_enabled=True,
     ),
     ModuleDef(

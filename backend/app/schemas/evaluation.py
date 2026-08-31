@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import date, datetime
 from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, computed_field
@@ -164,7 +164,7 @@ class EvaluationRead(BaseModel):
 class EvaluationDetail(EvaluationRead):
     scores: list[ScoreRead] = []
     comments: list[CommentRead] = []
-    # خودارزیابی کنار امتیاز ارزیاب دیده می‌شود تا فاصله‌ها موضوع گفت‌وگو شوند.
+    # خودارزیابی فقط برای HR کنار امتیاز ارزیاب دیده می‌شود تا فاصله‌ها مقایسه شوند.
     # عمداً در محاسبه نقشی ندارد — جدولش هم جداست (models/self_assessment.py).
     self_assessment: "SelfAssessmentRead | None" = None
     # شاخص‌های *این* پرونده و نسخهٔ چارچوبی که زیر آن باز شده (P1-05).
@@ -260,6 +260,8 @@ class MyOpenEvaluation(BaseModel):
     #: (`services/self_assessment.OPEN_STATUSES`). پیش از این فرانت فهرستِ
     #: وضعیت‌ها را دستی کپی کرده بود و می‌توانست از بک‌اند جدا بیفتد.
     self_assessment_open: bool = False
+    period_name: str | None = None
+    period_ends_on: date | None = None
 
     @computed_field  # type: ignore[prop-decorator]
     @property
@@ -301,6 +303,15 @@ class SelfAssessmentRead(BaseModel):
     submitted_at: datetime | None
     note: str | None
     scores: list[SelfAssessmentScoreRead] = []
+
+
+class MySelfAssessmentRead(SelfAssessmentRead):
+    """نسخهٔ فقط‌خواندنی خودارزیابی‌های ثبت‌شدهٔ خود فرد."""
+
+    evaluation_id: int
+    evaluation_code: str
+    period_name: str | None = None
+    period_ends_on: date | None = None
 
 
 class ObjectionRequest(BaseModel):

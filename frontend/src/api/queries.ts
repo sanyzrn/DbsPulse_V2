@@ -341,6 +341,16 @@ export function useMyOpenEvaluations(enabled = true) {
   });
 }
 
+/** خودارزیابی‌های ثبت‌شدهٔ خود فرد؛ برای نمایش خواندنی پس از قفل و در تاریخچه. */
+export function useMySelfAssessments(enabled = true) {
+  return useQuery({
+    queryKey: ["me", "self-assessments"],
+    queryFn: async () =>
+      (await apiClient.get<import("../types").MySelfAssessment[]>("/me/self-assessments")).data,
+    enabled,
+  });
+}
+
 /** برنامه‌های بهبودِ بازِ خود کارمند (فقط خواندنی). */
 export function useMyImprovementPlans() {
   return useQuery({

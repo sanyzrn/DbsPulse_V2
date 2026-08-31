@@ -5,7 +5,7 @@ from fastapi.responses import Response as FastAPIResponse
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_current_user, require_role_or_capability
+from app.api.deps import get_current_user, require_module, require_role_or_capability
 from app.core.security import hash_password
 from app.db.session import get_db
 from app.models.enums import Capability, CommentStage, PersonnelStatus, UserRole
@@ -130,13 +130,14 @@ def _with_accounts(db: Session, rows: list[Personnel]) -> list[PersonnelRead]:
     if not rows:
         return []
     ids = [r.id for r in rows]
-    usernames = dict(
-        db.execute(
-            select(User.personnel_id, User.username).where(
+    accounts = {
+        personnel_id: (username, role)
+        for personnel_id, username, role in db.execute(
+            select(User.personnel_id, User.username, User.role).where(
                 User.personnel_id.in_(ids), User.is_active.is_(True)
             )
         ).all()
-    )
+    }
     open_records = {
         record.subject_personnel_id: record
         for record in db.scalars(
@@ -151,10 +152,13 @@ def _with_accounts(db: Session, rows: list[Personnel]) -> list[PersonnelRead]:
     items = []
     for row in rows:
         item = PersonnelRead.model_validate(row)
-        item.account_username = usernames.get(row.id)
+        account = accounts.get(row.id)
+        item.account_username = account[0] if account else None
         record = open_records.get(row.id)
         item.open_evaluation_id = record.id if record else None
-        item.self_assessment_state = self_assessment_state(record, row.id in usernames)
+        item.self_assessment_state = self_assessment_state(
+            db, record, account[1] if account else None
+        )
         items.append(item)
     return items
 
@@ -220,6 +224,7 @@ def list_org_units(
 def invite_to_self_assessment(
     personnel_id: int,
     db: Session = Depends(get_db),
+    _module: None = Depends(require_module("self_assessment")),
     current_user: CurrentUser = Depends(
         require_role_or_capability(UserRole.hr, Capability.manage_personnel)
     ),
@@ -230,7 +235,7 @@ def invite_to_self_assessment(
     آن کانال را روشن کرده باشد — از آن راه هم می‌رود. صفِ ارسال بیرونی همان صفی
     است که بقیهٔ اعلان‌های گردش‌کار از آن رد می‌شوند.
 
-    یک‌بار برای هر پرونده: دکمه پس از ارسال غیرفعال می‌ماند تا پروندهٔ بعدی.
+    دعوت نخست هنگام بازشدن پرونده خودکار است؛ این مسیر برای یادآوری دوباره است.
     """
     personnel = db.get(Personnel, personnel_id)
     if personnel is None:

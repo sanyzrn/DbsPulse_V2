@@ -133,6 +133,7 @@ export const NAV_BY_ROLE: Record<string, NavItem[]> = {
   hr: [
     { to: "/hr/dashboard", label: "داشبورد", icon: ICONS.dashboard },
     { to: "/hr/queue", label: "صف بررسی", icon: ICONS.queue },
+    { to: "/me", label: "خودارزیابی من", icon: ICONS.scorecard, module: "self_assessment" },
     { to: "/hr/people", label: "مدیریت حساب و پرسنل", icon: ICONS.personnel },
     { to: "/hr/indicators", label: "شاخص‌ها", icon: ICONS.indicators },
     // کنار «شاخص‌ها» چون هر دو «فرمِ ارزیابی» را تعریف می‌کنند: یکی چه چیزی
@@ -151,6 +152,7 @@ export const NAV_BY_ROLE: Record<string, NavItem[]> = {
   // رسیدن به آن، کلیک روی اعلان بود.
   unit_supervisor: [
     { to: "/supervisor", label: "افراد زیرمجموعه", icon: ICONS.personnel },
+    { to: "/me", label: "خودارزیابی من", icon: ICONS.scorecard, module: "self_assessment" },
     // P2-01: تا پیش از این، ارزیاب هیچ راهی نداشت بفهمد نمره‌دهی‌اش نسبت به
     // بقیه کجاست — و این مفیدترین بازخوردی است که یک نمره‌دهنده می‌گیرد.
     { to: "/my-scoring", label: "الگوی نمره‌دهی من", icon: ICONS.chart, module: "role_analytics" },
@@ -167,9 +169,12 @@ export const NAV_BY_ROLE: Record<string, NavItem[]> = {
     { to: "/ceo", label: "پرونده‌های در انتظار", icon: ICONS.queue },
     { to: "/executive", label: "تحلیل سازمان", icon: ICONS.org, module: "role_analytics" },
   ],
-  employee: [{ to: "/me", label: "کارنامه من", icon: ICONS.scorecard }],
-  // پشتیبانی فنی هیچ صف کاری‌ای ندارد؛ همهٔ لینک‌هایش از مجوز می‌آیند (زیر).
-  support: [],
+  employee: [{ to: "/me", label: "خودارزیابی و کارنامه من", icon: ICONS.scorecard }],
+  // پشتیبانی فنی صف ارزیابی ندارد، ولی اگر حسابش به پرسنل وصل باشد مانند همهٔ
+  // نقش‌های غیرِ مدیرعامل/معاونت خودارزیابی خودش را انجام می‌دهد.
+  support: [
+    { to: "/me", label: "خودارزیابی من", icon: ICONS.scorecard, module: "self_assessment" },
+  ],
 };
 
 /** لینک‌هایی که به مجوز گره خورده‌اند، نه به نقش.

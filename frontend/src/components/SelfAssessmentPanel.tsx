@@ -32,11 +32,21 @@ export function SelfAssessmentPanel({
       };
     })
     .sort((a, b) => Math.abs(b.gap) - Math.abs(a.gap));
+  const comparable = rows.filter((row) => row.evaluatorScore !== null);
+  const selfAverage = comparable.length
+    ? comparable.reduce((sum, row) => sum + row.score, 0) / comparable.length
+    : 0;
+  const evaluatorAverage = comparable.length
+    ? comparable.reduce((sum, row) => sum + (row.evaluatorScore ?? 0), 0) / comparable.length
+    : 0;
+  const averageGap = selfAverage - evaluatorAverage;
+  const faScore = (value: number) =>
+    value.toLocaleString("fa-IR", { minimumFractionDigits: 1, maximumFractionDigits: 1 });
 
   return (
     <div className="rounded-2xl border border-gray-200 bg-white p-4">
       <div className="mb-1 flex flex-wrap items-center justify-between gap-2">
-        <h2 className="text-base font-bold text-gray-900">خودارزیابی کارمند</h2>
+        <h2 className="text-base font-bold text-gray-900">مقایسهٔ ارزیابی مدیر و خودارزیابی</h2>
         <span className="text-xs text-gray-500">ثبت‌شده در {formatDateTime(self.submitted_at)}</span>
       </div>
       <p className="mb-4 text-xs text-gray-500">
@@ -49,6 +59,25 @@ export function SelfAssessmentPanel({
           <span className="text-xs text-gray-500">دستاورد کلی از نگاه خودش: </span>
           {self.note}
         </p>
+      )}
+
+      {comparable.length > 0 && (
+        <div className="mb-4 grid grid-cols-3 gap-2">
+          <div className="rounded-xl bg-gray-50 px-3 py-2 text-center">
+            <p className="text-[11px] text-gray-500">میانگین خودارزیابی</p>
+            <p className="mt-1 text-base font-bold tabular-nums text-gray-900">{faScore(selfAverage)}</p>
+          </div>
+          <div className="rounded-xl bg-gray-50 px-3 py-2 text-center">
+            <p className="text-[11px] text-gray-500">میانگین ارزیابی مدیر</p>
+            <p className="mt-1 text-base font-bold tabular-nums text-gray-900">{faScore(evaluatorAverage)}</p>
+          </div>
+          <div className="rounded-xl bg-gray-50 px-3 py-2 text-center">
+            <p className="text-[11px] text-gray-500">فاصلهٔ میانگین</p>
+            <p className="mt-1 text-base font-bold tabular-nums text-gray-900">
+              {averageGap > 0 ? "+" : ""}{faScore(averageGap)}
+            </p>
+          </div>
+        </div>
       )}
 
       <div className="overflow-x-auto">

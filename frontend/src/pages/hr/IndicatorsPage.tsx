@@ -56,6 +56,7 @@ export function IndicatorsPage() {
     // پروندهٔ باز ممکن است به نسخهٔ تازه منتقل شده باشد؛ کشِ کهنه، فرمی نشان
     // می‌دهد که با آنچه سرور برای «ثبت» می‌خواهد یکی نیست.
     await queryClient.invalidateQueries({ queryKey: ["evaluation"] });
+    await queryClient.invalidateQueries({ queryKey: ["me", "self-assessment"] });
   }
 
   async function createIndicator() {

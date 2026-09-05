@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Link } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { motion } from "motion/react";
 import { apiClient, extractErrorMessage } from "../../api/client";
@@ -6,6 +7,7 @@ import { useIndicators, useMyCurrentSelfAssessment, useMyEvaluations, useMyImpro
 import { useAuth } from "../../auth/AuthContext";
 import { usePermissions } from "../../auth/PermissionsContext";
 import { OpenCaseCard } from "../../components/employee/OpenCaseCard";
+import { SelfAssessmentScores } from "../../components/employee/SelfAssessmentScores";
 import { ContractSelfAssessmentCard } from "../../components/employee/ContractSelfAssessmentCard";
 import { useConfirm } from "../../components/ConfirmDialog";
 import { PdfDownloadButton } from "../../components/PdfDownloadButton";
@@ -310,7 +312,6 @@ function MyPlanCard({ plan, index }: { plan: ImprovementPlanDetail; index: numbe
 
 function SelfAssessmentHistoryCard({ item }: { item: MySelfAssessment }) {
   const { data: indicators = [] } = useIndicators({ includeInactive: true });
-  const byId = new Map(indicators.map((indicator) => [indicator.id, indicator]));
   return (
     <Card
       title={`قرارداد ${formatDate(item.contract_start_date)} تا ${formatDate(item.contract_end_date)}`}
@@ -321,17 +322,7 @@ function SelfAssessmentHistoryCard({ item }: { item: MySelfAssessment }) {
       }
     >
       {item.note && <p className="mb-3 text-sm text-gray-700">{item.note}</p>}
-      <div className="space-y-2">
-        {item.scores.map((row) => (
-          <div key={row.indicator_id} className="flex items-start justify-between gap-3 rounded-xl bg-gray-50 px-3 py-2 text-sm">
-            <div>
-              <p className="text-gray-800">{byId.get(row.indicator_id)?.description ?? `شاخص ${row.indicator_id}`}</p>
-              {row.note && <p className="mt-0.5 text-xs text-gray-500">{row.note}</p>}
-            </div>
-            <span className="shrink-0 font-bold text-pulse-700">{row.score.toLocaleString("fa-IR")} از ۵</span>
-          </div>
-        ))}
-      </div>
+      <SelfAssessmentScores scores={item.scores} indicators={indicators} />
       <p className="mt-3 text-xs text-gray-500">این خودارزیابی قفل شده و قابل ویرایش نیست.</p>
     </Card>
   );
@@ -346,6 +337,32 @@ function SelfAssessmentHistoryCard({ item }: { item: MySelfAssessment }) {
  * سربرگ بیرون ماند چون داخلِ تب، عنوانِ دوم اضافی است.
  */
 export function MyEvaluationsPanel() {
+  const { user, loading, refreshUser } = useAuth();
+  const { can } = usePermissions();
+  const [refreshing, setRefreshing] = useState(false);
+  if (loading) return <p role="status" className="text-sm text-gray-500">در حال دریافت اطلاعات حساب…</p>;
+  if (!user) return null;
+  if (user.personnel_id == null) {
+    return (
+      <Card title="اتصال حساب به پروندهٔ پرسنلی">
+        <p className="text-sm leading-7 text-gray-600">
+          برای خودارزیابی شخصی، حساب «{user.username}» باید به پروندهٔ پرسنلی صاحب حساب متصل باشد.
+          {can("manage_users") ? " در ویرایش حساب، پرسنل متناظر را انتخاب و ذخیره کنید." : " از منابع انسانی بخواهید پرسنل متناظر را در حساب شما انتخاب کند."}
+        </p>
+        <div className="mt-4 flex flex-wrap items-center gap-3">
+          {can("manage_users") && <Link className="rounded-xl bg-pulse-600 px-4 py-2 text-sm font-medium text-white" to={`/hr/people/accounts?q=${encodeURIComponent(user.username)}`}>ویرایش اتصال حساب من</Link>}
+          <Button variant="secondary" loading={refreshing} onClick={async () => {
+            setRefreshing(true);
+            try { await refreshUser(); } finally { setRefreshing(false); }
+          }}>بررسی مجدد اتصال</Button>
+        </div>
+      </Card>
+    );
+  }
+  return <LinkedMyEvaluationsPanel key={`${user.id}:${user.personnel_id}`} />;
+}
+
+function LinkedMyEvaluationsPanel() {
   const { user } = useAuth();
   const { moduleEnabled, loading: permissionsLoading } = usePermissions();
   // تا قبل از رسیدن تنظیمات، هیچ بخش اختیاری چشمک نمی‌زند. پیش‌فرض ماژول‌ها
@@ -365,8 +382,9 @@ export function MyEvaluationsPanel() {
   const {
     data: currentSelfAssessment,
     error: currentSelfAssessmentError,
+    isPending: currentSelfAssessmentPending,
   } = useMyCurrentSelfAssessment(showSelfAssessment);
-  const { data: selfAssessments = [], error: selfAssessmentsError } = useMySelfAssessments(showSelfAssessment);
+  const { data: selfAssessments = [], error: selfAssessmentsError, isPending: selfAssessmentsPending } = useMySelfAssessments(showSelfAssessment);
   const [tab, setTab] = useState<"self" | "results">("self");
   const selfHistory = selfAssessments.filter(
     (item) => item.assessment_id !== currentSelfAssessment?.assessment_id,
@@ -399,18 +417,15 @@ export function MyEvaluationsPanel() {
 
       {tab === "self" && (
         <div className="space-y-4" role="tabpanel">
-          {currentSelfAssessment && <ContractSelfAssessmentCard item={currentSelfAssessment} />}
-          {currentSelfAssessmentError != null && (
-            <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">{extractErrorMessage(currentSelfAssessmentError)}</p>
+          {currentSelfAssessment && <ContractSelfAssessmentCard key={`${currentSelfAssessment.personnel_id}:${currentSelfAssessment.contract_start_date}`} item={currentSelfAssessment} />}
+          {(currentSelfAssessmentError != null || selfAssessmentsError != null) && (
+            <p role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">{extractErrorMessage(currentSelfAssessmentError ?? selfAssessmentsError)}</p>
           )}
           {showOpenCases && openCases.map((item, i) => (
             <OpenCaseCard key={item.id} item={item} index={i} />
           ))}
-          {selfAssessmentsError != null && (
-            <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">{extractErrorMessage(selfAssessmentsError)}</p>
-          )}
           {selfHistory.map((item) => <SelfAssessmentHistoryCard key={item.assessment_id} item={item} />)}
-          {!permissionsLoading && !currentSelfAssessment && openCases.length === 0 && selfHistory.length === 0 && (
+          {showSelfAssessment && !currentSelfAssessmentPending && !selfAssessmentsPending && !currentSelfAssessmentError && !selfAssessmentsError && !currentSelfAssessment && openCases.length === 0 && selfHistory.length === 0 && (
             <Card><EmptyState>هنوز خودارزیابی‌ای برای شما فعال یا ثبت نشده است.</EmptyState></Card>
           )}
         </div>

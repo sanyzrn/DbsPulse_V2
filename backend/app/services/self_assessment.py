@@ -21,7 +21,7 @@ from app.models.indicator_framework import IndicatorFramework
 from app.models.personnel import Personnel
 from app.models.user import User
 from app.services.audit import log_event
-from app.services.indicator_framework import ensure_framework
+from app.services.indicator_framework import current_framework, ensure_framework
 from app.services.notifications import notify
 
 EXCLUDED_ROLES = frozenset({UserRole.ceo, UserRole.deputy})
@@ -78,6 +78,12 @@ def assessment_for_evaluation(db: Session, record: EvaluationRecord) -> Contract
 
 
 def indicator_ids_for_assessment(db: Session, assessment: ContractSelfAssessment) -> set[int]:
+    # Opening a form or sending an invitation must not freeze its questions.
+    # Only a submitted assessment keeps its historical framework.
+    if assessment.submitted_at is None:
+        framework = current_framework(db)
+        if framework is not None:
+            return set(framework.member_ids)
     framework = db.get(IndicatorFramework, assessment.indicator_framework_id)
     return set(framework.member_ids) if framework is not None else set()
 

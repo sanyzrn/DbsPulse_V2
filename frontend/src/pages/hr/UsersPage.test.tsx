@@ -1,111 +1,38 @@
-import { describe, expect, it, vi } from "vitest";
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { beforeEach, expect, it, vi } from "vitest";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { MemoryRouter } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { apiClient } from "../../api/client";
-import { ConfirmProvider } from "../../components/ConfirmDialog";
-import { ToastProvider } from "../../components/Toast";
-import { UsersPage } from "./UsersPage";
+import { EditUserModal } from "./UsersPage";
+import type { AppUser, Personnel, UserRole } from "../../types";
 
-vi.mock("../../api/client", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("../../api/client")>();
-  return {
-    ...actual,
-    apiClient: { ...actual.apiClient, get: vi.fn(), patch: vi.fn(), post: vi.fn() },
-  };
-});
-
-// صفحه برای محافظ «قفل‌نشدن حساب خود» به کاربر فعلی نیاز دارد
-vi.mock("../../auth/AuthContext", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("../../auth/AuthContext")>();
-  return {
-    ...actual,
-    useAuth: () => ({
-      user: {
-        id: 999,
-        username: "hr-admin",
-        display_name: "hr-admin",
-        role: "hr",
-        personnel_id: null,
-        must_change_password: false,
-      },
-      loading: false,
-      login: vi.fn(),
-      logout: vi.fn(),
-      refreshUser: vi.fn(),
-    }),
-  };
-});
-
-function renderPage() {
-  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  return render(
-    <QueryClientProvider client={client}>
-      <MemoryRouter>
-        <ToastProvider>
-          <ConfirmProvider>
-            <UsersPage />
-          </ConfirmProvider>
-        </ToastProvider>
-      </MemoryRouter>
-    </QueryClientProvider>
-  );
+const mocks = vi.hoisted(() => ({ patch: vi.fn(), refreshUser: vi.fn() }));
+vi.mock("../../api/client", () => ({ apiClient: { patch: mocks.patch }, extractErrorMessage: () => "Error" }));
+vi.mock("../../auth/AuthContext", () => ({ useAuth: () => ({ user: { id: 78 }, refreshUser: mocks.refreshUser }) }));
+vi.mock("../../components/Toast", () => ({ useToast: () => ({ showSuccess: vi.fn(), showError: vi.fn() }) }));
+const person = { id: 60, full_name: "علی قاسمی", personnel_code: "2000290" } as Personnel;
+function setup(role: UserRole, personnelId: number | null = 60) {
+  const user = { id: 78, username: "a.ghasemi", role, full_name: "علی قاسمی", personnel_id: personnelId } as AppUser;
+  render(<QueryClientProvider client={new QueryClient()}><EditUserModal user={user} personnel={[person]} onClose={vi.fn()} /></QueryClientProvider>);
+  return userEvent.setup();
 }
+beforeEach(() => { mocks.patch.mockReset().mockResolvedValue({ data: {} }); mocks.refreshUser.mockReset().mockResolvedValue(undefined); });
 
-describe("UsersPage edit modal", () => {
-  it("opens the edit modal for an existing user and submits a role + password change", async () => {
-    const getMock = vi.mocked(apiClient.get);
-    const patchMock = vi.mocked(apiClient.patch);
-    getMock.mockImplementation(async (url: string) => {
-      if (url === "/users") {
-        return {
-          data: {
-            total: 1,
-            items: [
-              {
-                id: 1,
-                username: "sup1",
-                full_name: "مسئول واحد فروش، آقای رضایی",
-                display_name: "مسئول واحد فروش، آقای رضایی",
-                role: "unit_supervisor",
-                is_active: true,
-                personnel_id: null,
-                created_at: "",
-              },
-            ],
-          },
-        };
-      }
-      if (url === "/personnel") {
-        return { data: { total: 0, items: [] } };
-      }
-      throw new Error(`unexpected GET ${url}`);
-    });
-    patchMock.mockResolvedValue({ data: {} });
+it.each(["hr", "unit_supervisor", "support"] as const)("preserves personnel linkage when editing the name of a %s account", async (role) => {
+  const user = setup(role);
+  expect(screen.getByRole("combobox", { name: /پرسنل متناظر/ })).toHaveValue("60");
+  await user.type(screen.getByRole("textbox", { name: /نام و سِمَت/ }), " جدید");
+  await user.click(screen.getByRole("button", { name: "ذخیره" }));
+  await waitFor(() => expect(mocks.patch).toHaveBeenCalled());
+  const payload = mocks.patch.mock.calls[0]![1];
+  expect(payload).not.toHaveProperty("personnel_id");
+  expect(payload).not.toHaveProperty("role");
+  await waitFor(() => expect(mocks.refreshUser).toHaveBeenCalled());
+});
 
-    renderPage();
-
-    await screen.findByText("sup1");
-    // نامِ آدم کنار نام کاربری دیده می‌شود؛ فهرستی که فقط «sup1» دارد همان چیزی
-    // است که این ستون برای رفعش اضافه شد.
-    expect(screen.getByText("مسئول واحد فروش، آقای رضایی")).toBeInTheDocument();
-    await userEvent.click(screen.getByRole("button", { name: "ویرایش" }));
-
-    const dialog = await screen.findByRole("dialog");
-    expect(within(dialog).getByText("ویرایش کاربر: sup1")).toBeInTheDocument();
-
-    await userEvent.selectOptions(within(dialog).getByLabelText("نقش"), "hr");
-    await userEvent.type(within(dialog).getByLabelText(/تعیین رمز جدید/), "NewPassword123");
-    await userEvent.click(within(dialog).getByRole("button", { name: "ذخیره" }));
-
-    await waitFor(() =>
-      expect(patchMock).toHaveBeenCalledWith("/users/1", {
-        role: "hr",
-        full_name: "مسئول واحد فروش، آقای رضایی",
-        personnel_id: null,
-        password: "NewPassword123",
-      })
-    );
-  });
+it("links an HR account and refreshes its current identity", async () => {
+  const user = setup("hr", null);
+  await user.selectOptions(screen.getByRole("combobox", { name: /پرسنل متناظر/ }), "60");
+  await user.click(screen.getByRole("button", { name: "ذخیره" }));
+  await waitFor(() => expect(mocks.patch).toHaveBeenCalledWith("/users/78", expect.objectContaining({ personnel_id: 60 })));
+  await waitFor(() => expect(mocks.refreshUser).toHaveBeenCalled());
 });

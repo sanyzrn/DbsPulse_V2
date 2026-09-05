@@ -2,21 +2,22 @@ import { useMemo, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { apiClient, extractErrorMessage } from "../../api/client";
 import { useIndicators } from "../../api/queries";
+import { useAuth } from "../../auth/AuthContext";
 import { useConfirm } from "../ConfirmDialog";
 import { useToast } from "../Toast";
 import { Button } from "../../ui/Button";
 import { Card } from "../../ui/Card";
 import { useLocalDraft } from "../../ui/useLocalDraft";
 import { formatDate, formatDateTime } from "../../utils/dates";
+import { ASSESSMENT_SECTIONS, SelfAssessmentScores } from "./SelfAssessmentScores";
 import type { CurrentSelfAssessment } from "../../types";
 
 const SCORE_OPTIONS = [1, 2, 3, 4, 5];
 
 export function ContractSelfAssessmentCard({ item }: { item: CurrentSelfAssessment }) {
   const [showForm, setShowForm] = useState(false);
-  const [assessment, setAssessment] = useState(item);
-  const { data: allIndicators = [] } = useIndicators({ includeInactive: true });
-  const byId = new Map(allIndicators.map((indicator) => [indicator.id, indicator]));
+  const assessment = item;
+  const { data: allIndicators = [] } = useIndicators({ includeInactive: true }, true);
 
   if (!assessment.eligible) return null;
 
@@ -35,21 +36,7 @@ export function ContractSelfAssessmentCard({ item }: { item: CurrentSelfAssessme
             خودارزیابی شما در {formatDateTime(assessment.submitted_at)} ثبت نهایی شده است.
           </p>
           {assessment.note && <p className="mt-2 text-sm text-gray-700">{assessment.note}</p>}
-          <div className="mt-3 space-y-2">
-            {assessment.scores.map((row) => (
-              <div key={row.indicator_id} className="flex items-start justify-between gap-3 rounded-lg bg-white px-3 py-2 text-sm">
-                <div>
-                  <p className="text-gray-800">
-                    {byId.get(row.indicator_id)?.description ?? `شاخص ${row.indicator_id}`}
-                  </p>
-                  {row.note && <p className="mt-0.5 text-xs text-gray-500">{row.note}</p>}
-                </div>
-                <span className="shrink-0 rounded-lg bg-green-100 px-2 py-1 font-bold text-green-800">
-                  {row.score.toLocaleString("fa-IR")} از ۵
-                </span>
-              </div>
-            ))}
-          </div>
+          <div className="mt-4"><SelfAssessmentScores scores={assessment.scores} indicators={allIndicators} /></div>
           <p className="mt-3 text-xs text-gray-500">
             برای هر قرارداد فقط یک‌بار ثبت می‌شود و قابل ویرایش نیست.
           </p>
@@ -58,8 +45,7 @@ export function ContractSelfAssessmentCard({ item }: { item: CurrentSelfAssessme
         showForm ? (
           <ContractSelfAssessmentForm
             item={assessment}
-            onDone={(result) => {
-              setAssessment(result);
+            onDone={() => {
               setShowForm(false);
             }}
             onCancel={() => setShowForm(false)}
@@ -93,19 +79,22 @@ function ContractSelfAssessmentForm({
   onDone: (result: CurrentSelfAssessment) => void;
   onCancel: () => void;
 }) {
-  const { data: allIndicators = [] } = useIndicators({ includeInactive: true });
+  const { user } = useAuth();
+  const { data: allIndicators = [] } = useIndicators({ includeInactive: true }, true);
   const { showSuccess, showError } = useToast();
   const confirm = useConfirm();
   const queryClient = useQueryClient();
   const indicators = useMemo(() => {
     const wanted = new Set(item.indicator_ids);
-    return allIndicators.filter((indicator) => wanted.has(indicator.id));
+    return allIndicators.filter((indicator) => wanted.has(indicator.id))
+      .sort((a, b) => a.display_order - b.display_order || a.id - b.id);
   }, [allIndicators, item.indicator_ids]);
 
   const draftKey = `nafas-hr:self-assessment:${item.personnel_id}:${item.contract_start_date}`;
   const [draft, setDraft] = useLocalDraft(draftKey);
   const [busy, setBusy] = useState(false);
-  const allScored = indicators.length > 0 && indicators.every((i) => draft.scores[i.id]);
+  const scoredCount = indicators.filter((i) => SCORE_OPTIONS.includes(draft.scores[i.id] ?? 0)).length;
+  const allScored = indicators.length > 0 && indicators.length === item.indicator_ids.length && scoredCount === indicators.length;
 
   async function submit() {
     const ok = await confirm({
@@ -126,6 +115,7 @@ function ContractSelfAssessmentForm({
         note: draft.overallNote.trim() || null,
       });
       window.localStorage.removeItem(draftKey);
+      queryClient.setQueryData(["me", "self-assessment", "current", user?.id, user?.personnel_id], data);
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["me", "self-assessment"] }),
         queryClient.invalidateQueries({ queryKey: ["me", "self-assessments"] }),
@@ -134,6 +124,10 @@ function ContractSelfAssessmentForm({
       onDone(data);
     } catch (error) {
       showError(extractErrorMessage(error));
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["indicators"] }),
+        queryClient.invalidateQueries({ queryKey: ["me", "self-assessment"] }),
+      ]);
     } finally {
       setBusy(false);
     }
@@ -141,40 +135,66 @@ function ContractSelfAssessmentForm({
 
   return (
     <div className="space-y-4">
-      <div className="space-y-3">
-        {indicators.map((indicator) => (
-          <div key={indicator.id} className="rounded-xl border border-gray-100 bg-gray-50/50 p-3">
-            <p className="text-sm text-gray-800">{indicator.description}</p>
-            <p className="mt-0.5 text-xs text-gray-500">{indicator.category}</p>
-            <div className="mt-2 flex flex-wrap items-center gap-1.5">
-              {SCORE_OPTIONS.map((value) => (
-                <button
-                  key={value}
-                  type="button"
-                  onClick={() => setDraft({ ...draft, scores: { ...draft.scores, [indicator.id]: value } })}
-                  aria-pressed={draft.scores[indicator.id] === value}
-                  className={`h-9 w-9 rounded-lg border text-sm font-medium ${
-                    draft.scores[indicator.id] === value
-                      ? "border-pulse-500 bg-pulse-600 text-white"
-                      : "border-gray-300 bg-white text-gray-700 hover:bg-gray-100"
-                  }`}
-                >
-                  {value.toLocaleString("fa-IR")}
-                </button>
-              ))}
-              <input
-                className="ms-2 min-w-40 flex-1 rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm outline-none focus:border-gray-900"
-                placeholder="توضیح یا دستاورد شما (اختیاری)"
-                value={draft.notes[indicator.id] ?? ""}
-                onChange={(event) => setDraft({
-                  ...draft,
-                  notes: { ...draft.notes, [indicator.id]: event.target.value },
-                })}
-              />
-            </div>
-          </div>
-        ))}
+      <div className="rounded-2xl border border-gray-200 bg-gray-50 p-4">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <p className="text-sm font-semibold text-gray-800">ارزیابی عملکرد من</p>
+          <span className="text-xs text-gray-600" role="status">{scoredCount.toLocaleString("fa-IR")} از {item.indicator_ids.length.toLocaleString("fa-IR")} شاخص تکمیل شده</span>
+        </div>
+        <progress className="mt-3 h-2 w-full accent-pulse-600" value={scoredCount} max={item.indicator_ids.length || 1} aria-label="پیشرفت خودارزیابی" />
+        <p className="mt-2 text-xs leading-6 text-gray-500">به هر شاخص از ۱ تا ۵ امتیاز بدهید. پاسخ‌های شما تا ثبت نهایی در همین مرورگر نگه داشته می‌شوند.</p>
       </div>
+      {ASSESSMENT_SECTIONS.map((section) => {
+        const members = indicators.filter((indicator) => indicator.section === section.key);
+        if (!members.length) return null;
+        const completed = members.filter((indicator) => SCORE_OPTIONS.includes(draft.scores[indicator.id] ?? 0)).length;
+        return (
+          <section key={section.key} aria-label={section.title} className="overflow-hidden rounded-2xl border border-gray-200">
+            <div className={`flex flex-wrap items-center justify-between gap-3 px-4 py-4 sm:px-5 ${section.tone}`}>
+              <div>
+                <h3 className="text-base font-bold">{section.title}</h3>
+                <p className="mt-1 text-xs opacity-80">{section.description}</p>
+              </div>
+              <span className="rounded-full bg-white/70 px-3 py-1.5 text-xs font-medium">{completed.toLocaleString("fa-IR")} از {members.length.toLocaleString("fa-IR")} پاسخ</span>
+            </div>
+            <div className="divide-y divide-gray-100">
+              {members.map((indicator, index) => (
+                <fieldset key={indicator.id} className="min-w-0 p-4 sm:p-5">
+                  <legend className="sr-only">{indicator.description}</legend>
+                  <div className="flex items-start gap-3">
+                    <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-gray-100 text-xs font-bold text-gray-500" aria-hidden>{(index + 1).toLocaleString("fa-IR")}</span>
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium leading-7 text-gray-900">{indicator.category}</p>
+                      <p className="mt-1 text-xs font-medium text-gray-500">{indicator.description}</p>
+                    </div>
+                  </div>
+                  <div className="mt-4 grid gap-4 lg:grid-cols-[220px_minmax(0,1fr)] lg:items-end">
+                    <div>
+                      <p className="mb-2 text-xs text-gray-500">امتیاز شما</p>
+                      <div className="flex gap-2">
+                        {SCORE_OPTIONS.map((value) => (
+                          <button key={value} type="button" aria-label={`امتیاز ${value.toLocaleString("fa-IR")}`} aria-pressed={draft.scores[indicator.id] === value}
+                            onClick={() => setDraft({ ...draft, scores: { ...draft.scores, [indicator.id]: value } })}
+                            className={`h-10 w-10 rounded-xl border text-sm font-bold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-pulse-600 ${draft.scores[indicator.id] === value ? "border-pulse-600 bg-pulse-600 text-white shadow-sm" : "border-gray-200 bg-white text-gray-600 hover:border-pulse-400 hover:bg-pulse-50"}`}>
+                            {value.toLocaleString("fa-IR")}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                    <label className="block min-w-0">
+                      <span className="mb-2 block text-xs text-gray-500">توضیح یا دستاورد شما (اختیاری)</span>
+                      <input className="w-full rounded-xl border border-gray-200 bg-gray-50/50 px-3 py-2.5 text-sm outline-none focus:border-pulse-500 focus:bg-white"
+                        placeholder="نمونه‌ای از عملکرد خود بنویسید…" value={draft.notes[indicator.id] ?? ""}
+                        onChange={(event) => setDraft({ ...draft, notes: { ...draft.notes, [indicator.id]: event.target.value } })} />
+                    </label>
+                  </div>
+                </fieldset>
+              ))}
+            </div>
+          </section>
+        );
+      })}
+      {indicators.length < item.indicator_ids.length && <p className="text-sm text-amber-700">در حال دریافت آخرین شاخص‌ها…</p>}
+      {item.indicator_ids.length === 0 && <p className="text-sm text-gray-500">هنوز شاخصی برای خودارزیابی تعریف نشده است.</p>}
       <label className="block text-sm">
         <span className="mb-1.5 block font-medium text-gray-700">دستاورد کلی شما (اختیاری)</span>
         <textarea

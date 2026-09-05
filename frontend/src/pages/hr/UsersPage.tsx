@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { apiClient, extractErrorMessage } from "../../api/client";
 import { useDebouncedValue, usePersonnelList, useUsersList } from "../../api/queries";
@@ -16,7 +17,7 @@ import { ROLE_LABELS, type AppUser, type Personnel, type UserRole } from "../../
 import { SearchInput } from "../../ui/SearchInput";
 import { SectionTabs } from "../../components/SectionTabs";
 
-const ROLES: UserRole[] = ["unit_supervisor", "hr", "deputy", "ceo", "employee"];
+const ROLES: UserRole[] = ["unit_supervisor", "hr", "deputy", "ceo", "employee", "support"];
 /** پیش‌فرض تعداد در هر صفحه؛ کاربر می‌تواند از نوار پایین عوضش کند. */
 const DEFAULT_PAGE_SIZE = 10;
 
@@ -28,6 +29,7 @@ export function UsersPage({ showPersonnelTab = true }: { showPersonnelTab?: bool
   const { user: currentUser } = useAuth();
   const confirm = useConfirm();
   const queryClient = useQueryClient();
+  const [searchParams] = useSearchParams();
   const [form, setForm] = useState({
     username: "",
     fullName: "",
@@ -36,7 +38,7 @@ export function UsersPage({ showPersonnelTab = true }: { showPersonnelTab?: bool
   });
   const [personnelId, setPersonnelId] = useState<number | "">("");
   const [error, setError] = useState<string | null>(null);
-  const [search, setSearch] = useState("");
+  const [search, setSearch] = useState(() => searchParams.get("q") ?? "");
   const [roleFilter, setRoleFilter] = useState<UserRole | "">("");
   const [activeFilter, setActiveFilter] = useState<"" | "true" | "false">("");
   const [page, setPage] = useState(0);
@@ -85,7 +87,7 @@ export function UsersPage({ showPersonnelTab = true }: { showPersonnelTab?: bool
         // برای حساب «کارمند» نام از پروندهٔ پرسنلی می‌آید؛ فرستادن دوبارهٔ آن فقط
         // یک نسخهٔ دوم می‌سازد که با اصلاح پرونده هماهنگ نمی‌ماند.
         full_name: form.role === "employee" ? undefined : fullName.trim() || undefined,
-        personnel_id: form.role === "employee" ? personnelId : undefined,
+        personnel_id: personnelId === "" ? undefined : personnelId,
       });
       setForm({ username: "", fullName: "", password: "", role: "unit_supervisor" });
       setPersonnelId("");
@@ -217,11 +219,11 @@ export function UsersPage({ showPersonnelTab = true }: { showPersonnelTab?: bool
               ))}
             </select>
           </label>
-          {form.role === "employee" && (
+          {(
             <label className="flex flex-col gap-1 text-xs font-medium text-gray-600">
               پرسنل متناظر
               <select
-                required
+                required={form.role === "employee"}
                 className={`${inputClass} sm:w-52`}
                 value={personnelId}
                 onChange={(e) => setPersonnelId(e.target.value === "" ? "" : Number(e.target.value))}
@@ -385,7 +387,7 @@ export function UsersPage({ showPersonnelTab = true }: { showPersonnelTab?: bool
   );
 }
 
-function EditUserModal({
+export function EditUserModal({
   user,
   personnel,
   onClose,
@@ -395,6 +397,7 @@ function EditUserModal({
   onClose: () => void;
 }) {
   const { showSuccess, showError } = useToast();
+  const { user: currentUser, refreshUser } = useAuth();
   const queryClient = useQueryClient();
   const [role, setRole] = useState<UserRole>(user.role);
   const [fullName, setFullName] = useState(user.full_name ?? "");
@@ -420,12 +423,17 @@ function EditUserModal({
     setSaving(true);
     try {
       await apiClient.patch(`/users/${user.id}`, {
-        role,
+        ...(role !== user.role ? { role } : {}),
         full_name: fullName.trim() || null,
-        personnel_id: role === "employee" ? personnelId : null,
+        ...(personnelId !== (user.personnel_id ?? "") ? { personnel_id: personnelId === "" ? null : personnelId } : {}),
         ...(newPassword ? { password: newPassword } : {}),
       });
       await queryClient.invalidateQueries({ queryKey: ["users"] });
+      await queryClient.invalidateQueries({ queryKey: ["personnel"] });
+      if (user.id === currentUser?.id) {
+        await refreshUser();
+        await queryClient.invalidateQueries({ queryKey: ["me"] });
+      }
       showSuccess("کاربر به‌روزرسانی شد");
       onClose();
     } catch (err) {
@@ -480,7 +488,7 @@ function EditUserModal({
           </select>
         </label>
 
-        {role === "employee" && (
+        {(
           <label className="flex flex-col gap-1.5 text-sm font-medium text-gray-700">
             پرسنل متناظر
             <select
@@ -495,6 +503,9 @@ function EditUserModal({
                 </option>
               ))}
             </select>
+            <span className="text-xs font-normal leading-6 text-gray-500">
+              برای خودارزیابی شخصی در هر نقش، پروندهٔ پرسنلی خودِ صاحب حساب را انتخاب کنید. تغییر نقش یا نام، این اتصال را حذف نمی‌کند.
+            </span>
           </label>
         )}
 

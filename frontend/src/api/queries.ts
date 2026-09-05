@@ -1,4 +1,5 @@
 import { useQuery, keepPreviousData } from "@tanstack/react-query";
+import { useAuth } from "../auth/AuthContext";
 import { useEffect, useState } from "react";
 import { apiClient } from "./client";
 import {
@@ -193,9 +194,10 @@ export function useUsersList({
   });
 }
 
-export function useIndicators(options?: { section?: "general" | "specialized"; includeInactive?: boolean }) {
+export function useIndicators(options?: { section?: "general" | "specialized"; includeInactive?: boolean }, live = false) {
   return useQuery({
     queryKey: ["indicators", options ?? {}],
+    refetchInterval: live ? 15_000 : false,
     queryFn: async () =>
       (
         await apiClient.get<Indicator[]>("/indicators", {
@@ -324,8 +326,9 @@ export function useNotifications() {
 
 /** «کارنامه من»: نتایج نهایی‌شده ارزیابی خود کارمند (نقش employee). */
 export function useMyEvaluations(enabled = true) {
+  const { user } = useAuth();
   return useQuery({
-    queryKey: ["me", "evaluations"],
+    queryKey: ["me", "evaluations", user?.id, user?.personnel_id],
     queryFn: async () => (await apiClient.get<Page<MyEvaluation>>("/me/evaluations")).data,
     enabled,
   });
@@ -333,8 +336,9 @@ export function useMyEvaluations(enabled = true) {
 
 /** پروندهٔ در جریانِ خود کارمند — فقط وضعیت، بدون امتیاز. */
 export function useMyOpenEvaluations(enabled = true) {
+  const { user } = useAuth();
   return useQuery({
-    queryKey: ["me", "evaluations", "open"],
+    queryKey: ["me", "evaluations", "open", user?.id, user?.personnel_id],
     queryFn: async () =>
       (await apiClient.get<import("../types").MyOpenEvaluation[]>("/me/evaluations/open")).data,
     enabled,
@@ -343,8 +347,9 @@ export function useMyOpenEvaluations(enabled = true) {
 
 /** خودارزیابی‌های ثبت‌شدهٔ خود فرد؛ برای نمایش خواندنی پس از قفل و در تاریخچه. */
 export function useMySelfAssessments(enabled = true) {
+  const { user } = useAuth();
   return useQuery({
-    queryKey: ["me", "self-assessments"],
+    queryKey: ["me", "self-assessments", user?.id, user?.personnel_id],
     queryFn: async () =>
       (await apiClient.get<import("../types").MySelfAssessment[]>("/me/self-assessments")).data,
     enabled,
@@ -353,8 +358,10 @@ export function useMySelfAssessments(enabled = true) {
 
 /** فرم و وضعیت خودارزیابی قرارداد جاری؛ برای نمایش به پروندهٔ ارزیابی نیاز ندارد. */
 export function useMyCurrentSelfAssessment(enabled = true) {
+  const { user } = useAuth();
   return useQuery({
-    queryKey: ["me", "self-assessment", "current"],
+    queryKey: ["me", "self-assessment", "current", user?.id, user?.personnel_id],
+    refetchInterval: 15_000,
     queryFn: async () =>
       (await apiClient.get<import("../types").CurrentSelfAssessment>("/me/self-assessment/current")).data,
     enabled,
@@ -363,8 +370,9 @@ export function useMyCurrentSelfAssessment(enabled = true) {
 
 /** برنامه‌های بهبودِ بازِ خود کارمند (فقط خواندنی). */
 export function useMyImprovementPlans() {
+  const { user } = useAuth();
   return useQuery({
-    queryKey: ["me", "improvement-plans"],
+    queryKey: ["me", "improvement-plans", user?.id, user?.personnel_id],
     queryFn: async () =>
       (await apiClient.get<ImprovementPlanDetail[]>("/me/improvement-plans")).data,
   });

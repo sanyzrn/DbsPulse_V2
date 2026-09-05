@@ -272,6 +272,8 @@ def _submit_current_self_assessment(
     else:
         assessment.contract_end_date = personnel.contract_end_date
 
+    # Pin the version at submission, not when the employee first opened the form.
+    assessment.indicator_framework_id = ensure_framework(db).id
     allowed = indicator_ids_for_assessment(db, assessment)
     seen: set[int] = set()
     for item in payload.scores:

@@ -1,0 +1,21 @@
+4:53:16 PM [vite] (client) Re-optimizing dependencies because vite config has changed
+
+  VITE v8.1.2  ready in 4778 ms
+
+  ➜  Local:   http://127.0.0.1:5173/
+4:53:17 PM [vite] (client) [optimizer] bundling dependencies...
+5:01:38 PM [vite] (client) hmr update /src/index.css, /src/components/NotificationBell.tsx, /src/pages/hr/AdministrationPage.tsx, /src/pages/hr/PersonnelPage.tsx, /src/components/EmployeeProfileModal.tsx, /src/components/SelfAssessmentInviteButton.tsx, /src/pages/employee/MyEvaluationsPage.tsx, /src/components/RoleOverviewCards.tsx, /src/components/employee/ContractSelfAssessmentCard.tsx, /src/pages/hr/IndicatorsPage.tsx, /src/pages/hr/AuditLogPage.tsx, /src/components/PersonPicker.tsx
+5:01:38 PM [vite] (client) hmr update /src/index.css, /src/pages/hr/IndicatorsPage.tsx
+5:03:11 PM [vite] (client) hmr update /src/index.css, /src/components/employee/ContractSelfAssessmentCard.tsx
+5:03:11 PM [vite] (client) hmr update /src/index.css, /src/pages/employee/MyEvaluationsPage.tsx
+5:04:04 PM [vite] (client) hmr update /src/index.css, /src/components/employee/ContractSelfAssessmentCard.tsx
+5:05:17 PM [vite] (client) hmr update /src/index.css, /src/components/employee/ContractSelfAssessmentCard.tsx
+5:16:19 PM [vite] (client) hmr update /src/index.css, /src/pages/hr/UsersPage.tsx
+5:16:19 PM [vite] (client) hmr invalidate /src/pages/hr/UsersPage.tsx Could not Fast Refresh (new export)
+5:16:19 PM [vite] (client) hmr update /src/App.tsx
+5:18:56 PM [vite] (client) hmr update /src/index.css, /src/pages/employee/MyEvaluationsPage.tsx
+5:18:56 PM [vite] (client) hmr update /src/index.css, /src/components/NotificationBell.tsx, /src/pages/hr/AdministrationPage.tsx, /src/pages/hr/PersonnelPage.tsx, /src/components/EmployeeProfileModal.tsx, /src/components/SelfAssessmentInviteButton.tsx, /src/pages/employee/MyEvaluationsPage.tsx, /src/components/RoleOverviewCards.tsx, /src/components/employee/ContractSelfAssessmentCard.tsx, /src/pages/hr/IndicatorsPage.tsx, /src/pages/hr/AuditLogPage.tsx, /src/components/PersonPicker.tsx, /src/pages/hr/UsersPage.tsx and 8 more
+5:18:57 PM [vite] (client) hmr update /src/index.css, /src/components/employee/ContractSelfAssessmentCard.tsx
+5:18:57 PM [vite] (client) hmr invalidate /src/components/BulkCreateDialog.tsx Could not Fast Refresh ("isBlocked" export is incompatible). Learn more at https://github.com/vitejs/vite-plugin-react/tree/main/packages/plugin-react#consistent-components-exports
+5:18:57 PM [vite] (client) hmr update /src/pages/hr/PeriodsPage.tsx
+5:26:26 PM [vite] (client) hmr update /src/index.css, /src/components/employee/ContractSelfAssessmentCard.tsx

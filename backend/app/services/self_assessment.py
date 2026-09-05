@@ -1,96 +1,33 @@
-"""خودارزیابی (ارزیابی ۱۸۰ درجه): چه کسی دارد، چه کسی می‌بیند، و دعوت به انجامش.
+"""Contract-owned employee self-assessment rules.
 
-سه قاعده که منابع انسانی تعیین کرده و این ماژول تنها جای اعمالشان است.
-
-۱. چه کسی خودارزیابی دارد — قاعده‌ای زنجیره‌محور، نه نقش‌محور
---------------------------------------------------------------
-هر کسی که *موضوعِ* یک پروندهٔ ارزیابی است، مگر مدیرعامل و معاونت‌ها.
-
-فهرستِ *منفی* است و نه مثبت، و این عمدی است: با فهرستِ مثبت، هر نقشِ تازه‌ای که
-روزی اضافه شود بی‌صدا خودارزیابی‌اش را از دست می‌دهد و کسی خبردار نمی‌شود.
-
-۲. چه کسی می‌بیند — فقط خودِ فرد و منابع انسانی
------------------------------------------------
-مدیر مستقیم، معاونت و مدیرعامل هیچ‌وقت. نه پیش از ثبتِ نمره‌شان، نه پس از آن.
-
-پیش از این سه سوییچِ پنل مدیریت بود (پیش‌فرض خاموش) به‌علاوهٔ یک گاردِ زمانی.
-هر دو برداشته شدند: به کارمند گفته می‌شود «فقط شما و منابع انسانی»، و سوییچی که
-یک نفر می‌تواند بی‌سروصدا روشنش کند، آن جمله را به یک تنظیم تبدیل می‌کند نه یک
-تضمین.
-
-بهایش را می‌دانیم و پذیرفته‌ایم: گفت‌وگو دربارهٔ فاصلهٔ دو دیدگاه — که در ادبیاتِ
-ارزیابیِ ۱۸۰ درجه فایدهٔ اصلی روش است — از مسیرِ مدیر مستقیم حذف می‌شود.
-
-۳. پنجره: فقط `draft`، به‌علاوهٔ مهلتِ دوره
---------------------------------------------
-خودارزیابی تا پیش از قطعی‌شدنِ نمرهٔ ارزیاب معنا دارد. بعد از آن دیگر «دیدگاهِ
-مستقل» نیست، واکنش به نمره است — و کلِ ارزشِ جدولِ مقایسه به همین استقلال بند
-است. مهلتِ تاریخیِ دوره یک شرطِ *دوم* است که به این اضافه می‌شود، نه جایگزینش
-(`services/evaluation_window.py`).
-
-دعوت، و اینکه چرا مسدودکننده نیست
----------------------------------
-خودارزیابی از قبل کار می‌کرد ولی هیچ‌کس خبر نداشت؛ «اختیاری» با «کسی خبرش نکرده»
-یکی نیست. پس منابع انسانی از فهرست پرسنل دعوت می‌فرستد و می‌تواند تکرارش کند.
-
-مسدودکننده نشد چون یک کارمندِ در مرخصی کلِ چرخهٔ ارزیابی سازمان را متوقف می‌کرد
-— همان بن‌بستی که یک بار از گردش‌کار حذف شد. به‌جایش مهلتِ واقعی گذاشته شد.
-
-اعلانِ خودکار عمداً نیست
-------------------------
-هنگام باز شدنِ پرونده هیچ اعلانی نمی‌رود. تصمیمِ صریحِ منابع انسانی است: هیچ
-پیامی نباید به فرد بگوید پرونده‌اش در حال بررسی است. تنها اعلان، همین دعوتِ
-دستیِ خودارزیابی است و متنش هم فقط دربارهٔ خودِ خودارزیابی حرف می‌زند.
+Self-assessment is independent from an evaluation case. An eligible employee
+may submit it once while their current employment contract is active. Keeping
+the contract start date in the unique key means extending the same contract does
+not reopen the form, while a genuinely new contract does.
 """
+
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 
 from fastapi import HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.models.enums import EvaluationStatus, UserRole
+from app.models.contract_self_assessment import ContractSelfAssessment
+from app.models.enums import PersonnelStatus, UserRole
 from app.models.evaluation import EvaluationRecord
+from app.models.indicator_framework import IndicatorFramework
 from app.models.personnel import Personnel
 from app.models.user import User
 from app.services.audit import log_event
-from app.services.evaluation_window import ensure_open as ensure_submission_window_open
-from app.services.evaluation_window import record_accepts_entries
+from app.services.indicator_framework import ensure_framework
 from app.services.notifications import notify
 
-#: پنجرهٔ وضعیتیِ خودارزیابی — فقط `draft`.
-#:
-#: بازکردنش تا مرحله‌های بعد وسوسه‌انگیز است («چرا فرصت را کوتاه کنیم؟») ولی
-#: استقلالِ دو دیدگاه را از بین می‌برد: پس از `submit` نمرهٔ ارزیاب قفل شده و هر
-#: چیزی که فرد بعد از آن ثبت کند، دیگر دیدگاهِ مستقل نیست.
-#:
-#: `hr_approved` یک بار به‌اشتباه این‌جا بود و پنجره را ناپیوسته می‌کرد: باز در
-#: `draft`، بسته در `submitted`، و دوباره باز در `hr_approved` — یعنی درست بعد
-#: از آن‌که نمرهٔ ارزیاب ثبت *و* تأیید شده بود.
-OPEN_STATUSES = frozenset({EvaluationStatus.draft})
-
-#: نقش‌هایی که خودارزیابی ندارند — قاعدهٔ منابع انسانی: «همه، به‌جز مدیرعامل و
-#: معاونت‌ها». فهرستِ منفی، تا نقشِ تازه بی‌صدا از قلم نیفتد.
 EXCLUDED_ROLES = frozenset({UserRole.ceo, UserRole.deputy})
-
-#: نقش‌هایی که خودارزیابیِ *دیگران* را می‌بینند. خودِ فرد از مسیرِ `/api/me` به
-#: خودارزیابیِ خودش می‌رسد و این مجموعه دربارهٔ او حرف نمی‌زند.
 VIEWER_ROLES = frozenset({UserRole.hr})
 
-
-def may_self_assess(role: UserRole) -> bool:
-    """آیا این نقش اصلاً خودارزیابی دارد؟
-
-    شرطِ لازم است نه کافی: فرد باید موضوعِ همان پرونده هم باشد، که مسیرهای
-    `/api/me` جداگانه می‌سنجند.
-    """
-    return role not in EXCLUDED_ROLES
-
-
-#: حالت‌هایی که رابط باید از هم جدا نشان بدهد. رشته و نه بولین: «دعوت نشده» و
-#: «دعوت شده ولی انجام نداده» و «پرونده‌ای نیست» سه چیز متفاوت‌اند و هر سه به
-#: کنشِ متفاوتی می‌رسند.
+# Kept for API compatibility with clients that know the old state vocabulary.
 STATE_NO_CASE = "no_case"
 STATE_NO_ACCOUNT = "no_account"
 STATE_NOT_ELIGIBLE = "not_eligible"
@@ -100,82 +37,68 @@ STATE_INVITED = "invited"
 STATE_SUBMITTED = "submitted"
 
 
+def may_self_assess(role: UserRole) -> bool:
+    return role not in EXCLUDED_ROLES
+
+
 def may_view(record: EvaluationRecord, role: UserRole) -> bool:
-    """آیا این نقش می‌تواند خودارزیابیِ این پرونده را ببیند؟
-
-    فقط منابع انسانی. نه مدیر مستقیم، نه معاونت، نه مدیرعامل — و نه پیش از ثبتِ
-    نمره‌شان و نه پس از آن.
-
-    شرطِ «فقط پس از خروج از `draft`» عمداً این‌جا نیست. منابع انسانی باید بتواند
-    همان لحظه ببیند که خودارزیابی رسیده — وگرنه دعوت می‌فرستد و هیچ راهی ندارد
-    بفهمد جواب گرفته یا نه. کاملِ *شدنِ جدولِ مقایسه* به ثبتِ هر دو طرف بند است،
-    که خودِ جدول نشانش می‌دهد؛ آن یک چیزِ دیگر است.
-
-    `record` در امضا مانده چون قاعده ممکن است دوباره پرونده‌محور شود؛ حذفش یعنی
-    همهٔ فراخوان‌ها باید عوض شوند تا برگردد.
-    """
+    """Only HR may view another employee's self-assessment."""
     return role in VIEWER_ROLES
 
 
-def open_record_for(db: Session, personnel_id: int) -> EvaluationRecord | None:
-    """جدیدترین پرونده‌ای که هنوز امکان خودارزیابی برای آن وجود دارد."""
-    return db.scalar(
-        select(EvaluationRecord)
-        .where(
-            EvaluationRecord.subject_personnel_id == personnel_id,
-            EvaluationRecord.status.in_(OPEN_STATUSES),
-        )
-        .order_by(EvaluationRecord.created_at.desc())
-        .limit(1)
+def contract_is_open(personnel: Personnel, *, on: date | None = None) -> bool:
+    today = on or date.today()
+    return (
+        personnel.status == PersonnelStatus.active
+        and personnel.contract_start_date <= today <= personnel.contract_end_date
+        and (personnel.separation_date is None or today < personnel.separation_date)
     )
 
 
-def state_of(
-    db: Session, record: EvaluationRecord | None, account_role: UserRole | None
-) -> str:
-    if record is None:
-        return STATE_NO_CASE
+def assessment_for_contract(db: Session, personnel_id: int, contract_start_date: date) -> ContractSelfAssessment | None:
+    return db.scalar(
+        select(ContractSelfAssessment).where(
+            ContractSelfAssessment.personnel_id == personnel_id,
+            ContractSelfAssessment.contract_start_date == contract_start_date,
+        )
+    )
+
+
+def assessment_for_evaluation(db: Session, record: EvaluationRecord) -> ContractSelfAssessment | None:
+    """Find the subject's submitted self-assessment for this case's contract."""
+    contract_start = record.subject_contract_start_date
+    if contract_start is None and record.subject is not None:
+        contract_start = record.subject.contract_start_date
+    if contract_start is None:
+        return None
+    assessment = assessment_for_contract(db, record.subject_personnel_id, contract_start)
+    if assessment is None or assessment.submitted_at is None:
+        return None
+    return assessment
+
+
+def indicator_ids_for_assessment(db: Session, assessment: ContractSelfAssessment) -> set[int]:
+    framework = db.get(IndicatorFramework, assessment.indicator_framework_id)
+    return set(framework.member_ids) if framework is not None else set()
+
+
+def state_of(db: Session, personnel: Personnel, account_role: UserRole | None) -> str:
     if account_role is None:
         return STATE_NO_ACCOUNT
     if not may_self_assess(account_role):
         return STATE_NOT_ELIGIBLE
-    if record.self_assessment_submitted_at is not None:
+
+    assessment = assessment_for_contract(db, personnel.id, personnel.contract_start_date)
+    # A submitted form remains visible after the contract ends.
+    if assessment is not None and assessment.submitted_at is not None:
         return STATE_SUBMITTED
-    if record.status not in OPEN_STATUSES or not record_accepts_entries(db, record):
+    if not contract_is_open(personnel):
         return STATE_CLOSED
-    return STATE_INVITED if record.self_assessment_invited_at is not None else STATE_PENDING
+    return STATE_INVITED if assessment is not None and assessment.invited_at else STATE_PENDING
 
 
-def _deliver_invitation(
-    db: Session,
-    *,
-    record: EvaluationRecord,
-    personnel: Personnel,
-    account: User,
-    actor_user_id: int,
-    is_reminder: bool,
-) -> None:
-    record.self_assessment_invited_at = datetime.now(UTC)
-    record.self_assessment_invited_by_user_id = actor_user_id
-    notify(
-        db,
-        [account.id],
-        type_="self_assessment_invited",
-        message="یادآوری: لطفاً خودارزیابی این دوره را تا پایان مهلت ثبت کنید.",
-        evaluation_record_id=record.id,
-        link=f"/me?self-assessment={record.id}",
-    )
-    log_event(
-        db,
-        actor_user_id=actor_user_id,
-        event_type="self_assessment_reminded" if is_reminder else "self_assessment_invited",
-        evaluation_record_id=record.id,
-        new_value={"personnel_id": personnel.id, "notified_user_id": account.id},
-    )
-
-
-def invite(db: Session, personnel: Personnel, actor_user_id: int) -> EvaluationRecord:
-    """یادآوری دستی خودارزیابی؛ هیچ اعلان خودکاری برای موضوع پرونده نمی‌رود."""
+def invite(db: Session, personnel: Personnel, actor_user_id: int) -> ContractSelfAssessment:
+    """Send or repeat a reminder without creating an evaluation case."""
     account = db.scalar(
         select(User).where(
             User.personnel_id == personnel.id,
@@ -185,40 +108,60 @@ def invite(db: Session, personnel: Personnel, actor_user_id: int) -> EvaluationR
     if account is None:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=(
-                "این فرد حساب کاربری فعالی ندارد، پس اعلانی دریافت نمی‌کند. "
-                "ابتدا از همین صفحه برایش حساب بسازید."
-            ),
+            detail="این فرد حساب کاربری فعال ندارد؛ ابتدا برای او حساب بسازید",
         )
     if not may_self_assess(account.role):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="مدیرعامل و معاونت‌ها در این دوره مشمول خودارزیابی نیستند",
+            detail="مدیرعامل و معاونت‌ها مشمول خودارزیابی نیستند",
         )
-
-    record = open_record_for(db, personnel.id)
-    if record is None:
+    if not contract_is_open(personnel):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=(
-                "پروندهٔ بازی برای این فرد وجود ندارد. خودارزیابی به یک پروندهٔ ارزیابی وصل "
-                "می‌شود، پس ابتدا مسئول واحد باید پرونده را آغاز کند."
-            ),
+            detail="قرارداد این فرد در حال حاضر فعال نیست",
         )
-    if record.self_assessment_submitted_at is not None:
+
+    assessment = assessment_for_contract(db, personnel.id, personnel.contract_start_date)
+    if assessment is not None and assessment.submitted_at is not None:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="این فرد خودارزیابی‌اش را قبلاً ثبت کرده است",
+            detail="این فرد خودارزیابی این قرارداد را قبلاً ثبت کرده است",
         )
-    # دعوت‌کردن به کاری که مهلتش گذشته، فقط کاربر را سرِ دواندن است.
-    ensure_submission_window_open(db, record, "خودارزیابی")
 
-    _deliver_invitation(
+    is_reminder = assessment is not None and assessment.invited_at is not None
+    now = datetime.now(UTC)
+    if assessment is None:
+        framework = ensure_framework(db)
+        assessment = ContractSelfAssessment(
+            personnel_id=personnel.id,
+            contract_start_date=personnel.contract_start_date,
+            contract_end_date=personnel.contract_end_date,
+            indicator_framework_id=framework.id,
+        )
+        db.add(assessment)
+    else:
+        # Extending the same contract must not create a second opportunity.
+        assessment.contract_end_date = personnel.contract_end_date
+    assessment.invited_at = now
+    assessment.invited_by_user_id = actor_user_id
+    db.flush()
+
+    notify(
         db,
-        record=record,
-        personnel=personnel,
-        account=account,
-        actor_user_id=actor_user_id,
-        is_reminder=record.self_assessment_invited_at is not None,
+        [account.id],
+        type_="self_assessment_invited",
+        message="یادآوری: لطفاً خودارزیابی قرارداد جاری خود را ثبت کنید.",
+        link="/me",
     )
-    return record
+    log_event(
+        db,
+        actor_user_id=actor_user_id,
+        event_type="self_assessment_reminded" if is_reminder else "self_assessment_invited",
+        new_value={
+            "personnel_id": personnel.id,
+            "contract_self_assessment_id": assessment.id,
+            "contract_start_date": personnel.contract_start_date.isoformat(),
+            "notified_user_id": account.id,
+        },
+    )
+    return assessment

@@ -145,6 +145,12 @@ class EvaluationRecord(Base):
         ForeignKey("users.id"), nullable=True
     )
 
+    # Snapshot of the subject's employment contract when this evaluation was opened.
+    # Self-assessment is contract-owned, so comparisons must not follow a later
+    # personnel edit into a different contract.
+    subject_contract_start_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+    subject_contract_end_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+
     #: تمدیدِ مهلتِ ثبت برای همین یک پرونده — استثنایی که منابع انسانی می‌دهد.
     #:
     #: مهلتِ عادی از `evaluation_periods.ends_on` می‌آید و برای همه یکی است. ولی

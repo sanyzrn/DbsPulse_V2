@@ -101,7 +101,9 @@ def notify_for_workflow_action(db: Session, record: EvaluationRecord, action: st
     link = f"/evaluations/{record.id}"
 
     evaluator_id = (
-        record.deputy_user_id
+        record.ceo_user_id
+        if record.unit_supervisor_user_id is None and record.deputy_user_id is None
+        else record.deputy_user_id
         if record.unit_supervisor_user_id is None
         else record.unit_supervisor_user_id
     )
@@ -113,7 +115,7 @@ def notify_for_workflow_action(db: Session, record: EvaluationRecord, action: st
 
     recipients: list[int] = []
     message = ""
-    if action in ("submit", "manager_submit"):
+    if action in ("submit", "manager_submit", "direct_ceo_submit"):
         recipients = _active_user_ids_with_role(db, UserRole.hr)
         message = f"پرونده {code} ({name}) در صف بررسی منابع انسانی قرار گرفت"
     elif action == "hr_approve":
@@ -123,6 +125,9 @@ def notify_for_workflow_action(db: Session, record: EvaluationRecord, action: st
         # مسیر «مدیر»: مرحلهٔ معاونت مصرف شده، پس نفرِ بعدی مدیرعامل است.
         recipients = [record.ceo_user_id]
         message = f"پرونده {code} ({name}) در انتظار تأیید نهایی شماست"
+    elif action == "hr_finalize_direct_ceo":
+        recipients = [record.ceo_user_id]
+        message = f"پرونده {code} ({name}) توسط منابع انسانی نهایی شد"
     elif action == "deputy_approve":
         recipients = [record.ceo_user_id]
         message = f"پرونده {code} ({name}) در انتظار تأیید نهایی شماست"
@@ -165,7 +170,7 @@ def notify_for_workflow_action(db: Session, record: EvaluationRecord, action: st
             link=link,
         )
 
-    if action == "ceo_finalize":
+    if action in ("ceo_finalize", "hr_finalize_direct_ceo"):
         # اگر خود کارمند حساب فعال دارد، نتیجه نهایی به او هم ابلاغ می‌شود («کارنامه من»)
         from app.models.user import User
 

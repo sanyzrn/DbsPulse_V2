@@ -20,7 +20,6 @@ from app.models.evaluation import EvaluationComment, EvaluationRecord, Evaluatio
 from app.models.evaluation_access import EvaluationAccess
 from app.models.indicator_framework import IndicatorFramework
 from app.models.personnel import Personnel
-from app.models.self_assessment import SelfAssessmentScore
 from app.models.user import User
 from app.schemas.auth import CurrentUser
 from app.schemas.evaluation import (
@@ -57,7 +56,13 @@ from app.services.indicator_framework import (
 from app.services.notifications import notify, notify_stage_owner_reassigned
 from app.services.pdf import weasyprint_available
 from app.services.scoring_scheme import active_scheme, rules_for_record
-from app.services.self_assessment import may_view as may_view_self_assessment
+from app.services.self_assessment import (
+    assessment_for_contract,
+    assessment_for_evaluation,
+)
+from app.services.self_assessment import (
+    may_view as may_view_self_assessment,
+)
 from app.services.self_evaluation import (
     ensure_chain_stages_are_not_redundant,
     ensure_evaluators_are_not_the_subject,
@@ -69,6 +74,7 @@ from app.services.workflow import (
     OPEN_STATUSES,
     apply_transition,
     finalize_scoring,
+    is_direct_ceo_path,
     is_manager_path,
     may_act_at,
 )
@@ -102,9 +108,7 @@ def _get_record_or_404_for_update(db: Session, evaluation_id: int) -> Evaluation
     FOR UPDATE را روی سمت nullable یک outer join نمی‌پذیرد، پس صراحتاً فقط خودِ
     evaluation_records قفل می‌شود (of=EvaluationRecord ⇒ «FOR UPDATE OF …»)."""
     record = db.scalar(
-        select(EvaluationRecord)
-        .where(EvaluationRecord.id == evaluation_id)
-        .with_for_update(of=EvaluationRecord)
+        select(EvaluationRecord).where(EvaluationRecord.id == evaluation_id).with_for_update(of=EvaluationRecord)
     )
     if record is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="ارزیابی یافت نشد")
@@ -121,14 +125,14 @@ def _is_the_scorer(record: EvaluationRecord, current_user: CurrentUser) -> bool:
     """
     if record.status is not EvaluationStatus.draft:
         return False
-    manager_path = is_manager_path(record)
-    stage_role = UserRole.deputy if manager_path else UserRole.unit_supervisor
-    scorer_id = record.deputy_user_id if manager_path else record.unit_supervisor_user_id
-    return (
-        scorer_id is not None
-        and current_user.id == scorer_id
-        and may_act_at(current_user.role, stage_role)
-    )
+    if is_direct_ceo_path(record):
+        stage_role = UserRole.ceo
+        scorer_id = record.ceo_user_id
+    else:
+        manager_path = is_manager_path(record)
+        stage_role = UserRole.deputy if manager_path else UserRole.unit_supervisor
+        scorer_id = record.deputy_user_id if manager_path else record.unit_supervisor_user_id
+    return scorer_id is not None and current_user.id == scorer_id and may_act_at(current_user.role, stage_role)
 
 
 def _ensure_can_view(record: EvaluationRecord, current_user: CurrentUser) -> None:
@@ -141,9 +145,7 @@ def _ensure_can_view(record: EvaluationRecord, current_user: CurrentUser) -> Non
         return
     allowed_ids = {record.unit_supervisor_user_id, record.deputy_user_id, record.ceo_user_id}
     if current_user.id not in allowed_ids:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN, detail="شما به این ارزیابی دسترسی ندارید"
-        )
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="شما به این ارزیابی دسترسی ندارید")
 
 
 def _was_returned(db: Session, evaluation_id: int) -> bool:
@@ -193,17 +195,13 @@ def _self_assessment_of(db: Session, record: EvaluationRecord) -> SelfAssessment
     None یعنی فرد چیزی ثبت نکرده — که کاملاً مجاز است: خودارزیابی اختیاری و
     غیرمسدودکننده است.
     """
-    if record.self_assessment_submitted_at is None:
+    assessment = assessment_for_evaluation(db, record)
+    if assessment is None:
         return None
-    rows = db.scalars(
-        select(SelfAssessmentScore).where(
-            SelfAssessmentScore.evaluation_record_id == record.id
-        )
-    )
     return SelfAssessmentRead(
-        submitted_at=record.self_assessment_submitted_at,
-        note=record.self_assessment_note,
-        scores=[SelfAssessmentScoreRead.model_validate(r) for r in rows],
+        submitted_at=assessment.submitted_at,
+        note=assessment.note,
+        scores=[SelfAssessmentScoreRead.model_validate(row) for row in assessment.scores],
     )
 
 
@@ -211,21 +209,15 @@ def _self_assessment_of(db: Session, record: EvaluationRecord) -> SelfAssessment
 #: این‌جا فقط صدا زده می‌شود تا سیاستِ محرمانگی و گاردِ ضدلنگر از هم جدا نیفتند.
 
 
-def _to_detail(
-    db: Session, record: EvaluationRecord, current_user: CurrentUser
-) -> EvaluationDetail:
+def _to_detail(db: Session, record: EvaluationRecord, current_user: CurrentUser) -> EvaluationDetail:
     framework = (
-        db.get(IndicatorFramework, record.indicator_framework_id)
-        if record.indicator_framework_id is not None
-        else None
+        db.get(IndicatorFramework, record.indicator_framework_id) if record.indicator_framework_id is not None else None
     )
     return EvaluationDetail.model_validate(record).model_copy(
         update={
             "was_returned": _was_returned(db, record.id),
             "self_assessment": (
-                _self_assessment_of(db, record)
-                if may_view_self_assessment(record, current_user.role)
-                else None
+                _self_assessment_of(db, record) if may_view_self_assessment(record, current_user.role) else None
             ),
             "indicator_ids": sorted(indicator_ids_for_record(db, record)),
             "indicator_framework_version": framework.version if framework else None,
@@ -241,9 +233,7 @@ def _persisted_scores(db: Session, record: EvaluationRecord) -> list[ScoreRead]:
     `scores` در EvaluationDetail را داشته باشد؛ وگرنه کش با ردیف‌های ناقص پر می‌شود.
     """
     rows = db.scalars(
-        select(EvaluationScore)
-        .where(EvaluationScore.evaluation_record_id == record.id)
-        .order_by(EvaluationScore.id)
+        select(EvaluationScore).where(EvaluationScore.evaluation_record_id == record.id).order_by(EvaluationScore.id)
     ).all()
     return [ScoreRead.model_validate(row) for row in rows]
 
@@ -266,9 +256,7 @@ def _replace_scores(db: Session, record: EvaluationRecord, payload: ScoresUpsert
                 status_code=status.HTTP_400_BAD_REQUEST, detail="هر شاخص فقط یک‌بار می‌تواند امتیاز بگیرد"
             )
         indicator_ids_seen.add(item.indicator_id)
-        rows.append(
-            {"indicator_id": item.indicator_id, "score": item.score, "evidence_text": item.evidence_text}
-        )
+        rows.append({"indicator_id": item.indicator_id, "score": item.score, "evidence_text": item.evidence_text})
 
     db.query(EvaluationScore).filter(EvaluationScore.evaluation_record_id == record.id).delete()
     for row in rows:
@@ -281,9 +269,7 @@ def _replace_scores(db: Session, record: EvaluationRecord, payload: ScoresUpsert
 def create_evaluation(
     payload: EvaluationCreate,
     db: Session = Depends(get_db),
-    current_user: CurrentUser = Depends(
-        require_chain_stage(UserRole.unit_supervisor)
-    ),
+    current_user: CurrentUser = Depends(require_chain_stage(UserRole.unit_supervisor)),
 ) -> EvaluationRecord:
     # پرونده به دورهٔ بازِ امروز برچسب می‌خورد، اگر دوره‌ای باز باشد.
     #
@@ -305,9 +291,7 @@ def create_evaluation(
             detail="این پرسنل غیرفعال است؛ امکان شروع ارزیابی برای او وجود ندارد",
         )
 
-    access = db.scalar(
-        select(EvaluationAccess).where(EvaluationAccess.personnel_id == personnel.id)
-    )
+    access = db.scalar(select(EvaluationAccess).where(EvaluationAccess.personnel_id == personnel.id))
     if access is None:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -329,11 +313,16 @@ def create_evaluation(
             ),
         )
 
-    if personnel.is_manager:
-        if (
-            not may_act_at(current_user.role, UserRole.deputy)
-            or current_user.id != access.deputy_user_id
-        ):
+    if access.unit_supervisor_user_id is None and access.deputy_user_id is None:
+        if not may_act_at(current_user.role, UserRole.ceo) or current_user.id != access.ceo_user_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="فقط مدیرعامل مربوطه می‌تواند ارزیابی مستقیم این فرد را آغاز کند",
+            )
+        record_status = EvaluationStatus.draft
+        unit_supervisor_user_id = None
+    elif personnel.is_manager:
+        if not may_act_at(current_user.role, UserRole.deputy) or current_user.id != access.deputy_user_id:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="فقط معاونت مربوطه می‌تواند ارزیابی این فرد را آغاز کند",
@@ -389,7 +378,14 @@ def create_evaluation(
     # محاسبه‌اش همیشه از همین نسخه می‌خواند، حتی اگر HR فردا وزن‌ها را عوض کند.
     scheme = active_scheme(db)
     # و به نسخهٔ چارچوب شاخص‌ها (P1-05) — یعنی *چه سؤال‌هایی* پرسیده می‌شود.
-    framework = ensure_framework(db)
+    contract_assessment = assessment_for_contract(db, personnel.id, personnel.contract_start_date)
+    framework = (
+        db.get(IndicatorFramework, contract_assessment.indicator_framework_id)
+        if contract_assessment is not None
+        else ensure_framework(db)
+    )
+    if framework is None:
+        framework = ensure_framework(db)
 
     record = EvaluationRecord(
         evaluation_code=next_evaluation_code(db),
@@ -400,6 +396,8 @@ def create_evaluation(
         period_id=active_period.id if active_period else None,
         scoring_scheme_id=scheme.id if scheme else None,
         indicator_framework_id=framework.id,
+        subject_contract_start_date=personnel.contract_start_date,
+        subject_contract_end_date=personnel.contract_end_date,
         status=record_status,
     )
     db.add(record)
@@ -450,20 +448,12 @@ def _apply_evaluation_filters(
 ):
     """فیلترهای ترکیب‌پذیر فهرست/خروجی ارزیابی‌ها — یک‌جا تا list و export.xlsx
     همیشه رفتار یکسان داشته باشند (خروجی همان چیزی است که HR فیلتر کرده)."""
-    if (
-        min_final_pct is not None
-        and max_final_pct is not None
-        and min_final_pct > max_final_pct
-    ):
+    if min_final_pct is not None and max_final_pct is not None and min_final_pct > max_final_pct:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="کمینهٔ امتیاز نهایی نمی‌تواند از بیشینهٔ آن بزرگ‌تر باشد",
         )
-    if (
-        created_from is not None
-        and created_to is not None
-        and created_from > created_to
-    ):
+    if created_from is not None and created_to is not None and created_from > created_to:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="تاریخ شروع بازه نمی‌تواند بعد از تاریخ پایان آن باشد",
@@ -476,19 +466,14 @@ def _apply_evaluation_filters(
         query = query.where(EvaluationRecord.status == status_filter)
     if q:
         pattern = f"%{q.strip()}%"
-        query = query.where(
-            EvaluationRecord.evaluation_code.ilike(pattern)
-            | Personnel.full_name.ilike(pattern)
-        )
+        query = query.where(EvaluationRecord.evaluation_code.ilike(pattern) | Personnel.full_name.ilike(pattern))
     if org_unit:
         query = query.where(Personnel.org_unit == org_unit)
     if created_from is not None:
         query = query.where(EvaluationRecord.created_at >= created_from)
     if created_to is not None:
         # بازه شامل خودِ روز پایان است (created_at از نوع timestamp است)
-        query = query.where(
-            EvaluationRecord.created_at < created_to + timedelta(days=1)
-        )
+        query = query.where(EvaluationRecord.created_at < created_to + timedelta(days=1))
     if min_final_pct is not None:
         query = query.where(EvaluationRecord.final_weighted_pct >= min_final_pct)
     if max_final_pct is not None:
@@ -585,11 +570,7 @@ def list_evaluations(
     )
 
     total = db.scalar(select(func.count()).select_from(query.subquery())) or 0
-    items = list(
-        db.scalars(
-            query.order_by(EvaluationRecord.created_at.desc()).limit(limit).offset(offset)
-        )
-    )
+    items = list(db.scalars(query.order_by(EvaluationRecord.created_at.desc()).limit(limit).offset(offset)))
     # صف بررسی نباید پرونده‌ای که قبلاً برگشت خورده و دوباره ارسال شده را از یک
     # ثبت تازه تشخیص‌نداده نمایش دهد؛ یک کوئری دسته‌ای به‌جای N+1 در audit_log
     returned_ids: set[int] = set()
@@ -607,10 +588,7 @@ def list_evaluations(
     return EvaluationPage(
         total=total,
         items=[
-            EvaluationRead.model_validate(r).model_copy(
-                update={"was_returned": r.id in returned_ids}
-            )
-            for r in items
+            EvaluationRead.model_validate(r).model_copy(update={"was_returned": r.id in returned_ids}) for r in items
         ],
     )
 
@@ -709,9 +687,7 @@ def set_evaluator_comment(
     ensure_submission_window_open(db, record, "ثبت ارزیابی")
     # نمره‌دهندهٔ اول این نظر را ثبت می‌کند — در هر دو مسیر، در مرحلهٔ نمره‌دهی.
     if not _is_the_scorer(record, current_user):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN, detail="امکان ثبت نظر در این مرحله وجود ندارد"
-        )
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="امکان ثبت نظر در این مرحله وجود ندارد")
     record.evaluator_comment = payload.evaluator_comment
     db.commit()
     db.refresh(record)
@@ -745,9 +721,7 @@ def set_special_score(
     try:
         validate_bonus(payload.bonus_points, reason, rules_for_record(db, record))
     except ValueError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)
-        ) from exc
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
 
     previous = {
         "bonus_points": float(record.bonus_points) if record.bonus_points is not None else None,
@@ -789,9 +763,14 @@ def submit_evaluation(
     # در مسیر «مدیر» نمره‌دهنده معاونت است، پس گذارِ دیگری با همان مقصد لازم
     # است. محاسبهٔ نتیجه در هر دو مسیر همین‌جا انجام می‌شود — جایی که نمره‌دهی
     # تمام می‌شود — نه در تأیید معاونت.
-    action = "manager_submit" if is_manager_path(record) else "submit"
+    action = (
+        "direct_ceo_submit" if is_direct_ceo_path(record) else "manager_submit" if is_manager_path(record) else "submit"
+    )
     apply_transition(
-        db, record, action, current_user,
+        db,
+        record,
+        action,
+        current_user,
         before=lambda: finalize_scoring(db, record, current_user),
     )
     db.commit()
@@ -802,6 +781,7 @@ def submit_evaluation(
 @router.post("/{evaluation_id}/hr-approve", response_model=EvaluationRead)
 def hr_approve(
     evaluation_id: int,
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
     current_user: CurrentUser = Depends(require_roles(UserRole.hr)),
 ) -> EvaluationRead:
@@ -811,10 +791,27 @@ def hr_approve(
     ensure_not_deciding_about_oneself(record, current_user)
     # در مسیر «مدیر»، تأیید منابع انسانی پرونده را مستقیم روی میز مدیرعامل
     # می‌گذارد: مرحلهٔ معاونت مصرف شده، چون خودش نمره داده است.
-    action = "hr_approve_manager" if is_manager_path(record) else "hr_approve"
-    apply_transition(db, record, action, current_user)
+    direct_ceo = is_direct_ceo_path(record)
+    action = (
+        "hr_finalize_direct_ceo" if direct_ceo else "hr_approve_manager" if is_manager_path(record) else "hr_approve"
+    )
+
+    def _finalize_direct_ceo_record() -> None:
+        record.finalized_at = datetime.now(UTC)
+        record.final_snapshot = build_final_snapshot(db, record)
+        record.verify_token = secrets.token_urlsafe(24)
+
+    apply_transition(
+        db,
+        record,
+        action,
+        current_user,
+        before=_finalize_direct_ceo_record if direct_ceo else None,
+    )
     db.commit()
     db.refresh(record)
+    if direct_ceo:
+        background_tasks.add_task(archive_final_pdf_detached, record.id)
     return _to_read(db, record)
 
 
@@ -875,9 +872,7 @@ def return_evaluation(
     evaluation_id: int,
     payload: ReturnRequest,
     db: Session = Depends(get_db),
-    current_user: CurrentUser = Depends(
-        require_roles(UserRole.hr, UserRole.deputy, UserRole.ceo)
-    ),
+    current_user: CurrentUser = Depends(require_roles(UserRole.hr, UserRole.deputy, UserRole.ceo)),
 ) -> EvaluationRead:
     """برگشت پرونده یک مرحله به عقب با ذکر دلیل اجباری؛ امتیازهای قبلی حفظ می‌شوند."""
     record = _get_record_or_404_for_update(db, evaluation_id)
@@ -1017,10 +1012,7 @@ def extend_submission_window(
             db,
             [scorer_id],
             type_="submission_window_extended",
-            message=(
-                f"مهلت ثبت پروندهٔ {record.evaluation_code} تا "
-                f"{payload.until:%Y-%m-%d} تمدید شد"
-            ),
+            message=(f"مهلت ثبت پروندهٔ {record.evaluation_code} تا {payload.until:%Y-%m-%d} تمدید شد"),
             evaluation_record_id=record.id,
             link=f"/evaluations/{record.id}",
         )
@@ -1055,8 +1047,7 @@ def hr_claim(
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail=(
-                f"این پرونده از قبل در اختیار «{record.hr_username}» است؛ "
-                "برای جابه‌جایی از «واگذاری» استفاده کنید."
+                f"این پرونده از قبل در اختیار «{record.hr_username}» است؛ برای جابه‌جایی از «واگذاری» استفاده کنید."
             ),
         )
 
@@ -1255,9 +1246,7 @@ def reassign_stage_owner(
             detail=f"کاربر انتخاب‌شده برای «{stage_label}» باید نقش «{stage_label}» داشته باشد",
         )
     # همان نامساوی P0-10: جایگزین نباید خودِ ارزیابی‌شونده باشد.
-    ensure_evaluators_are_not_the_subject(
-        db, record.subject_personnel_id, [payload.new_user_id]
-    )
+    ensure_evaluators_are_not_the_subject(db, record.subject_personnel_id, [payload.new_user_id])
     # و نباید از قبل در مرحلهٔ دیگری از همین پرونده نشسته باشد. بدون این، همین
     # endpoint راهِ دور زدنِ قید «سه نفر متفاوت» بود: زنجیره درست ساخته می‌شد و
     # بعد یک جابه‌جایی، دو صندلی را به یک نفر می‌داد.
@@ -1324,9 +1313,7 @@ def evaluation_summary_pdf(
             )
 
     if record.status != EvaluationStatus.finalized or record.final_snapshot is None:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, detail="ارزیابی هنوز نهایی نشده است"
-        )
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="ارزیابی هنوز نهایی نشده است")
 
     # اگر کتابخانه‌های بومی WeasyPrint روی این سرور نصب نباشند، به‌جای خطای مبهم
     # (AttributeError روی سند None) یک پیام واضح ۵۰۰ برمی‌گردانیم.
@@ -1363,9 +1350,7 @@ def evaluation_summary_pdf(
     return Response(
         content=document.pdf_bytes,
         media_type="application/pdf",
-        headers={
-            "Content-Disposition": f'inline; filename="{record.evaluation_code}.pdf"'
-        },
+        headers={"Content-Disposition": f'inline; filename="{record.evaluation_code}.pdf"'},
     )
 
 
@@ -1394,9 +1379,7 @@ def add_comment(
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="نقش شما اجازه ثبت کامنت ندارد")
 
     comment_stage, required_status, required_user_id = mapping
-    if record.status != required_status or (
-        required_user_id is not None and current_user.id != required_user_id
-    ):
+    if record.status != required_status or (required_user_id is not None and current_user.id != required_user_id):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN, detail="در این مرحله امکان ثبت کامنت برای شما وجود ندارد"
         )
@@ -1432,9 +1415,7 @@ def _add_reply(
 
     parent = db.get(EvaluationComment, payload.parent_comment_id)
     if parent is None or parent.evaluation_record_id != record.id:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="کامنتِ والد یافت نشد"
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="کامنتِ والد یافت نشد")
     if parent.parent_comment_id is not None:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,

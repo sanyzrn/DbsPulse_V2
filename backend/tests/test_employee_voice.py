@@ -5,6 +5,7 @@
 بگیرد (فقط HR می‌توانست)، و هیچ راهی برای ثبت مخالفت نداشت. «رؤیت» فقط ثبت می‌کرد
 که او نتیجه را *دید*، نه این‌که پذیرفت.
 """
+
 from datetime import UTC, datetime, timedelta
 
 from app.core.config import settings
@@ -105,9 +106,7 @@ def test_the_subject_can_download_their_own_document(client, db_session):
     """سندی که دربارهٔ یک نفر است باید در اختیار خودش باشد."""
     case = _case(client, db_session, finalize=True)
 
-    r = client.get(
-        f"/api/evaluations/{case['id']}/summary.pdf", headers=auth_header(case["employee"])
-    )
+    r = client.get(f"/api/evaluations/{case['id']}/summary.pdf", headers=auth_header(case["employee"]))
 
     assert r.status_code == 200
     assert r.content[:5] == b"%PDF-"
@@ -129,9 +128,7 @@ def test_an_employee_cannot_download_someone_elses_document(client, db_session):
     mine = _case(client, db_session, finalize=True)
     other = _case(client, db_session, finalize=True)
 
-    r = client.get(
-        f"/api/evaluations/{other['id']}/summary.pdf", headers=auth_header(mine["employee"])
-    )
+    r = client.get(f"/api/evaluations/{other['id']}/summary.pdf", headers=auth_header(mine["employee"]))
 
     assert r.status_code == 403
 
@@ -141,9 +138,7 @@ def test_chain_roles_still_cannot_download_the_document(client, db_session):
     case = _case(client, db_session, finalize=True)
 
     for actor in ("sup", "dep", "ceo"):
-        r = client.get(
-            f"/api/evaluations/{case['id']}/summary.pdf", headers=auth_header(case[actor])
-        )
+        r = client.get(f"/api/evaluations/{case['id']}/summary.pdf", headers=auth_header(case[actor]))
         assert r.status_code == 403, actor
 
 
@@ -192,9 +187,7 @@ def test_the_objection_window_closes(client, db_session):
     client.post(f"/api/me/evaluations/{case['id']}/acknowledge", headers=auth_header(case["employee"]))
 
     record = db_session.get(EvaluationRecord, case["id"])
-    record.acknowledged_at = datetime.now(UTC) - timedelta(
-        days=settings.objection_window_days + 1
-    )
+    record.acknowledged_at = datetime.now(UTC) - timedelta(days=settings.objection_window_days + 1)
     db_session.commit()
 
     r = client.post(
@@ -251,9 +244,7 @@ def test_the_objection_does_not_alter_the_result_or_the_document(client, db_sess
     """سند نهایی هش و QR تأیید دارد؛ اعتراض یک رکورد موازی است، نه بازنویسی آن."""
     case = _case(client, db_session, finalize=True)
     before = client.get(f"/api/evaluations/{case['id']}", headers=auth_header(case["hr"])).json()
-    pdf_before = client.get(
-        f"/api/evaluations/{case['id']}/summary.pdf", headers=auth_header(case["hr"])
-    ).content
+    pdf_before = client.get(f"/api/evaluations/{case['id']}/summary.pdf", headers=auth_header(case["hr"])).content
 
     client.post(f"/api/me/evaluations/{case['id']}/acknowledge", headers=auth_header(case["employee"]))
     client.post(
@@ -263,9 +254,7 @@ def test_the_objection_does_not_alter_the_result_or_the_document(client, db_sess
     )
 
     after = client.get(f"/api/evaluations/{case['id']}", headers=auth_header(case["hr"])).json()
-    pdf_after = client.get(
-        f"/api/evaluations/{case['id']}/summary.pdf", headers=auth_header(case["hr"])
-    ).content
+    pdf_after = client.get(f"/api/evaluations/{case['id']}/summary.pdf", headers=auth_header(case["hr"])).content
 
     assert after["final_weighted_pct"] == before["final_weighted_pct"]
     assert after["status"] == "finalized"
@@ -366,10 +355,7 @@ def test_non_hr_roles_cannot_resolve_an_objection(client, db_session):
 
 def _indicator_payload(db_session, score: int):
     return {
-        "scores": [
-            {"indicator_id": i.id, "score": score, "note": "توضیح خودم"}
-            for i in active_indicators(db_session)
-        ],
+        "scores": [{"indicator_id": i.id, "score": score, "note": "توضیح خودم"} for i in active_indicators(db_session)],
         "note": "دستاورد اصلی من در این دوره راه‌اندازی سامانهٔ گزارش‌گیری بود",
     }
 
@@ -393,10 +379,8 @@ def test_the_employee_can_submit_a_self_assessment_while_the_case_is_open(client
     assert r.json()["submitted_at"] is not None
     assert len(r.json()["scores"]) == 20
     assert "گزارش‌گیری" in r.json()["note"]
-    open_row = client.get(
-        "/api/me/evaluations/open", headers=auth_header(case["employee"])
-    ).json()[0]
-    assert open_row["self_assessment_submitted_at"] is not None
+    current = client.get("/api/me/self-assessment/current", headers=auth_header(case["employee"])).json()
+    assert current["state"] == "submitted"
 
 
 def test_every_role_except_deputy_and_ceo_can_self_assess_its_own_record(client, db_session):
@@ -427,9 +411,7 @@ def test_every_role_except_deputy_and_ceo_can_self_assess_its_own_record(client,
 def test_deputy_and_ceo_have_no_self_assessment_access(client, db_session):
     case = _case(client, db_session, finalize=False)
     for actor in ("dep", "ceo"):
-        response = client.get(
-            "/api/me/evaluations/open", headers=auth_header(case[actor])
-        )
+        response = client.get("/api/me/evaluations/open", headers=auth_header(case[actor]))
         assert response.status_code == 403, actor
 
 
@@ -468,9 +450,7 @@ def test_the_self_assessment_never_enters_the_result(client, db_session):
     client.post(f"/api/evaluations/{case['id']}/submit", headers=auth_header(case["sup"]))
     client.post(f"/api/evaluations/{case['id']}/hr-approve", headers=auth_header(case["hr"]))
     client.post(f"/api/evaluations/{case['id']}/deputy-approve", headers=auth_header(case["dep"]))
-    final = client.post(
-        f"/api/evaluations/{case['id']}/ceo-finalize", headers=auth_header(case["ceo"])
-    ).json()
+    final = client.post(f"/api/evaluations/{case['id']}/ceo-finalize", headers=auth_header(case["ceo"])).json()
 
     # امتیاز ارزیاب همه ۳ بود (full_valid_scores) → دقیقاً ۶۰٪
     assert final["final_weighted_pct"] == 60.0, "خودارزیابی نباید در میانگین اثر بگذارد"
@@ -496,9 +476,7 @@ def test_only_hr_ever_sees_a_self_assessment(client, db_session):
     )
 
     def detail(actor):
-        return client.get(
-            f"/api/evaluations/{case['id']}", headers=auth_header(case[actor])
-        ).json()
+        return client.get(f"/api/evaluations/{case['id']}", headers=auth_header(case[actor])).json()
 
     # پیش از ثبتِ نمرهٔ ارزیاب
     hr_view = detail("hr")
@@ -549,12 +527,8 @@ def test_the_self_assessment_is_locked_after_submission(client, db_session):
     assert "قابل تغییر نیست" in again.json()["detail"]
 
 
-def test_the_window_closes_once_the_evaluator_has_scored(client, db_session):
-    """خودارزیابی فقط تا پیش از قطعی‌شدنِ نمرهٔ ارزیاب معنا دارد.
-
-    بعد از آن دیگر «دیدگاه مستقل» نیست، واکنش به نمره است — و همین است که
-    مقایسهٔ دو دیدگاه را بی‌معنا می‌کند.
-    """
+def test_the_contract_form_stays_open_after_the_evaluator_has_scored(client, db_session):
+    """ثبت نمرهٔ ارزیاب، خودارزیابی مستقلِ قرارداد را باز یا بسته نمی‌کند."""
     case = _case(client, db_session, finalize=False)  # وضعیت: submitted
 
     r = client.post(
@@ -563,8 +537,7 @@ def test_the_window_closes_once_the_evaluator_has_scored(client, db_session):
         headers=auth_header(case["employee"]),
     )
 
-    assert r.status_code == 400
-    assert "پنجرهٔ خودارزیابی بسته است" in r.json()["detail"]
+    assert r.status_code == 200
 
 
 def _self_assessment_notes(client, user):
@@ -589,7 +562,7 @@ def test_submission_notifies_hr_and_never_the_scorer(client, db_session):
     assert _self_assessment_notes(client, case["sup"]) == []
     rows = _self_assessment_notes(client, case["hr"])
     assert rows, "منابع انسانی باید خبردار شود"
-    assert "جدول مقایسه" in rows[0]["message"]
+    assert "قرارداد جاری" in rows[0]["message"]
 
 
 def test_an_employee_cannot_self_assess_someone_elses_record(client, db_session):
@@ -608,14 +581,7 @@ def test_an_employee_cannot_self_assess_someone_elses_record(client, db_session)
 # ───────────────────────── پنجرهٔ خودارزیابی: پیوسته و یک‌جا تعریف‌شده
 
 
-def test_the_window_does_not_reopen_after_hr_approval(client, db_session):
-    """پنجره ناپیوسته نیست.
-
-    `hr_approved` زمانی در فهرستِ بازها بود، چون مسیر «مدیر» مستقیماً از همان
-    وضعیت شروع می‌شد. آن رفتار برداشته شد ولی عضو ماند، و نتیجه‌اش پنجره‌ای بود
-    که بعد از ثبتِ نمرهٔ ارزیاب *و* تأیید منابع انسانی دوباره باز می‌شد — دقیقاً
-    همان چیزی که قرار بود ممکن نباشد.
-    """
+def test_hr_approval_does_not_close_the_contract_form(client, db_session):
     case = _case(client, db_session, finalize=False)  # وضعیت: submitted
     client.post(f"/api/evaluations/{case['id']}/hr-approve", headers=auth_header(case["hr"]))
 
@@ -625,12 +591,10 @@ def test_the_window_does_not_reopen_after_hr_approval(client, db_session):
         headers=auth_header(case["employee"]),
     )
 
-    assert r.status_code == 400
-    assert "پنجرهٔ خودارزیابی بسته است" in r.json()["detail"]
+    assert r.status_code == 200
 
 
-def test_the_open_case_says_whether_the_window_is_open(client, db_session):
-    """تعریفِ پنجره یک جا بیشتر نیست؛ فرانت آن را از سرور می‌گیرد نه از کپیِ دستی."""
+def test_the_open_case_no_longer_owns_the_self_assessment_window(client, db_session):
     case = _case(client, db_session, finalize=False)  # وضعیت: submitted
 
     closed = client.get("/api/me/evaluations/open", headers=auth_header(case["employee"])).json()
@@ -642,7 +606,9 @@ def test_the_open_case_says_whether_the_window_is_open(client, db_session):
         headers=auth_header(case["hr"]),
     )
     opened = client.get("/api/me/evaluations/open", headers=auth_header(case["employee"])).json()
-    assert opened[0]["self_assessment_open"] is True
+    assert opened[0]["self_assessment_open"] is False
+    current = client.get("/api/me/self-assessment/current", headers=auth_header(case["employee"])).json()
+    assert current["open"] is True
 
 
 # ───────────────────────── دعوت: یادآوری، نه بن‌بست
@@ -650,9 +616,7 @@ def test_the_open_case_says_whether_the_window_is_open(client, db_session):
 
 def test_opening_an_evaluation_does_not_notify_the_employee(client, db_session):
     case = _case(client, db_session, finalize=False)
-    notes = client.get(
-        "/api/notifications", headers=auth_header(case["employee"])
-    ).json()
+    notes = client.get("/api/notifications", headers=auth_header(case["employee"])).json()
     rows = notes["items"] if isinstance(notes, dict) else notes
     invites = [n for n in rows if n["type"] == "self_assessment_invited"]
 

@@ -333,13 +333,27 @@ class SelfAssessmentRead(BaseModel):
     scores: list[SelfAssessmentScoreRead] = []
 
 
+class CurrentSelfAssessmentRead(SelfAssessmentRead):
+    """Self-assessment state for one personnel contract."""
+
+    assessment_id: int | None = None
+    personnel_id: int
+    personnel_name: str
+    contract_start_date: date
+    contract_end_date: date
+    state: str
+    eligible: bool
+    open: bool
+    indicator_ids: list[int] = []
+
+
 class MySelfAssessmentRead(SelfAssessmentRead):
     """نسخهٔ فقط‌خواندنی خودارزیابی‌های ثبت‌شدهٔ خود فرد."""
 
-    evaluation_id: int
-    evaluation_code: str
-    period_name: str | None = None
-    period_ends_on: date | None = None
+    assessment_id: int
+    personnel_id: int
+    contract_start_date: date
+    contract_end_date: date
 
 
 class ObjectionRequest(BaseModel):

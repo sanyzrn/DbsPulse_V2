@@ -21,6 +21,7 @@
 «رد شد» شبیه خطا به‌نظر می‌رسد — ولی همان گارد است که جلوی دو پروندهٔ هم‌زمان
 برای یک نفر را می‌گیرد. رد شدن این‌جا نتیجهٔ درست است، نه استثنا.
 """
+
 from dataclasses import dataclass
 from datetime import date
 from enum import Enum
@@ -32,11 +33,13 @@ from sqlalchemy.orm import Session
 from app.models.enums import EvaluationStatus, PersonnelStatus
 from app.models.evaluation import EvaluationRecord
 from app.models.evaluation_access import EvaluationAccess
+from app.models.indicator_framework import IndicatorFramework
 from app.models.personnel import Personnel
 from app.services.evaluation import inactive_seat_labels, next_evaluation_code
 from app.services.evaluation_window import open_period
 from app.services.indicator_framework import ensure_framework
 from app.services.scoring_scheme import active_scheme
+from app.services.self_assessment import assessment_for_contract
 from app.services.workflow import IS_OPEN_RECORD
 
 
@@ -127,11 +130,7 @@ class PersonPlan:
 
 
 def _load_cohort(db: Session, cohort: CohortFilter) -> list[Personnel]:
-    return list(
-        db.scalars(
-            select(Personnel).where(*cohort.conditions()).order_by(Personnel.full_name)
-        )
-    )
+    return list(db.scalars(select(Personnel).where(*cohort.conditions()).order_by(Personnel.full_name)))
 
 
 def plan(db: Session, cohort: CohortFilter) -> list[PersonPlan]:
@@ -147,24 +146,18 @@ def plan(db: Session, cohort: CohortFilter) -> list[PersonPlan]:
     person_ids = [p.id for p in people]
     access_by_person = {
         row.personnel_id: row
-        for row in db.scalars(
-            select(EvaluationAccess).where(EvaluationAccess.personnel_id.in_(person_ids))
-        )
+        for row in db.scalars(select(EvaluationAccess).where(EvaluationAccess.personnel_id.in_(person_ids)))
     }
     open_by_person = {
         record.subject_personnel_id: record
         for record in db.scalars(
-            select(EvaluationRecord).where(
-                EvaluationRecord.subject_personnel_id.in_(person_ids), IS_OPEN_RECORD
-            )
+            select(EvaluationRecord).where(EvaluationRecord.subject_personnel_id.in_(person_ids), IS_OPEN_RECORD)
         )
     }
 
     plans = []
     for person in people:
-        plans.append(
-            _plan_one(db, person, access_by_person.get(person.id), open_by_person.get(person.id))
-        )
+        plans.append(_plan_one(db, person, access_by_person.get(person.id), open_by_person.get(person.id)))
     return plans
 
 
@@ -193,7 +186,8 @@ def _plan_one(
         return PersonPlan(**base, outcome=BulkOutcome.blocked_inactive)
     if access is None:
         return PersonPlan(**base, outcome=BulkOutcome.blocked_no_access_row)
-    if not person.is_manager and access.unit_supervisor_user_id is None:
+    direct_ceo_path = access.unit_supervisor_user_id is None and access.deputy_user_id is None
+    if not person.is_manager and access.unit_supervisor_user_id is None and not direct_ceo_path:
         return PersonPlan(**base, outcome=BulkOutcome.blocked_no_supervisor)
     # صندلی‌های زنجیره باید زنده باشند: پرونده‌ای که برای حسابِ غیرفعال باز شود
     # هرگز جلو نمی‌رود و یادآوری‌ها هم به جایی نمی‌رسد (M-1).
@@ -204,12 +198,18 @@ def _plan_one(
     # دقیقاً مثل create_evaluation. پیش از این دسته‌ای مستقیماً در `hr_approved`
     # ساخته می‌شد: بررسیِ منابع انسانی رد می‌شد و پرونده می‌توانست بدون هیچ نمره‌ای
     # تا نهایی‌شدن برود (C-1 در گزارش ممیزی).
-    assignee = access.deputy_user_id if person.is_manager else access.unit_supervisor_user_id
+    assignee = (
+        access.ceo_user_id
+        if direct_ceo_path
+        else access.deputy_user_id
+        if person.is_manager
+        else access.unit_supervisor_user_id
+    )
     return PersonPlan(
         **base,
         outcome=BulkOutcome.created,
         assignee_user_id=assignee,
-        manager_path=person.is_manager,
+        manager_path=person.is_manager or direct_ceo_path,
     )
 
 
@@ -228,13 +228,15 @@ def execute(db: Session, cohort: CohortFilter) -> list[PersonPlan]:
     # دسته خوانده می‌شوند، پس همهٔ پرونده‌های یک اجرا زیر یک نسخه‌اند.
     scheme = active_scheme(db)
     framework = ensure_framework(db)
+    created_personnel_ids = [p.personnel_id for p in plans if p.outcome is BulkOutcome.created]
+    personnel_by_id = {
+        row.id: row for row in db.scalars(select(Personnel).where(Personnel.id.in_(created_personnel_ids)))
+    }
     access_by_person = {
         row.personnel_id: row
         for row in db.scalars(
             select(EvaluationAccess).where(
-                EvaluationAccess.personnel_id.in_(
-                    [p.personnel_id for p in plans if p.outcome is BulkOutcome.created]
-                )
+                EvaluationAccess.personnel_id.in_([p.personnel_id for p in plans if p.outcome is BulkOutcome.created])
             )
         )
     }
@@ -243,17 +245,24 @@ def execute(db: Session, cohort: CohortFilter) -> list[PersonPlan]:
         if person_plan.outcome is not BulkOutcome.created:
             continue
         access = access_by_person[person_plan.personnel_id]
+        personnel = personnel_by_id[person_plan.personnel_id]
+        contract_assessment = assessment_for_contract(db, personnel.id, personnel.contract_start_date)
+        record_framework = (
+            db.get(IndicatorFramework, contract_assessment.indicator_framework_id)
+            if contract_assessment is not None
+            else framework
+        )
         record = EvaluationRecord(
             evaluation_code=next_evaluation_code(db),
             subject_personnel_id=person_plan.personnel_id,
-            unit_supervisor_user_id=(
-                None if person_plan.manager_path else access.unit_supervisor_user_id
-            ),
+            unit_supervisor_user_id=(None if person_plan.manager_path else access.unit_supervisor_user_id),
             deputy_user_id=access.deputy_user_id,
             ceo_user_id=access.ceo_user_id,
             period_id=active_period.id if active_period else None,
             scoring_scheme_id=scheme.id if scheme else None,
-            indicator_framework_id=framework.id,
+            indicator_framework_id=record_framework.id,
+            subject_contract_start_date=personnel.contract_start_date,
+            subject_contract_end_date=personnel.contract_end_date,
             # هر دو مسیر از `draft` شروع می‌شوند — همان رفتار create_evaluation.
             # تفاوتِ مسیر «مدیر» فقط در *نمره‌دهندهٔ اول* است (معاونت)، نه در وضعیت.
             status=EvaluationStatus.draft,

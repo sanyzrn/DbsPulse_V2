@@ -79,13 +79,7 @@ def upsert_access(
             ),
         )
 
-    if payload.unit_supervisor_user_id is None and payload.deputy_user_id is None:
-        # اگر هر دو مرحلهٔ میانی خالی باشند، هیچ‌کس نمره نمی‌دهد و پرونده از همان
-        # اول در حالتی می‌ماند که فقط لغو از آن خارجش می‌کند.
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="دست‌کم یکی از «مسئول واحد» یا «معاونت» باید تعیین شود؛ وگرنه نمره‌دهنده‌ای وجود ندارد",
-        )
+    # خالی‌بودن هر دو مرحلهٔ میانی، مسیر مستقیم مدیرعامل است.
     if payload.unit_supervisor_user_id is not None:
         _ensure_active_user_with_role(db, payload.unit_supervisor_user_id, UserRole.unit_supervisor)
     if payload.deputy_user_id is not None:

@@ -54,7 +54,7 @@ export function LoginPage() {
           >
             <div className="rounded-[28px] border border-white/80 bg-white/80 p-10 shadow-float backdrop-blur">
               <img
-                src="/brand/nafas-pharmed-logo.png"
+                src="/brand/nafas-pharmed-logo-clean.png"
                 alt="نفس زیست فارمد"
                 className="mb-10 h-auto w-full max-w-md object-contain"
               />

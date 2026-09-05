@@ -98,7 +98,7 @@ export function Layout() {
           از کفِ پنجره جدا بماند. */}
       <aside
         className={`sticky top-3 hidden h-[calc(100vh-1.5rem)] shrink-0 pt-3 transition-[width] duration-200 lg:top-4 lg:h-[calc(100vh-2rem)] lg:block lg:pt-4 ${
-          collapsed ? "w-16" : "w-60"
+          collapsed ? "w-16" : "w-72"
         }`}
       >
         <Sidebar items={items} collapsed={collapsed} onToggleCollapse={toggleCollapse} />
@@ -119,7 +119,7 @@ export function Layout() {
             />
             <motion.aside
               key="drawer"
-              className="fixed inset-y-3 right-3 z-50 w-64 lg:hidden"
+              className="fixed inset-y-3 right-3 z-50 w-72 lg:hidden"
               initial={{ x: "100%" }}
               animate={{ x: 0 }}
               exit={{ x: "100%" }}

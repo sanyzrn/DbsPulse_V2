@@ -211,9 +211,7 @@ class ImportRow:
         مدیرعامل الزامی است (کسی باید پرونده را ببندد) و دست‌کم یکی از دو مرحلهٔ
         میانی، وگرنه هیچ‌کس نمره نمی‌دهد.
         """
-        return self.ceo_user_id is not None and (
-            self.unit_supervisor_user_id is not None or self.deputy_user_id is not None
-        )
+        return self.ceo_user_id is not None
 
     @property
     def ok(self) -> bool:

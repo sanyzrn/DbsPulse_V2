@@ -5,9 +5,11 @@
 از `Indicator.is_active` — وگرنه همان خرابی‌ای که این تغییر برای رفعش آمده
 برمی‌گردد، فقط از یک مسیر دیگر.
 """
+
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from app.models.contract_self_assessment import ContractSelfAssessment
 from app.models.enums import EvaluationStatus
 from app.models.evaluation import EvaluationRecord, EvaluationScore
 from app.models.indicator import Indicator
@@ -115,8 +117,16 @@ def _is_untouched():
         .where(EvaluationScore.evaluation_record_id == EvaluationRecord.id)
         .exists()
     )
-    self_assessed = EvaluationRecord.self_assessment_submitted_at.isnot(None)
-    return ~scored & ~self_assessed
+    contract_self_assessment = (
+        select(ContractSelfAssessment.id)
+        .where(
+            ContractSelfAssessment.personnel_id == EvaluationRecord.subject_personnel_id,
+            ContractSelfAssessment.contract_start_date == EvaluationRecord.subject_contract_start_date,
+        )
+        .exists()
+    )
+    legacy_self_assessed = EvaluationRecord.self_assessment_submitted_at.isnot(None)
+    return ~scored & ~contract_self_assessment & ~legacy_self_assessed
 
 
 def impact_of_membership_change(db: Session) -> dict:
@@ -129,12 +139,8 @@ def impact_of_membership_change(db: Session) -> dict:
     untouched = _is_untouched()
     open_records = select(EvaluationRecord).where(EvaluationRecord.status.in_(OPEN_STATUSES))
 
-    frozen = db.scalar(
-        select(func.count()).select_from(open_records.where(~untouched).subquery())
-    )
-    movable = db.scalar(
-        select(func.count()).select_from(open_records.where(untouched).subquery())
-    )
+    frozen = db.scalar(select(func.count()).select_from(open_records.where(~untouched).subquery()))
+    movable = db.scalar(select(func.count()).select_from(open_records.where(untouched).subquery()))
     return {"frozen_open_records": frozen or 0, "movable_open_records": movable or 0}
 
 

@@ -70,6 +70,11 @@ def is_manager_path(record: EvaluationRecord) -> bool:
     return record.unit_supervisor_user_id is None
 
 
+def is_direct_ceo_path(record: EvaluationRecord) -> bool:
+    """The CEO scores this record directly; HR performs its final approval."""
+    return record.unit_supervisor_user_id is None and record.deputy_user_id is None
+
+
 # `is_manager_path` عمداً پیش از این جدول تعریف شده: چند گذار مستقیماً به آن
 # ارجاع می‌دهند (نه از راه lambda)، و پایین‌تر بودنش یعنی NameError در import.
 TRANSITIONS: dict[str, Transition] = {
@@ -95,6 +100,15 @@ TRANSITIONS: dict[str, Transition] = {
         error_status=http_status.HTTP_403_FORBIDDEN,
         error_detail="این ارزیابی در مرحله ثبت توسط شما نیست",
     ),
+    "direct_ceo_submit": Transition(
+        from_statuses=frozenset({EvaluationStatus.draft}),
+        to_status=EvaluationStatus.submitted,
+        allowed_role=UserRole.ceo,
+        assignee_field="ceo_user_id",
+        guard=is_direct_ceo_path,
+        error_status=http_status.HTTP_403_FORBIDDEN,
+        error_detail="این ارزیابی در مرحلهٔ ثبت توسط شما نیست",
+    ),
     "hr_approve": Transition(
         from_statuses=frozenset({EvaluationStatus.submitted}),
         to_status=EvaluationStatus.hr_approved,
@@ -104,6 +118,17 @@ TRANSITIONS: dict[str, Transition] = {
         guard=lambda record: not is_manager_path(record),
         error_status=http_status.HTTP_400_BAD_REQUEST,
         error_detail="این ارزیابی در انتظار بررسی منابع انسانی نیست",
+        owner_error_detail="این پرونده در اختیار کاربر دیگری از منابع انسانی است",
+    ),
+    "hr_finalize_direct_ceo": Transition(
+        from_statuses=frozenset({EvaluationStatus.submitted}),
+        to_status=EvaluationStatus.finalized,
+        allowed_role=UserRole.hr,
+        assignee_field="hr_user_id",
+        claimable_if_unassigned=True,
+        guard=is_direct_ceo_path,
+        error_status=http_status.HTTP_400_BAD_REQUEST,
+        error_detail="این ارزیابی در انتظار بررسی نهایی منابع انسانی نیست",
         owner_error_detail="این پرونده در اختیار کاربر دیگری از منابع انسانی است",
     ),
     # در مسیر «مدیر» معاونت نمره را از قبل داده و ثبت کرده، پس تأیید منابع انسانی

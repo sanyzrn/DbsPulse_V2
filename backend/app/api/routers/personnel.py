@@ -5,7 +5,12 @@ from fastapi.responses import Response as FastAPIResponse
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_current_user, require_module, require_role_or_capability
+from app.api.deps import (
+    get_current_user,
+    require_module,
+    require_role_or_capability,
+    require_roles,
+)
 from app.core.security import hash_password
 from app.db.session import get_db
 from app.models.enums import Capability, CommentStage, PersonnelStatus, UserRole
@@ -14,6 +19,7 @@ from app.models.evaluation_access import EvaluationAccess
 from app.models.personnel import Personnel
 from app.models.user import User
 from app.schemas.auth import CurrentUser
+from app.schemas.evaluation import CurrentSelfAssessmentRead, SelfAssessmentScoreRead
 from app.schemas.personnel import (
     ImportRowIssue,
     PersonnelCreate,
@@ -25,10 +31,16 @@ from app.schemas.personnel import (
     PersonnelUpdate,
 )
 from app.services.audit import log_event
+from app.services.authorization import capabilities_of
 from app.services.excel import build_personnel_workbook
 from app.services.org_unit import known_sites, units_in_site
 from app.services.personnel_import import ImportPreview, build_template, commit_import, parse_workbook
-from app.services.self_assessment import OPEN_STATUSES as SELF_ASSESSMENT_OPEN_STATUSES
+from app.services.self_assessment import (
+    assessment_for_contract,
+    contract_is_open,
+    indicator_ids_for_assessment,
+    may_self_assess,
+)
 from app.services.self_assessment import invite as invite_to_self_assessment_service
 from app.services.self_assessment import state_of as self_assessment_state
 from app.services.sessions import revoke_all_for_user
@@ -73,9 +85,7 @@ def _apply_personnel_filters(
         )
     if site:
         query = query.where(
-            Personnel.org_unit.in_(
-                units_in_site(list(db.scalars(select(Personnel.org_unit).distinct())), site)
-            )
+            Personnel.org_unit.in_(units_in_site(list(db.scalars(select(Personnel.org_unit).distinct())), site))
         )
     if status_filter is not None:
         query = query.where(Personnel.status == status_filter)
@@ -90,6 +100,7 @@ def _personnel_order_by(sort_by: str, sort_dir: str):
     column = _PERSONNEL_SORT_COLUMNS.get(sort_by, Personnel.full_name)
     return column.desc() if sort_dir == "desc" else column.asc()
 
+
 _ACCESS_COLUMN_BY_ROLE = {
     UserRole.unit_supervisor: EvaluationAccess.unit_supervisor_user_id,
     UserRole.deputy: EvaluationAccess.deputy_user_id,
@@ -100,9 +111,7 @@ _ACCESS_COLUMN_BY_ROLE = {
 def _can_view_personnel(db: Session, personnel_id: int, current_user: CurrentUser) -> bool:
     if current_user.role == UserRole.hr:
         return True
-    access = db.scalar(
-        select(EvaluationAccess).where(EvaluationAccess.personnel_id == personnel_id)
-    )
+    access = db.scalar(select(EvaluationAccess).where(EvaluationAccess.personnel_id == personnel_id))
     if access is not None and current_user.id in {
         access.unit_supervisor_user_id,
         access.deputy_user_id,
@@ -144,7 +153,7 @@ def _with_accounts(db: Session, rows: list[Personnel]) -> list[PersonnelRead]:
             select(EvaluationRecord)
             .where(
                 EvaluationRecord.subject_personnel_id.in_(ids),
-                EvaluationRecord.status.in_(SELF_ASSESSMENT_OPEN_STATUSES),
+                IS_OPEN_RECORD,
             )
             .order_by(EvaluationRecord.created_at)
         )
@@ -156,9 +165,7 @@ def _with_accounts(db: Session, rows: list[Personnel]) -> list[PersonnelRead]:
         item.account_username = account[0] if account else None
         record = open_records.get(row.id)
         item.open_evaluation_id = record.id if record else None
-        item.self_assessment_state = self_assessment_state(
-            db, record, account[1] if account else None
-        )
+        item.self_assessment_state = self_assessment_state(db, row, account[1] if account else None)
         items.append(item)
     return items
 
@@ -181,7 +188,10 @@ def list_personnel(
     query = select(Personnel)
     # نقش‌های غیر از HR فقط پرسنلی را می‌بینند که برایشان دسترسی ارزیابی تعریف شده؛
     # HR به کل فهرست پرسنل دسترسی دارد (طبق بخش ۴ سند مشخصات).
-    if current_user.role != UserRole.hr or accessible_to_me:
+    can_manage_personnel = current_user.role == UserRole.hr or Capability.manage_personnel in capabilities_of(
+        db, current_user.id
+    )
+    if not can_manage_personnel or accessible_to_me:
         column = _ACCESS_COLUMN_BY_ROLE.get(current_user.role)
         if column is None:
             return PersonnelPage(total=0, items=[])
@@ -199,11 +209,7 @@ def list_personnel(
     )
 
     total = db.scalar(select(func.count()).select_from(query.subquery())) or 0
-    items = list(
-        db.scalars(
-            query.order_by(_personnel_order_by(sort_by, sort_dir)).limit(limit).offset(offset)
-        )
-    )
+    items = list(db.scalars(query.order_by(_personnel_order_by(sort_by, sort_dir)).limit(limit).offset(offset)))
     return PersonnelPage(total=total, items=_with_accounts(db, items))
 
 
@@ -215,9 +221,7 @@ def list_org_units(
     current_user: CurrentUser = Depends(require_role_or_capability(UserRole.hr, Capability.manage_personnel)),
 ) -> list[str]:
     """واحدهای سازمانی متمایز — منبع گزینه‌های فیلتر «واحد» در فهرست‌های HR."""
-    return list(
-        db.scalars(select(Personnel.org_unit).distinct().order_by(Personnel.org_unit))
-    )
+    return list(db.scalars(select(Personnel.org_unit).distinct().order_by(Personnel.org_unit)))
 
 
 @router.post("/{personnel_id}/invite-self-assessment", response_model=PersonnelRead)
@@ -225,9 +229,7 @@ def invite_to_self_assessment(
     personnel_id: int,
     db: Session = Depends(get_db),
     _module: None = Depends(require_module("self_assessment")),
-    current_user: CurrentUser = Depends(
-        require_role_or_capability(UserRole.hr, Capability.manage_personnel)
-    ),
+    current_user: CurrentUser = Depends(require_role_or_capability(UserRole.hr, Capability.manage_personnel)),
 ) -> PersonnelRead:
     """از کارمند بخواه خودارزیابی‌اش را انجام دهد.
 
@@ -309,9 +311,7 @@ def create_personnel(
     """
     existing = db.scalar(select(Personnel).where(Personnel.personnel_code == payload.personnel_code))
     if existing is not None:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, detail="کد پرسنلی تکراری است"
-        )
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="کد پرسنلی تکراری است")
 
     account = payload.account
     # نام کاربری تکراری *پیش از* ساخت پرسنل بررسی می‌شود: هر دو در یک تراکنش‌اند، پس
@@ -319,13 +319,9 @@ def create_personnel(
     if account is not None:
         duplicate = db.scalar(select(User).where(User.username == account.username))
         if duplicate is not None:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST, detail="نام کاربری تکراری است"
-            )
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="نام کاربری تکراری است")
 
-    personnel = Personnel(
-        **payload.model_dump(exclude={"account"}), created_by_user_id=current_user.id
-    )
+    personnel = Personnel(**payload.model_dump(exclude={"account"}), created_by_user_id=current_user.id)
     db.add(personnel)
     db.flush()
     log_event(
@@ -369,9 +365,7 @@ def create_personnel(
 
     db.commit()
     db.refresh(personnel)
-    return PersonnelCreated.model_validate(personnel).model_copy(
-        update={"account_username": account_username}
-    )
+    return PersonnelCreated.model_validate(personnel).model_copy(update={"account_username": account_username})
 
 
 # ───────────────────────────── ورود دسته‌ای از Excel
@@ -455,9 +449,7 @@ async def commit_personnel_import(
     """
     preview = parse_workbook(await _read_upload(file), db)
     if preview.file_errors:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, detail=preview.file_errors[0]
-        )
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=preview.file_errors[0])
 
     result = commit_import(db, preview, current_user.id)
 
@@ -467,6 +459,45 @@ async def commit_personnel_import(
         created_accounts=len(result.accounts),
         skipped_rows=result.skipped_rows,
         accounts=result.accounts,
+    )
+
+
+@router.get(
+    "/{personnel_id}/self-assessment",
+    response_model=CurrentSelfAssessmentRead,
+)
+def get_personnel_self_assessment(
+    personnel_id: int,
+    db: Session = Depends(get_db),
+    _module: None = Depends(require_module("self_assessment")),
+    current_user: CurrentUser = Depends(require_roles(UserRole.hr)),
+) -> CurrentSelfAssessmentRead:
+    """HR view of exactly the selected personnel's current-contract form."""
+    personnel = db.get(Personnel, personnel_id)
+    if personnel is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="پرسنل یافت نشد")
+    account_role = db.scalar(
+        select(User.role).where(
+            User.personnel_id == personnel.id,
+            User.is_active.is_(True),
+        )
+    )
+    assessment = assessment_for_contract(db, personnel.id, personnel.contract_start_date)
+    eligible = account_role is not None and may_self_assess(account_role)
+    is_open = eligible and contract_is_open(personnel) and (assessment is None or assessment.submitted_at is None)
+    return CurrentSelfAssessmentRead(
+        assessment_id=assessment.id if assessment else None,
+        personnel_id=personnel.id,
+        personnel_name=personnel.full_name,
+        contract_start_date=personnel.contract_start_date,
+        contract_end_date=personnel.contract_end_date,
+        state=self_assessment_state(db, personnel, account_role),
+        eligible=eligible,
+        open=is_open,
+        indicator_ids=(sorted(indicator_ids_for_assessment(db, assessment)) if assessment else []),
+        submitted_at=assessment.submitted_at if assessment else None,
+        note=assessment.note if assessment else None,
+        scores=[SelfAssessmentScoreRead.model_validate(row) for row in (assessment.scores if assessment else [])],
     )
 
 
@@ -480,9 +511,7 @@ def get_personnel(
     if personnel is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="پرسنل یافت نشد")
     if not _can_view_personnel(db, personnel_id, current_user):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN, detail="شما به این پرسنل دسترسی ندارید"
-        )
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="شما به این پرسنل دسترسی ندارید")
     return personnel
 
 
@@ -557,13 +586,9 @@ def update_personnel(
 
     updates = payload.model_dump(exclude_unset=True)
     if "personnel_code" in updates and updates["personnel_code"] != personnel.personnel_code:
-        existing = db.scalar(
-            select(Personnel).where(Personnel.personnel_code == updates["personnel_code"])
-        )
+        existing = db.scalar(select(Personnel).where(Personnel.personnel_code == updates["personnel_code"]))
         if existing is not None:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST, detail="کد پرسنلی تکراری است"
-            )
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="کد پرسنلی تکراری است")
 
     # تغییر is_manager یک متغیر ساختاری گردش‌کار است (وجود/عدم‌وجود مرحلهٔ مسئول
     # واحد). اگر ارزیابی بازی (نهایی‌نشده) روی همین فرد در جریان باشد، آن رکورد
@@ -633,9 +658,7 @@ def update_personnel(
     # اگر فرد به «مدیر» تبدیل شود، دسترسی مسئول واحد قبلی (در صورت وجود) دیگر معتبر
     # نیست؛ طبق همان قانونی که در ثبت/ویرایش دسترسی اعمال می‌شود، باید خودکار پاک شود.
     if personnel.is_manager:
-        access = db.scalar(
-            select(EvaluationAccess).where(EvaluationAccess.personnel_id == personnel.id)
-        )
+        access = db.scalar(select(EvaluationAccess).where(EvaluationAccess.personnel_id == personnel.id))
         if access is not None and access.unit_supervisor_user_id is not None:
             old_supervisor_id = access.unit_supervisor_user_id
             access.unit_supervisor_user_id = None

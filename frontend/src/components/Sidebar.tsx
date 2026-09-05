@@ -34,14 +34,14 @@ export function Sidebar({
     <div className="flex h-full flex-col overflow-hidden rounded-3xl border border-gray-200 bg-white shadow-sm">
       <div
         className={`flex h-14 shrink-0 items-center border-b border-gray-200 ${
-          collapsed ? "justify-center px-2" : "gap-2.5 px-4"
+          collapsed ? "justify-center px-2" : "gap-2 px-3"
         }`}
       >
         <Tooltip label={APP_NAME_FA} enabled={collapsed}>
-          <NavLink to="/" aria-label={APP_NAME} onClick={onNavigate} className="flex items-center gap-2.5">
+          <NavLink to="/" aria-label={APP_NAME} onClick={onNavigate} className="flex min-w-0 items-center gap-2">
             <BrandMark className="h-7 w-7 shrink-0" />
             {!collapsed && (
-              <span className="truncate text-sm font-extrabold tracking-tight text-gray-900">
+              <span className="min-w-0 whitespace-nowrap text-[11px] font-extrabold tracking-tight text-gray-900">
                 {APP_NAME_FA}
               </span>
             )}

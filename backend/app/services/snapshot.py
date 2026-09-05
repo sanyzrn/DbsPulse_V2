@@ -4,22 +4,28 @@ snapshot در لحظه تأیید نهایی ثبت می‌شود تا تغیی�
 سند حقوقی را عوض نکند. فیلد snapshot_version برای تحول‌پذیری شِما است: هر تغییر
 شکل در آینده باید نسخه را بالا ببرد و رندر PDF بر اساس نسخه شاخه شود.
 """
+
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.models.contract_self_assessment import (
+    ContractSelfAssessment,
+    ContractSelfAssessmentScore,
+)
 from app.models.evaluation import EvaluationComment, EvaluationRecord, EvaluationScore
 from app.models.indicator import Indicator
 from app.models.personnel import Personnel
-from app.models.self_assessment import SelfAssessmentScore
 from app.models.user import User
-from app.services.workflow import is_manager_path
+from app.services.self_assessment import assessment_for_evaluation
+from app.services.workflow import is_direct_ceo_path, is_manager_path
 
+# ۵: خودارزیابی مستقل از پرونده و متصل به قرارداد استخدامی است.
 # ۴: افزودن `self_assessment` — برگهٔ مقایسهٔ «خود فرد / مسئول مستقیم» داخل سند.
 # ۳: افزودن `single_decider` — نمره‌دهندهٔ اول و تأییدکنندهٔ نهایی یک نفر بوده‌اند.
 # ۲: افزودن امتیاز ویژه (`bonus_points` / `bonus_reason` / `base_weighted_pct`).
 # افزودنی است، پس قالب PDF هر دو نسخه را رندر می‌کند: در snapshot نسخهٔ ۱ این
 # کلیدها نیستند و بخشِ مربوطه اصلاً چاپ نمی‌شود.
-SNAPSHOT_VERSION = 4
+SNAPSHOT_VERSION = 5
 
 
 def build_final_snapshot(db: Session, record: EvaluationRecord) -> dict:
@@ -28,21 +34,21 @@ def build_final_snapshot(db: Session, record: EvaluationRecord) -> dict:
     # ناسازگاری داده می‌شود و پیام روشن می‌دهد.
     if personnel is None:
         raise ValueError("پرسنل مرتبط با این ارزیابی یافت نشد؛ امکان ساخت سند نهایی نیست")
-    scores = db.scalars(
-        select(EvaluationScore).where(EvaluationScore.evaluation_record_id == record.id)
-    ).all()
-    self_scores = db.scalars(
-        select(SelfAssessmentScore).where(
-            SelfAssessmentScore.evaluation_record_id == record.id
-        )
-    ).all()
-    comments = db.scalars(
-        select(EvaluationComment).where(EvaluationComment.evaluation_record_id == record.id)
-    ).all()
+    scores = db.scalars(select(EvaluationScore).where(EvaluationScore.evaluation_record_id == record.id)).all()
+    self_assessment = assessment_for_evaluation(db, record)
+    self_scores = self_assessment.scores if self_assessment is not None else []
+    comments = db.scalars(select(EvaluationComment).where(EvaluationComment.evaluation_record_id == record.id)).all()
     indicators_by_id = {i.id: i for i in db.scalars(select(Indicator))}
 
     manager_path = is_manager_path(record)
-    evaluator_user_id = record.deputy_user_id if manager_path else record.unit_supervisor_user_id
+    direct_ceo_path = is_direct_ceo_path(record)
+    evaluator_user_id = (
+        record.ceo_user_id
+        if direct_ceo_path
+        else record.deputy_user_id
+        if manager_path
+        else record.unit_supervisor_user_id
+    )
     evaluator = db.get(User, evaluator_user_id)
 
     return {
@@ -55,7 +61,7 @@ def build_final_snapshot(db: Session, record: EvaluationRecord) -> dict:
         },
         "evaluator": {
             "username": evaluator.username if evaluator else None,
-            "role_label": "معاونت" if manager_path else "مسئول واحد",
+            "role_label": "مدیرعامل" if direct_ceo_path else "معاونت" if manager_path else "مسئول واحد",
         },
         # اگر نمره‌دهندهٔ اول و تأییدکنندهٔ نهایی یک نفر بوده‌اند، سند باید همین
         # را بگوید. دو تأیید در لاگ، بدون این جمله، دو بررسی مستقل به‌نظر می‌رسد.
@@ -66,23 +72,17 @@ def build_final_snapshot(db: Session, record: EvaluationRecord) -> dict:
         #
         # عمداً در snapshot می‌نشیند و نه به‌صورت query در لحظهٔ چاپ: سند نهایی
         # باید همان چیزی را نشان بدهد که در لحظهٔ نهایی‌شدن بوده.
-        "self_assessment": _self_assessment_block(record, self_scores, scores, indicators_by_id),
+        "self_assessment": _self_assessment_block(self_assessment, self_scores, scores, indicators_by_id),
         "evaluation_started_at": record.created_at.isoformat(),
         "evaluation_code": record.evaluation_code,
-        "general_score_pct": float(record.general_score_pct)
-        if record.general_score_pct is not None
-        else None,
+        "general_score_pct": float(record.general_score_pct) if record.general_score_pct is not None else None,
         "specialized_score_pct": float(record.specialized_score_pct)
         if record.specialized_score_pct is not None
         else None,
-        "final_weighted_pct": float(record.final_weighted_pct)
-        if record.final_weighted_pct is not None
-        else None,
+        "final_weighted_pct": float(record.final_weighted_pct) if record.final_weighted_pct is not None else None,
         # امتیازِ فرم پیش از امتیاز ویژه. سند نهایی باید بتواند بگوید عدد نهایی
         # از کجا آمده — «۸۴ از فرم + ۳ بابتِ فلان کار»، نه یک ۸۷ بی‌منشأ.
-        "base_weighted_pct": float(record.base_weighted_pct)
-        if record.base_weighted_pct is not None
-        else None,
+        "base_weighted_pct": float(record.base_weighted_pct) if record.base_weighted_pct is not None else None,
         "bonus_points": float(record.bonus_points) if record.bonus_points else None,
         "bonus_reason": record.bonus_reason,
         "recommendation": record.recommendation,
@@ -113,8 +113,8 @@ def build_final_snapshot(db: Session, record: EvaluationRecord) -> dict:
 
 
 def _self_assessment_block(
-    record: EvaluationRecord,
-    self_scores: list[SelfAssessmentScore],
+    assessment: ContractSelfAssessment | None,
+    self_scores: list[ContractSelfAssessmentScore],
     evaluator_scores: list[EvaluationScore],
     indicators_by_id: dict[int, Indicator],
 ) -> dict | None:
@@ -128,7 +128,7 @@ def _self_assessment_block(
     ارزیاب هنوز نداده، باید در برگه بماند — حذفش یعنی سند، حرفِ خودِ فرد را
     بی‌صدا انداخته است.
     """
-    if record.self_assessment_submitted_at is None:
+    if assessment is None or assessment.submitted_at is None:
         return None
 
     evaluator_by_indicator = {row.indicator_id: row.score for row in evaluator_scores}
@@ -149,7 +149,7 @@ def _self_assessment_block(
         )
     rows.sort(key=lambda row: abs(row["gap"] or 0), reverse=True)
     return {
-        "submitted_at": record.self_assessment_submitted_at.isoformat(),
-        "note": record.self_assessment_note,
+        "submitted_at": assessment.submitted_at.isoformat(),
+        "note": assessment.note,
         "rows": rows,
     }

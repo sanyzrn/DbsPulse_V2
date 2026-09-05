@@ -87,7 +87,11 @@ def run_contract_expiry_sweep(db: Session) -> int:
 def _current_owner_ids(db: Session, record: EvaluationRecord) -> list[int]:
     is_manager_path = record.unit_supervisor_user_id is None
     if record.status == EvaluationStatus.draft:
-        owner = record.deputy_user_id if is_manager_path else record.unit_supervisor_user_id
+        owner = (
+            record.ceo_user_id
+            if record.deputy_user_id is None and is_manager_path
+            else record.deputy_user_id if is_manager_path else record.unit_supervisor_user_id
+        )
         return [owner] if owner is not None else []
     if record.status == EvaluationStatus.submitted:
         return _active_hr_ids(db)

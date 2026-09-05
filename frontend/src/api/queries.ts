@@ -351,6 +351,16 @@ export function useMySelfAssessments(enabled = true) {
   });
 }
 
+/** فرم و وضعیت خودارزیابی قرارداد جاری؛ برای نمایش به پروندهٔ ارزیابی نیاز ندارد. */
+export function useMyCurrentSelfAssessment(enabled = true) {
+  return useQuery({
+    queryKey: ["me", "self-assessment", "current"],
+    queryFn: async () =>
+      (await apiClient.get<import("../types").CurrentSelfAssessment>("/me/self-assessment/current")).data,
+    enabled,
+  });
+}
+
 /** برنامه‌های بهبودِ بازِ خود کارمند (فقط خواندنی). */
 export function useMyImprovementPlans() {
   return useQuery({

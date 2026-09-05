@@ -1,6 +1,10 @@
 from app.models.audit_log import AuditLog
 from app.models.auth_session import AuthSession
 from app.models.capability import UserCapability
+from app.models.contract_self_assessment import (
+    ContractSelfAssessment,
+    ContractSelfAssessmentScore,
+)
 from app.models.evaluation import EvaluationComment, EvaluationRecord, EvaluationScore
 from app.models.evaluation_access import EvaluationAccess
 from app.models.evaluation_document import EvaluationDocument
@@ -24,6 +28,8 @@ __all__ = [
     "AuditLog",
     "UserCapability",
     "AuthSession",
+    "ContractSelfAssessment",
+    "ContractSelfAssessmentScore",
     "EvaluationComment",
     "EvaluationRecord",
     "EvaluationScore",

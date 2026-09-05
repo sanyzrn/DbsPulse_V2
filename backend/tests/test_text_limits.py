@@ -9,6 +9,7 @@
    ردش می‌کند (۵۰۰ به‌جای ۴۲۲)، یا سقفِ دیتابیس عملاً بی‌اثر می‌شود.
 ۳. **پیام** فارسی است. سقف گذاشتن بدون گفتنِ «چقدر»، ویژگی نیست؛ بن‌بست است.
 """
+
 import pytest
 from sqlalchemy import inspect
 
@@ -39,6 +40,12 @@ COLUMN_LIMITS = [
     ("indicators", "category", text_limits.INDICATOR_CATEGORY_MAX),
     ("indicators", "description", text_limits.INDICATOR_DESCRIPTION_MAX),
     ("self_assessment_scores", "note", text_limits.SELF_ASSESSMENT_NOTE_MAX),
+    ("contract_self_assessments", "note", text_limits.SELF_ASSESSMENT_SUMMARY_MAX),
+    (
+        "contract_self_assessment_scores",
+        "note",
+        text_limits.SELF_ASSESSMENT_NOTE_MAX,
+    ),
 ]
 
 
@@ -48,9 +55,7 @@ def test_the_column_carries_the_same_limit_as_the_schema(db_session, table, colu
     columns = {c["name"]: c for c in inspect(db_session.bind).get_columns(table)}
     assert column in columns, f"{table}.{column} وجود ندارد"
     actual = getattr(columns[column]["type"], "length", None)
-    assert actual == expected, (
-        f"{table}.{column} سقفش {actual} است ولی text_limits می‌گوید {expected}"
-    )
+    assert actual == expected, f"{table}.{column} سقفش {actual} است ولی text_limits می‌گوید {expected}"
 
 
 @pytest.fixture()

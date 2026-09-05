@@ -61,7 +61,7 @@ export interface Personnel {
   separation_reason: SeparationReason | null;
   /** نام کاربریِ حساب این فرد، اگر دارد. null یعنی هنوز نمی‌تواند وارد شود. */
   account_username: string | null;
-  /** وضعیت خودارزیابیِ پروندهٔ باز — تعیین می‌کند دکمهٔ دعوت چه بگوید. */
+  /** وضعیت خودارزیابیِ قرارداد جاری — مستقل از بازبودن پروندهٔ ارزیابی. */
   self_assessment_state: SelfAssessmentState;
   open_evaluation_id: number | null;
   created_at: string;
@@ -262,11 +262,23 @@ export interface SelfAssessment {
   scores: SelfAssessmentScoreRow[];
 }
 
+export interface CurrentSelfAssessment extends SelfAssessment {
+  assessment_id: number | null;
+  personnel_id: number;
+  personnel_name: string;
+  contract_start_date: string;
+  contract_end_date: string;
+  state: SelfAssessmentState;
+  eligible: boolean;
+  open: boolean;
+  indicator_ids: number[];
+}
+
 export interface MySelfAssessment extends SelfAssessment {
-  evaluation_id: number;
-  evaluation_code: string;
-  period_name: string | null;
-  period_ends_on: string | null;
+  assessment_id: number;
+  personnel_id: number;
+  contract_start_date: string;
+  contract_end_date: string;
 }
 
 export interface EvaluationScoreRow {

@@ -386,6 +386,17 @@ REM  8. Start the servers
 REM ------------------------------------------------------------
 echo [8/8] Starting servers...
 
+REM Re-running the launcher while this project's backend is already healthy is
+REM not an error. This commonly happens after the launcher window is closed or
+REM after a previous health check/test left the server running. Reuse it instead
+REM of telling the user to kill a working service.
+set "BACKEND_ALREADY_RUNNING=0"
+"%PY%" -c "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8000/api/health', timeout=2).status==200 else 1)" >nul 2>nul
+if not errorlevel 1 (
+    set "BACKEND_ALREADY_RUNNING=1"
+    echo    OK  backend is already healthy on port 8000 - reusing it
+)
+
 REM Anything wrong with port 8000 makes uvicorn exit instantly in its own
 REM window, which is easy to miss. Name it now rather than let the health
 REM check time out for 40 seconds first and then say nothing useful.
@@ -397,10 +408,13 @@ REM reserve whole ranges of ports, and inside such a range nobody is
 REM listening (so connect says "free") while bind fails with WSAEACCES
 REM 10013. check_port binds for real - on 0.0.0.0, the same address
 REM uvicorn is started with below - and tells the two cases apart.
-pushd "%BACKEND%"
-"%PY%" -m scripts.check_port --port 8000
-set "PORTRC=!errorlevel!"
-popd
+set "PORTRC=0"
+if "!BACKEND_ALREADY_RUNNING!"=="0" (
+    pushd "%BACKEND%"
+    "%PY%" -m scripts.check_port --port 8000
+    set "PORTRC=!errorlevel!"
+    popd
+)
 
 if "!PORTRC!"=="2" (
     echo.
@@ -438,8 +452,35 @@ if not "!PORTRC!"=="0" (
     call :fail "Port 8000 could not be tested - see the error above." "Fix the reported problem, then run this script again."
 )
 
-start "DbsPulse Backend (port 8000)" /D "%BACKEND%" cmd /k ""%VENV%\Scripts\uvicorn.exe" app.main:app --reload --host 0.0.0.0 --port 8000"
-start "DbsPulse Frontend (port 5173)" /D "%FRONTEND%" cmd /k "npm run dev -- --host"
+REM Do not invoke Scripts\uvicorn.exe directly. Windows console-script launchers
+REM embed the absolute Python path that existed when the venv was created, so a
+REM copied or renamed project leaves uvicorn.exe pointing at the old directory
+REM and it exits immediately (often without printing an error). Running the
+REM package through this venv's Python is relocatable and uses the same install.
+if "!BACKEND_ALREADY_RUNNING!"=="0" start "DbsPulse Backend (port 8000)" /D "%BACKEND%" cmd /k ".venv\Scripts\python.exe -m uvicorn app.main:app --reload --host 0.0.0.0 --port 8000"
+
+REM Apply the same restart-safe behaviour to Vite. Looking for its entry module
+REM distinguishes this project's frontend from an unrelated service on 5173.
+set "FRONTEND_ALREADY_RUNNING=0"
+"%PY%" -c "import urllib.request,sys; d=urllib.request.urlopen('http://127.0.0.1:5173/', timeout=2).read(); sys.exit(0 if b'/src/main.tsx' in d else 1)" >nul 2>nul
+if not errorlevel 1 (
+    set "FRONTEND_ALREADY_RUNNING=1"
+    echo    OK  frontend is already running on port 5173 - reusing it
+)
+
+set "FRONTEND_PORTRC=0"
+if "!FRONTEND_ALREADY_RUNNING!"=="0" (
+    pushd "%BACKEND%"
+    "%PY%" -m scripts.check_port --port 5173
+    set "FRONTEND_PORTRC=!errorlevel!"
+    popd
+)
+
+if "!FRONTEND_PORTRC!"=="2" call :fail "Port 5173 is occupied by another application." "Stop that application, then run this script again."
+if "!FRONTEND_PORTRC!"=="3" call :fail "Port 5173 is reserved by Windows." "Release the reserved port or configure Vite to use another one."
+if not "!FRONTEND_PORTRC!"=="0" call :fail "Port 5173 could not be tested." "Fix the reported bind problem, then run this script again."
+
+if "!FRONTEND_ALREADY_RUNNING!"=="0" start "DbsPulse Frontend (port 5173)" /D "%FRONTEND%" cmd /k "npm run dev -- --host"
 
 echo    Waiting for the backend to answer on /api/health...
 set "BACKEND_READY=0"
@@ -498,7 +539,7 @@ echo    OK  backend is healthy
 echo.
 
 set "LAN_IP="
-for /f "usebackq delims=" %%I in (`powershell -NoProfile -Command "$ip = (Get-NetIPAddress -AddressFamily IPv4 ^| Where-Object { $_.IPAddress -notlike '127.*' -and $_.IPAddress -notlike '169.254.*' } ^| Select-Object -First 1 -ExpandProperty IPAddress); if ($ip) { $ip }"`) do set "LAN_IP=%%I"
+for /f "usebackq delims=" %%I in (`powershell -NoProfile -Command "foreach ($item in Get-NetIPAddress -AddressFamily IPv4) { if ($item.IPAddress -notlike '127.*' -and $item.IPAddress -notlike '169.254.*') { $item.IPAddress; break } }"`) do set "LAN_IP=%%I"
 
 start "" "http://localhost:5173"
 

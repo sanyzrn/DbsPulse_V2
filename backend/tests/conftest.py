@@ -13,6 +13,7 @@ os.environ.setdefault("ENABLE_SCHEDULER", "false")
 os.environ.setdefault("BOOTSTRAP_ADMIN", "false")
 
 import subprocess
+import sys
 from datetime import date, timedelta
 from pathlib import Path
 
@@ -26,7 +27,11 @@ BACKEND_DIR = Path(__file__).resolve().parent.parent
 
 @pytest.fixture(scope="session", autouse=True)
 def _migrate_test_db():
-    subprocess.run(["alembic", "upgrade", "head"], cwd=BACKEND_DIR, check=True)
+    subprocess.run(
+        [sys.executable, "-m", "alembic", "upgrade", "head"],
+        cwd=BACKEND_DIR,
+        check=True,
+    )
 
 
 @pytest.fixture()

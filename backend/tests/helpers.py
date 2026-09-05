@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import date, timedelta
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -72,8 +72,8 @@ def make_personnel(db: Session, job_title: str = "کارشناس", **overrides) 
         full_name="کارمند تست",
         job_title=job_title,
         org_unit="واحد تست",
-        contract_start_date=date(2025, 1, 1),
-        contract_end_date=date(2026, 1, 1),
+        contract_start_date=date.today() - timedelta(days=180),
+        contract_end_date=date.today() + timedelta(days=180),
     )
     defaults.update(overrides)
     personnel = Personnel(**defaults)
